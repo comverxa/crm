@@ -44,6 +44,11 @@ for(const relative of ["privacidade.html","termos.html","acesso.html"]){
   const dimensions=await page.evaluate(()=>({width:document.documentElement.scrollWidth,viewport:innerWidth}));
   assert.ok(dimensions.width<=dimensions.viewport+3,relative+" overflow "+JSON.stringify(dimensions));
   assert.ok(await page.locator("h1").isVisible());
+  if(relative==="acesso.html"){
+   const signIn=page.locator("#login-btn");
+   assert.ok(await signIn.isVisible());
+   assert.equal(await signIn.getAttribute("href"),"https://app.comverxa.com.br/");
+  }
   console.log("PASS | "+relative+" legal page mobile");
  }catch(e){problems.push(relative+": "+e.message)}
  finally{await page.close()}
