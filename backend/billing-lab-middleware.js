@@ -64,8 +64,18 @@ Bun.serve=function(labConfig){
    return new Response(safeUi,{headers:{"Set-Cookie":labTokenCookie+"="+csrf+"; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600","Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin"}});
   }
   if(method!=="GET"){
-    const origin=req.headers.get("origin"),same=new URL(req.url).origin,fetchSite=req.headers.get("sec-fetch-site");
-    if((origin&&origin!==same&&origin!=="null")||fetchSite==="cross-site")return labError("Origem recusada.",403);
+    // Railway can forward the public HTTPS request to an internal HTTP origin.
+    // Never infer the allowed public origin from req.url. A cross-site origin
+    // is rejected; opaque-origin browsers must prove possession of the
+    // admin session AND a fresh per-page CSRF token below.
+    const origin=req.headers.get("origin"),fetchSite=req.headers.get("sec-fetch-site");
+    const publicOrigin="https://app.comverxa.com.br";
+    const externalOrigin=!!origin&&origin!=="null"&&origin!==publicOrigin;
+    const crossSiteWithoutOpaqueContext=fetchSite==="cross-site"&&origin!=="null"&&origin!==publicOrigin;
+    if(externalOrigin||crossSiteWithoutOpaqueContext){
+      console.warn("COMVERXA Billing Lab: origem bloqueada",{originClass:origin===publicOrigin?"public":origin==="null"?"opaque":!origin?"absent":"external",fetchSite:fetchSite||"absent",forwardedHttps:(req.headers.get("x-forwarded-proto")||"").toLowerCase()==="https"});
+      return labError("Origem recusada.",403);
+    }
     if(req.headers.get("x-comverxa-billing-lab")!=="sandbox")return labError("Confirmação do laboratório ausente.",403);
     const supplied=req.headers.get("x-comverxa-billing-csrf")||"";
     if(!labMatches(supplied,labCsrfCookieValue(req)))return labError("Sessão de teste expirada. Atualize a página antes de tentar novamente.",403);
