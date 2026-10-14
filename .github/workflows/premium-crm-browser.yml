@@ -1,0 +1,20 @@
+name: COMVERXA - Testes Premium do CRM
+on:
+  push:
+    paths:
+      - backend/premium-crm-ui.js
+      - tests/premium-crm-browser.mjs
+      - .github/workflows/premium-crm-browser.yml
+  workflow_dispatch:
+jobs:
+  responsive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar Playwright Chrome
+        run: npm install --no-save playwright-core@1.56.1
+      - name: Verificar sintaxe e interface sem acessar clientes
+        run: |
+          node --check backend/premium-crm-ui.js
+          node tests/premium-crm-browser.mjs
