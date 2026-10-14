@@ -10,8 +10,11 @@ O CRM está online e o ADM Master funciona; o laboratório financeiro é fictíc
 - [x] Testes automatizados de laboratório com autenticação simulada e CSRF, sem transações financeiras reais.
 - [x] Criação e pagamento de cobrança fictícia confirmados em navegador móvel.
 - [x] Site comercial e páginas públicas `privacidade.html` e `termos.html` acessíveis.
+- [x] Portal do Cliente em `/crm/acesso.html` publicado e testado, autenticação delegada ao aplicativo sem coleta de senhas no site estático.
+- [x] Estilo premium responsivo do CRM publicado: navegador Chrome validou grade sem overflow em iPhone 390px e desktop 1440px, com botão de leads sensível à contagem (dados sintéticos apenas).
+- [x] Aceite operacional de produção (`.github/workflows/crm-launch-acceptance.yml`) aprovado, sem credenciais ou dados pessoais.
 - [x] Pipeline CI para smoke test público sem autenticação (`.github/workflows/commercial-readiness.yml`).
-- [ ] Versão do laboratório de renovação/inadimplência **em revisão para publicação**; preparada e com testes CI, ainda não em produção.
+- [x] Laboratório de renovação/inadimplência **publicado em produção em 14/10/2026**: lembretes internos, alertas de vencimento, faixas de atraso e renovação fictícia. Testes CI e de acesso anônimo passaram; **homologação manual autenticada do novo fluxo ainda pendente**.
 
 ## P0 — bloqueiam comercialização em escala
 
@@ -44,7 +47,7 @@ Homologar um a um: cadastro PF/MEI/PJ; trial de 14 dias; limites reais de usuár
 - Verificar HSTS e X-Content-Type-Options em respostas administrativas; smoke público encontrou avisos, não falhas críticas.
 
 ## P2 — premium e escala
-- UI design system do CRM com tipografia consistente, acessibilidade (teclado, labels, contraste, estados de erro), modo mobile e layouts de tabela.
+- UI premium: grade responsiva do painel e navegação móvel **implantadas**; **pendente** revisar acessibilidade por teclado, contraste, tabelas e todas as telas com contas autenticadas em dispositivos reais.
 - Onboarding guiado com checklist de primeiro acesso, convite de usuários e seleção de plano sem fricção.
 - Painel do titular: MRR, ARR, inadimplência, churn, LTV, trials convertidos, clientes por plano, auditoria e eventos financeiros.
 - Cobrança recorrente com gateway homologado, assinatura idempotente, webhooks assinados, reconciliação e estornos. Não habilitar cobrança real sem aceite expresso.
