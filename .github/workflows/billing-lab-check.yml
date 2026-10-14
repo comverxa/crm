@@ -1,0 +1,29 @@
+name: Validar simulador de cobrancas COMVERXA
+on:
+  push:
+    paths:
+      - backend/billing-lab-middleware.js
+      - backend/billing-lab-ui.html
+      - .github/workflows/billing-lab-check.yml
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Conferir sintaxe, separacao financeira e estado sandbox
+        run: |
+          node --check backend/billing-lab-middleware.js
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const middleware=fs.readFileSync('backend/billing-lab-middleware.js','utf8'),html=fs.readFileSync('backend/billing-lab-ui.html','utf8');
+          const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+          if(scripts.length!==1)throw Error('Expected exactly one script');
+          new Function(scripts[0][1]);
+          const markers=['COMVERXA_BILLING_MODE!=="sandbox"','/data/comverxa-billing-lab.sqlite','/api/master/me','/api/master/overview','realChargesEnabled:false','automaticAccessChanges:false','X-COMVERXA-Billing-Lab','PAID_SIMULATED'];
+          for(const marker of markers)if(!middleware.includes(marker))throw Error('Missing sandbox invariant '+marker);
+          if(middleware.includes('/api/master/plan')||middleware.includes('/api/master/finance/payments"'))throw Error('Unexpected changes to real billing/access paths');
+          for(const marker of ['TESTE','FICTÍCIO','/api/master/billing-lab/overview','/api/master/billing-lab/mark-paid'])if(!html.includes(marker))throw Error('UI sandbox invariant '+marker);
+          console.log('OK: syntax and sandbox invariants; no payment gateway configured');
+          NODE
