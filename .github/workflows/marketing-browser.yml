@@ -5,6 +5,7 @@ on:
       - tests/marketing-browser.mjs
       - site/index.html
       - site/assets/style.css
+      - site/acesso.html
       - site/privacidade.html
       - site/termos.html
       - .github/workflows/marketing-browser.yml
