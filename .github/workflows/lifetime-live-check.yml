@@ -1,0 +1,31 @@
+name: COMVERXA - Validar licencas em producao
+on:
+  push:
+    paths:
+      - .github/workflows/lifetime-live-check.yml
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Confirmar seguranca das duas licencas sem login
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br',cases=[
+            ['CRM online','/healthz','GET',null,[200]],
+            ['ADM lifetime sem login','/admin/lifetime','GET',null,[301,302,303,401,403]],
+            ['Dados privados sem login','/api/master/lifetime/overview','GET',null,[401,403]],
+            ['Segunda reserva sem login','/api/master/lifetime/reserve','POST',{slot:2,email:'nao.autorizado@example.invalid'},[401,403]],
+            ['Ativacao sem login','/api/master/lifetime/activate','POST',{slot:2},[401,403]],
+            ['Sessao ADM bloqueada','/api/master/me','GET',null,[401,403]]
+          ];let fail=0;
+          for(const [name,path,method,body,allowed] of cases){
+           const r=await fetch(base+path,{method,redirect:'manual',headers:body?{'Content-Type':'application/json','Origin':base}:{},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(16000)});
+           const ok=allowed.includes(r.status);console.log((ok?'PASS':'FAIL')+' '+name+' HTTP '+r.status);
+           if(!ok)fail++;
+           if(path==='/healthz'&&(await r.json()).status!=='ok')fail++;
+          }
+          if(fail)throw Error(fail+' verificacoes falharam');
+          console.log('PASS: painel privado, registro sem cobrança e rotas protegidas');
+          NODE
