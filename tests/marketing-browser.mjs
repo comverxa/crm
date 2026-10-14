@@ -26,6 +26,7 @@ for(const size of [{width:390,height:844,name:"iPhone"},{width:1440,height:900,n
    const menu=page.locator("#menu-toggle");assert.ok(await menu.isVisible());
    await menu.click();assert.equal(await menu.getAttribute("aria-expanded"),"true");
    const nav=page.locator("#primary-nav");assert.ok(await nav.isVisible());
+   const mobileCustomer=nav.locator('a[href="./acesso.html"]');assert.ok(await mobileCustomer.isVisible(),"Customer access must be visible in expanded mobile menu");
    await menu.click();assert.equal(await menu.getAttribute("aria-expanded"),"false");
   }
   await page.locator("#avaliacao").scrollIntoViewIfNeeded();
