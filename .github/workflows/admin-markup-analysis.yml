@@ -17,3 +17,13 @@ jobs:
           const patterns=Array.from(new Set(body.match(/\/(?:api|admin)\/[a-zA-Z0-9_/-]+/g)||[])).sort();
           console.log(JSON.stringify({http:r.status,len:body.length,paths:patterns,hasBodyEnd:body.includes('</body>'),scriptCount:(body.match(/<script/g)||[]).length,formCount:(body.match(/<form/g)||[]).length,contentType:r.headers.get('content-type'),csp:r.headers.get('content-security-policy')},null,2));
           NODE
+
+      - name: Inspecionar uso de overview no cliente
+        run: |
+          node - <<'NODE'
+          const html=await(await fetch('https://app.comverxa.com.br/admin')).text();
+          const key='/api/master/overview';
+          const position=html.indexOf(key);
+          console.log('OVERVIEW CONTEXT',html.slice(Math.max(0,position-200),position+1700).replace(/cookie|token|secret/ig,'[redacted]'));
+          console.log('DOCUMENT HEADER',html.slice(0,500));
+          NODE
