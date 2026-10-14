@@ -1,0 +1,25 @@
+name: Inspecionar estrutura publica da interface CRM
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/inspect-crm-layout.yml
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspecionar HTML de login e CSS publico sem autenticar
+        run: |
+          node - <<'NODE'
+          const url='https://app.comverxa.com.br/';
+          const r=await fetch(url);
+          const html=await r.text();
+          console.log(JSON.stringify({status:r.status,size:html.length,title:(html.match(/<title>([^<]+)/)||[])[1],styles:(html.match(/<style/g)||[]).length,scripts:(html.match(/<script/g)||[]).length,ids:(html.match(/id="([^"]+)"/g)||[]).slice(0,100)}));
+          for(const needle of ['Visão do seu negócio','Adicionar primeiro lead','Painel','navtab','dashboard','metric','stat-card','statgrid','tab-btn','lead']){
+           const i=html.indexOf(needle);
+           console.log(JSON.stringify({needle,position:i,near:i>=0?html.slice(Math.max(0,i-500),i+620).replace(/[\n\r]+/g,' ').slice(0,1200):''}));
+          }
+          const style=html.slice(html.indexOf('<style'),html.indexOf('</style>')+8);
+          console.log('STYLE_HEAD',style.slice(0,4300));
+          console.log('STYLESHEET_KEYS',JSON.stringify([...new Set((style.match(/\.[a-z][a-z0-9_-]+/gi)||[]))].slice(0,160)));
+          NODE
