@@ -59,7 +59,7 @@ assert.equal(crossSite.status,403);
 const absentCookie=await post("/api/master/billing-lab/invoices",payload,{cookies:cookie});
 assert.equal(absentCookie.status,403);
 const good=await post("/api/master/billing-lab/invoices",payload,{fetchSite:"same-origin"});
-assert.equal(good.status,201,await good.text().catch(()=>""));
+assert.equal(good.status,201,await good.clone().text().catch(()=>""));
 const saved=await good.json();
 assert.equal(saved.realPayment,false);
 assert.equal(saved.accessChanged,false);
