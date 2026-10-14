@@ -1,0 +1,19 @@
+name: Inspecionar estrutura publica do ADM
+on:
+  push:
+    paths:
+      - .github/workflows/admin-markup-analysis.yml
+  workflow_dispatch:
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspecionar somente rotas e metadados do HTML publico
+        run: |
+          node - <<'NODE'
+          const r=await fetch('https://app.comverxa.com.br/admin');
+          const body=await r.text();
+          const patterns=Array.from(new Set(body.match(/\/(?:api|admin)\/[a-zA-Z0-9_/-]+/g)||[])).sort();
+          console.log(JSON.stringify({http:r.status,len:body.length,paths:patterns,hasBodyEnd:body.includes('</body>'),scriptCount:(body.match(/<script/g)||[]).length,formCount:(body.match(/<form/g)||[]).length,contentType:r.headers.get('content-type'),csp:r.headers.get('content-security-policy')},null,2));
+          NODE
