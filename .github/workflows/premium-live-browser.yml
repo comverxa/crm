@@ -1,0 +1,17 @@
+name: COMVERXA - Homologar UI premium em producao
+on:
+  push:
+    paths:
+      - tests/premium-live-browser.mjs
+      - .github/workflows/premium-live-browser.yml
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar Playwright
+        run: npm install --no-save playwright-core@1.56.1
+      - name: Testar CRM de producao sem contas reais
+        run: node tests/premium-live-browser.mjs
