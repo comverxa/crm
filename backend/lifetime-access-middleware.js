@@ -3,7 +3,7 @@
 // A segunda vaga permanece vazia até decisão expressa do ADM Master.
 import {Database as LifetimeDatabase} from "bun:sqlite";
 import {randomBytes,timingSafeEqual} from "node:crypto";
-const ltDb=new LifetimeDatabase("/data/conecta_saas.db",{create:false});
+const ltDb=new LifetimeDatabase("/data/conecta_saas.db",{create:true});
 ltDb.exec("PRAGMA busy_timeout=5000");
 ltDb.exec("CREATE TABLE IF NOT EXISTS cxv_lifetime_seats(slot INTEGER PRIMARY KEY CHECK(slot IN (1,2)),email TEXT COLLATE NOCASE UNIQUE,company_id TEXT UNIQUE,status TEXT NOT NULL CHECK(status IN ('reserved','active')),initial_checked INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,activated_at TEXT)");
 const ltNow=()=>new Date().toISOString();
