@@ -1,0 +1,20 @@
+name: COMVERXA - Testar acessos vitalicios
+on:
+  push:
+    paths:
+      - backend/lifetime-access-middleware.js
+      - backend/lifetime-access-ui.html
+      - tests/lifetime-access.test.mjs
+      - .github/workflows/lifetime-access-test.yml
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Teste integrado de licencas e seguranca
+        run: |
+          bun build ./backend/lifetime-access-middleware.js --target bun --outdir /tmp/cvx-lifetime-check
+          bun run tests/lifetime-access.test.mjs
