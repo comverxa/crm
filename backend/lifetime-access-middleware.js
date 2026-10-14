@@ -72,6 +72,14 @@ Bun.serve=function(lifetimeConfig){
  };
  return ltPreviousServe({...lifetimeConfig,fetch:async function(req,server){
   const route=new URL(req.url).pathname,method=req.method;
+  if(route==="/admin"&&method==="GET"){
+   const response=await original(req,server);
+   if(response.status!==200||!(response.headers.get("content-type")||"").includes("text/html"))return response;
+   const html=await response.text(),headers=new Headers(response.headers);
+   headers.delete("content-length");headers.delete("content-encoding");headers.set("Cache-Control","no-store");
+   const link='<a href="/admin/lifetime" style="padding:10px 14px;background:#087b6f;color:#fff;border-radius:10px;text-decoration:none;font-weight:800">Acessos vitalicios</a>';
+   return new Response(html.includes("</header>")?html.replace("</header>",link+"</header>"):html,{status:200,headers});
+  }
   if(route!=="/admin/lifetime"&&!route.startsWith("/api/master/lifetime/"))return original(req,server);
   const master=await ltMaster(req,server);
   if(!master){
