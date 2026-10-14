@@ -1,0 +1,36 @@
+name: Diagnosticar links de acesso COMVERXA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/diagnosticar-acesso-404.yml
+jobs:
+  conferir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Testar URLs completas com cliente comum e iPhone
+        run: |
+          node - <<'NODE'
+          const urls=[
+           'https://comverxa.github.io/',
+           'https://comverxa.github.io/acesso.html',
+           'https://comverxa.github.io/crm/',
+           'https://comverxa.github.io/crm/acesso.html',
+           'https://app.comverxa.com.br/'
+          ];
+          const iphone='Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1';
+          let fail=false;
+          for(const url of urls){
+           for(const agent of ['default','iphone']){
+            try{
+             const res=await fetch(url,{headers:agent==='iphone'?{'user-agent':iphone}:undefined,redirect:'follow',signal:AbortSignal.timeout(15000)});
+             const body=await res.text();
+             const entry=JSON.stringify({url,agent,status:res.status,endUrl:res.url,bytes:body.length,header:res.headers.get('content-type'),pageTitle:(body.match(/<title[^>]*>(.*?)<\/title>/i)||[])[1],containsClient:body.includes('Acessar minha conta'),contains404:body.includes('File not found'),cache:res.headers.get('cache-control'),age:res.headers.get('age')});
+             console.log(entry);
+             if(url==='https://comverxa.github.io/crm/acesso.html'&&(res.status!==200||!body.includes('Acessar minha conta')))fail=true;
+            }catch(e){console.log(JSON.stringify({url,agent,error:String(e)}));if(url.includes('/crm/acesso.html'))fail=true}
+           }
+          }
+          if(fail)process.exit(1);
+          NODE
