@@ -1,0 +1,46 @@
+name: Testar confirmacao ADM COMVERXA no navegador
+on:
+  push:
+    paths:
+      - .github/workflows/admin-browser-v7.yml
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Instalar controlador do Chrome
+        run: npm install --no-save playwright-core@1.56.1
+      - name: Testar comportamento de seguranca com token ficticio
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright-core';
+          const base='https://app.comverxa.com.br';
+          const token='0'.repeat(64);
+          const healthy=await fetch(base+'/healthz');
+          const status=await healthy.json();
+          if(healthy.status!==200||status.status!=='ok')throw Error('Healthcheck failed');
+          const badLink=await fetch(base+'/admin/verify?token='+token,{redirect:'manual'});
+          console.log('Invalid token GET /admin/verify',badLink.status);
+          if(badLink.status!==400)throw Error('Invalid tokens accepted by verify route');
+          const bin='/usr/bin/google-chrome';
+          const browser=await chromium.launch({headless:true,executablePath:bin,args:['--no-sandbox']});
+          try{
+            const page=await browser.newPage();
+            const response=await page.goto(base+'/admin/authenticate?token='+token);
+            console.log('Confirmation page response',response.status());
+            if(response.status()!==200)throw Error('Confirmation page unavailable');
+            const csp=response.headers()['content-security-policy']||'';
+            console.log('CSP policy',csp);
+            if(csp.split(';').some(x=>x.trim().split(' ')[0]==='sandbox'))throw Error('Sandbox remained on confirmation page');
+            if((await page.locator('h1').textContent())!=='COMVERXA ADM Master')throw Error('Wrong page');
+            const waiting=page.waitForResponse(r=>r.url().includes('/admin/confirm')&&r.request().method()==='POST',{timeout:12000});
+            await page.locator('button[type="submit"]').click();
+            const posted=await waiting;
+            const headers=await posted.request().allHeaders();
+            console.log('Browser origin',headers.origin||'ABSENT','status',posted.status());
+            if(headers.origin!==base)throw Error('Browser sent incorrect origin');
+            if(posted.status()!==400)throw Error('Invalid confirmation token was not rejected by server');
+          }finally{await browser.close()}
+          console.log('BROWSER TESTS PASSED: same-origin form; invalid token rejected');
+          NODE
