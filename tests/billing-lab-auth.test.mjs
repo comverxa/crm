@@ -82,7 +82,7 @@ assert.equal(result.crmAccessChanged,false);
 const list=await captured(new Request(base+"/api/master/billing-lab/overview",{headers:{cookie}}));
 assert.equal(list.status,200);
 const data=await list.json();
-assert.equal(data.invoices[0].status,"PAID_SIMULATED");
+assert.equal(data.invoices.find(x=>x.id===saved.invoice.id).status,"PAID_SIMULATED");
 assert.equal(data.realChargesEnabled,false);
 assert.equal(data.automaticAccessChanges,false);
 assert.equal(masterInvocations,0,"Must not call CRM mutation routes");
