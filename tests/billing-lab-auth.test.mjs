@@ -42,13 +42,13 @@ const joinedCookies=cookie+"; "+setCookie.split(";")[0];
 const payload={company_id:"company_test",reference:"2026-10",due_date:"2026-10-30",amount_cents:100};
 async function post(route,obj,{origin="null",csrfHeader=csrf,cookies=joinedCookies,labHeader="sandbox",fetchSite}={}){
  const headers={"content-type":"application/json","cookie":cookies,"Origin":origin,"x-comverxa-billing-lab":labHeader};
- if(csrfHeader!==undefined)headers["x-comverxa-billing-csrf"]=csrfHeader;
+ if(csrfHeader!==null)headers["x-comverxa-billing-csrf"]=csrfHeader;
  if(fetchSite)headers["sec-fetch-site"]=fetchSite;
  return captured(new Request(base+route,{method:"POST",headers,body:JSON.stringify(obj)}));
 }
 const unauthorizedRequest=await post("/api/master/billing-lab/invoices",payload,{cookies:""});
 assert.equal(unauthorizedRequest.status,401);
-const missingCsrf=await post("/api/master/billing-lab/invoices",payload,{csrfHeader:undefined});
+const missingCsrf=await post("/api/master/billing-lab/invoices",payload,{csrfHeader:null});
 assert.equal(missingCsrf.status,403);
 const wrongCsrf=await post("/api/master/billing-lab/invoices",payload,{csrfHeader:"0".repeat(48)});
 assert.equal(wrongCsrf.status,403);
