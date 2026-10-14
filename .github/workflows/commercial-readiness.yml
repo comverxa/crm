@@ -1,0 +1,18 @@
+name: COMVERXA - Homologacao comercial publica
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tests/commercial-readiness.mjs
+      - site/index.html
+      - site/privacidade.html
+      - site/termos.html
+      - .github/workflows/commercial-readiness.yml
+jobs:
+  homologar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Executar verificacoes sem acessar dados de clientes
+        run: node tests/commercial-readiness.mjs
