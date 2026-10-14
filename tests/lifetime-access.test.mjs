@@ -43,7 +43,7 @@ assert.equal(overview.seats[0].email,"joaopaulo.loovi@gmail.com");
 assert.equal(overview.seats[0].status,"active");
 assert.equal(overview.seats[1].status,"reserved");assert.equal(overview.seats[1].email,null);
 assert.equal(overview.chargeEnabled,false);
-const chk=new Database(dbPath,{create:false});
+const chk=new Database(dbPath,{create:true});
 let c1=chk.query("SELECT plan,status,paid_until FROM companies WHERE id='c1'").get();
 assert.equal(c1.plan,"professional");assert.equal(c1.status,"active");assert.equal(c1.paid_until,253402300799);
 assert.equal(chk.query("SELECT COUNT(*) as n FROM cxv_lifetime_seats").get().n,2);
