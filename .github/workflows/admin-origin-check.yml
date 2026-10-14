@@ -1,0 +1,50 @@
+name: Verificar origem ADM Master
+on:
+  push:
+    paths:
+      - .github/workflows/admin-origin-check.yml
+  workflow_dispatch:
+
+jobs:
+  admin-origin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Confirmar HTTPS e healthcheck
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br';
+          const r=await fetch(base+'/healthz',{signal:AbortSignal.timeout(12000)});
+          const data=await r.json();
+          console.log('HTTP',r.status,'health',data.status,'service',data.service);
+          if(r.status!==200 || data.status!=='ok')process.exit(1);
+          NODE
+      - name: Conferir cabecalhos publicos da verificacao
+        run: |
+          node - <<'NODE'
+          const token='0'.repeat(64);
+          const r=await fetch('https://app.comverxa.com.br/admin/verify?token='+token,{redirect:'manual',signal:AbortSignal.timeout(12000)});
+          const csp=r.headers.get('content-security-policy')||'';
+          const type=r.headers.get('content-type')||'';
+          const marker=r.headers.get('x-comverxa-admin-verify')||'';
+          const sandbox=csp.split(';').some(x=>x.trim().toLowerCase().split(' ')[0]==='sandbox');
+          console.log(JSON.stringify({status:r.status,type,marker,sandbox,csp,cache:r.headers.get('cache-control')},null,2));
+          // An invalid token can return an error instead of an HTML form;
+          // in that case a real verification must still be tested separately.
+          if(r.status===200 && type.includes('text/html')){
+            if(sandbox || marker!=='same-origin-document-v3')process.exit(1);
+          }
+          NODE
+      - name: Confirmar que confirmacao invalida nao autentica
+        run: |
+          node - <<'NODE'
+          const r=await fetch('https://app.comverxa.com.br/admin/confirm',{
+            method:'POST',
+            headers:{'content-type':'application/x-www-form-urlencoded',origin:'https://app.comverxa.com.br'},
+            body:'token='+encodeURIComponent('0'.repeat(64)),
+            redirect:'manual',
+            signal:AbortSignal.timeout(12000)
+          });
+          console.log('POST /admin/confirm token invalido: status',r.status);
+          if(r.status>=500 || r.status===200)process.exit(1);
+          NODE
