@@ -54,7 +54,7 @@ const kinds={individual:"Pessoa Física",mei:"MEI",business:"Pessoa Jurídica"};
 let state={clients:[],invoices:[],events:[],today:""};
 function notify(m,bad){const x=$("notice");x.className="notice "+(bad?"error":"success");x.style.display="block";x.textContent=m;x.scrollIntoView({behavior:"smooth",block:"nearest"})}
 function cell(row,t){const td=row.insertCell();td.textContent=String(t??"");return td}
-async function call(path,body){const r=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-COMVERXA-Billing-Lab":"sandbox"},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Operação recusada.");return d}
+async function call(path,body){const r=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-COMVERXA-Billing-Lab":"sandbox","X-COMVERXA-Billing-CSRF":BILLING_LAB_CSRF},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Operação recusada.");return d}
 async function load(){
 const r=await fetch("/api/master/billing-lab/overview",{credentials:"same-origin"});if(r.status===401){location.assign("/admin");return}
 if(!r.ok)throw Error("Laboratório indisponível. Verifique a sessão do ADM Master.");
