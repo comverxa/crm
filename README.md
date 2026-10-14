@@ -1,31 +1,46 @@
-# Conecta CRM — site comercial
+# COMVERXA CRM
 
-Site comercial de apresentação do **Conecta CRM SaaS**, para profissionais autônomos, MEIs e empresas.
+**Cada conversa, uma oportunidade.**
 
-**Entrar no CRM:** https://conecta-crm-saas-production.up.railway.app/
+Site oficial de apresentação e comercialização da **COMVERXA**, plataforma de gestão comercial na nuvem para profissionais, MEIs, equipes e empresas.
 
-**Site GitHub Pages (após ativação):** https://joaobotelho-executivo.github.io/conecta-crm-site/
+- **Site comercial (GitHub Pages):** https://comverxa.github.io/crm/
+- **Acesso e cadastro no CRM:** https://conecta-crm-saas-production.up.railway.app/
+- **Repositório:** https://github.com/comverxa/crm
 
-## Como funciona
+## Experiência do site comercial
 
-- Este repositório contém apenas HTML e CSS **públicos** do site comercial.
-- O aplicativo CRM com cadastro, senha, leads, equipe e banco SQLite continua hospedado na **Railway**.
-- **Não há dados reais de clientes neste repositório.** Não envie senhas, tokens Meta, chaves de API, bancos de dados, arquivos de configuração com segredos ou informações de clientes para este repositório.
-- O site está em `site/` e o fluxo de publicação em `.github/workflows/pages.yml`.
-- Para ativar GitHub Pages: em **Settings > Pages > Build and deployment**, selecione **GitHub Actions**. A ação `Publicar Conecta CRM no GitHub Pages` pode ser executada automaticamente a cada push ou manualmente em Actions.
-- GitHub Pages é hospedagem de arquivos estáticos. Não executa o aplicativo com autenticação e dados.
+A página de vendas apresenta benefícios e recursos da COMVERXA, exemplos **ilustrativos** do dashboard e do funil de vendas, comparação entre trabalho manual e gestão centralizada, planos Essencial/Profissional/Empresarial, perguntas frequentes, e um **simulador interativo de compatibilidade de planos**.
 
-## Comercialização
+O simulador utiliza apenas valores informados no navegador para comparar os limites publicados:
 
-O SaaS da Railway inclui cadastro separado por contratante, login individual e período de teste. Cobrança automática, integração Meta por WhatsApp e validação final de segurança dependem de configurações adicionais; não anuncie essas integrações como ativas sem verificar.
+| Plano | Usuários | Leads | Linhas WhatsApp |
+| --- | ---: | ---: | ---: |
+| Essencial | até 2 | até 500 | 1 |
+| Profissional | até 10 | até 10.000 | até 3 |
+| Empresarial | até 40 | até 100.000 | até 3 |
 
-## Arquivos
+O simulador não envia informações pessoais nem contrata planos. A contratação e o preço são **sob consulta**. A integração WhatsApp (QR/Evolution ou Meta Cloud API) depende da configuração de cada canal e da disponibilidade de serviços externos. O cadastro no app permite teste de 14 dias e não inicia cobrança automática.
 
-```text
-site/
-  index.html
-  assets/style.css
-  .nojekyll
-.github/workflows/pages.yml
-README.md
-```
+## Arquitetura
+
+Este repositório contém somente o **site público, estático** e um painel demonstrativo local. Não armazena nem executa as contas e os dados do CRM de produção.
+
+- `site/index.html`: página comercial principal, conteúdo, simulador e interações simples.
+- `site/assets/style.css`: identidade visual responsiva.
+- `site/.nojekyll`: compatibilidade do GitHub Pages.
+- `.github/workflows/pages.yml`: publicação automática do diretório `site/` a cada push na branch `main`.
+- `app.html`: demonstração local independente, **não** é o aplicativo de produção.
+- Aplicativo de produção hospedado no **Railway**, com armazenamento e autenticação próprios.
+
+### Como atualizar o site
+
+Altere `site/index.html` e/ou `site/assets/style.css` e faça commit na branch `main`. O workflow GitHub Actions publica `site/`. Confira a conclusão em https://github.com/comverxa/crm/actions.
+
+A página comercial não possui endpoint próprio de captura de leads. Para receber solicitações de contato sem exigir uma nova conta no CRM, é necessário configurar um canal comercial oficial e um endpoint/formulário com tratamento de dados e consentimento apropriados. Não anuncie essa função como existente antes de implementá-la.
+
+## Segurança e conteúdo
+
+**Nunca** envie para este repositório credenciais, tokens Meta, chaves API, dados reais de clientes, arquivos SQLite ou variáveis secretas. Evite usar depoimentos, resultados ou números de performance sem comprovação. Os números exibidos na prévia do sistema são fictícios, utilizados exclusivamente para ilustrar a interface.
+
+© 2026 COMVERXA.
