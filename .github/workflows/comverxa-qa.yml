@@ -1,0 +1,24 @@
+name: QA - COMVERXA SaaS (sem dados reais)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/comverxa-smoke.mjs'
+      - '.github/workflows/comverxa-qa.yml'
+jobs:
+  smoke:
+    name: Verificar saude, login e protecao de rotas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Executar verificacoes HTTP nao destrutivas
+        env:
+          COMVERXA_URL: https://app.comverxa.com.br
+        run: node tests/comverxa-smoke.mjs
