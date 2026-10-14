@@ -22,9 +22,23 @@ O simulador utiliza apenas valores informados no navegador para comparar os limi
 
 O simulador não envia informações pessoais nem contrata planos. A contratação e o preço são **sob consulta**. A integração WhatsApp (QR/Evolution ou Meta Cloud API) depende da configuração de cada canal e da disponibilidade de serviços externos. O cadastro no app permite teste de 14 dias e não inicia cobrança automática.
 
+## Prontidão comercial (outubro/2026)
+
+A COMVERXA dispõe de site comercial, domínio do CRM, painel ADM Master e módulo financeiro de registros manuais. O laboratório de cobranças é **simulação sem movimentação de dinheiro**. **O produto não deve ser descrito como totalmente homologado para vendas em escala até a conclusão dos requisitos P0.**
+
+- [Matriz de produção e critérios P0/P1/P2](./docs/PRODUCAO-HOMOLOGACAO-COMVERXA.md)
+- [Modelo de contrato SaaS para PF, MEI e PJ](./docs/comercial/CONTRATO-SaaS-COMVERXA-MODELO.md)
+- [Anexo LGPD/DPA — minuta](./docs/comercial/ANEXO-LGPD-DPA-MODELO.md)
+- [Aviso de privacidade público](./site/privacidade.html)
+- [Termos públicos de uso](./site/termos.html)
+- [Teste automático de prontidão pública](./tests/commercial-readiness.mjs)
+- [CI — homologação pública](./.github/workflows/commercial-readiness.yml)
+
+**Limitações importantes:** sem evidência de teste autenticado de isolamento multiempresa nem teste de restauração; pagamento recorrente real não ativado; integrações WhatsApp precisam ser homologadas individualmente; minutas exigem identificação formal do fornecedor e revisão jurídica. O Railway deve ter faturamento e continuidade confirmados antes de contratos mensais.
+
 ## Arquitetura
 
-Este repositório contém somente o **site público, estático** e um painel demonstrativo local. Não armazena nem executa as contas e os dados do CRM de produção.
+Este repositório contém o **site público estático**, demonstração local, minutas e testes auxiliares, além de módulos experimentais de suporte em `backend/`. O CRM completo continua implantado no Railway, e sua implementação original não é substituída pelos exemplos do repositório. Nenhuma credencial, banco ou dado real deve ser publicado aqui.
 
 - `site/index.html`: página comercial principal, conteúdo, simulador e interações simples.
 - `site/assets/style.css`: identidade visual responsiva.
