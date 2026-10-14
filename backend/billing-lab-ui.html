@@ -14,6 +14,15 @@ h1{font-size:clamp(25px,3vw,35px);margin:13px 0 8px;letter-spacing:-.04em}h2{mar
 label{display:block;font-size:13px;font-weight:720;color:#557081;margin:16px 0 6px}input,select{width:100%;padding:12px;border:1px solid #cedde7;border-radius:10px;background:#fff;color:#18384d;font:inherit;min-height:44px}
 input:focus,select:focus{outline:3px solid #25b5aa32;border-color:#189e91}button{border:1px solid #0c8073;border-radius:10px;padding:11px 15px;background:#0e8678;color:white;font-size:14px;font-weight:800;cursor:pointer;min-height:43px}button:disabled{opacity:.5;cursor:not-allowed}button:hover:not(:disabled){filter:brightness(.96)}button.alt{background:#f1f7fa;color:#205061;border-color:#d2e2e9}button.cancel{background:#fff0ef;color:#ac4f47;border-color:#f2d8d5}button.small{padding:7px 10px;font-size:12px;min-height:34px}
 .actions{display:flex;flex-wrap:wrap;gap:8px}.label{font-size:12px;color:#71899b}.pill{border-radius:99px;padding:5px 10px;display:inline-block;background:#eaf3f8;color:#3f6678;font-size:12px;font-weight:800}.pill.PAID_SIMULATED{background:#e4f7ed;color:#15725a}.pill.CANCELED{background:#fce9e7;color:#9c4c43}.pill.OVERDUE{background:#fff0d2;color:#976715}
+.alert-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:16px}
+.alert-mini{background:#f7fafc;border:1px solid #e1e9ee;border-radius:12px;padding:15px}
+.alert-mini strong{display:block;font-size:20px;margin:5px 0;color:#17394a;font-variant-numeric:tabular-nums}
+.alert-mini span{font-size:12px;color:#6b8191}
+.alert-mini.warning{border-color:#e8d097;background:#fffaec}
+.alert-mini.danger{border-color:#e9c4bd;background:#fff5f2}
+.filter-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0 17px}
+.filter-line select{max-width:260px}
+@media(max-width:550px){.alert-grid{grid-template-columns:1fr}}
 .scroller{width:100%;overflow-x:auto;border-radius:12px;border:1px solid #e0e8ee}table{border-collapse:separate;border-spacing:0;width:100%;min-width:680px}th{text-align:left;background:#f4f8fa;font-size:11px;letter-spacing:.055em;color:#708596;text-transform:uppercase;padding:13px}td{border-top:1px solid #edf2f5;padding:13px;vertical-align:middle}
 .notice{padding:11px 13px;border-radius:9px;margin:16px 0;display:none}.notice.error{background:#fff0ef;color:#a03f42}.notice.success{background:#e5f8ef;color:#137154}
 footer{text-align:center;color:#7d96a5;font-size:12px;padding:18px}.topline{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
@@ -31,6 +40,19 @@ footer{text-align:center;color:#7d96a5;font-size:12px;padding:18px}.topline{disp
 <div class="stat"><small>Valor pago (FICTÍCIO)</small><b id="k-paid">—</b></div>
 <div class="stat"><small>Vencidas (TESTE)</small><b id="k-overdue">—</b></div>
 </div>
+<section class="card" aria-label="Alertas de renovação e inadimplência no laboratório">
+<div class="topline"><h2>Alertas e inadimplência simulada</h2><span class="tag">SOMENTE TESTES</span></div>
+<p>Vencimentos e atrasos são calculados automaticamente pela data de hoje. Não enviamos avisos reais nem bloqueamos clientes.</p>
+<div class="alert-grid">
+<div class="alert-mini warning"><span>Vencem nos próximos 7 dias</span><strong id="k-soon">—</strong><span id="k-soon-value">—</span></div>
+<div class="alert-mini danger"><span>Em atraso (TESTE)</span><strong id="k-debt">—</strong><span id="k-debt-value">—</span></div>
+<div class="alert-mini"><span>Renovações prontas para simular</span><strong id="k-renew">—</strong><span>Competências pagas ficticiamente</span></div>
+<div class="alert-mini"><span>1–7 dias de atraso</span><strong id="aging-1_7">—</strong><span>Contagem por faixa</span></div>
+<div class="alert-mini"><span>8–30 dias de atraso</span><strong id="aging-8_30">—</strong><span>Contagem por faixa</span></div>
+<div class="alert-mini"><span>31+ dias de atraso</span><strong id="aging-31_plus">—</strong><span>Contagem por faixa</span></div>
+</div>
+<p class="label" style="margin-top:14px">Para testar inadimplência, crie uma competência anterior com data de vencimento já passada. Para renovar, use o botão em uma cobrança paga ficticiamente.</p>
+</section>
 <div id="notice" class="notice" role="status" aria-live="polite"></div>
 <div class="grid">
 <section class="card"><h2>Criar cobrança fictícia</h2><p>Selecione um cliente já existente no CRM para testar seu ciclo de mensalidade.</p>
@@ -42,6 +64,7 @@ footer{text-align:center;color:#7d96a5;font-size:12px;padding:18px}.topline{disp
 <div class="actions" style="margin-top:22px"><button type="submit" id="btn-create">Criar cobrança de TESTE</button><button class="alt" id="refresh" type="button">Atualizar</button></div></form>
 </section>
 <section class="card"><div class="topline"><div><h2>Cobranças de teste</h2><p>Simule pagamento ou cancelamento. Os lançamentos e eventos permanecem registrados.</p></div><span class="pill">100% SANDBOX</span></div>
+<div class="filter-line"><label for="invoice-filter" style="margin:0">Filtrar cobranças:</label><select id="invoice-filter" aria-label="Filtrar cobranças de teste"><option value="all">Todas</option><option value="due-soon">A vencer em 7 dias</option><option value="overdue">Em atraso</option><option value="pending">Pendentes</option><option value="paid">Pagas (simuladas)</option><option value="canceled">Canceladas</option></select></div>
 <div class="scroller"><table><thead><tr><th>Cliente</th><th>Competência</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody id="rows"><tr><td colspan="6">Carregando...</td></tr></tbody></table></div></section></div>
 <section class="card"><div class="topline"><h2>Histórico das simulações</h2><span class="label">Últimos 150 eventos auditados</span></div><div class="scroller"><table><thead><tr><th>Data/hora</th><th>Evento</th><th>Responsável</th><th>Descrição</th></tr></thead><tbody id="events"><tr><td colspan="4">Carregando...</td></tr></tbody></table></div></section>
 <footer>COMVERXA · Simulador interno · Sem API bancária · Sem cobrança real · Sem alteração de acessos</footer>
@@ -50,8 +73,9 @@ footer{text-align:center;color:#7d96a5;font-size:12px;padding:18px}.topline{disp
 const $=id=>document.getElementById(id);
 const fmt=x=>(Number(x||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const date=x=>x?String(x).slice(0,10).split("-").reverse().join("/"):"—";
+const daysUntil=(dateValue,today)=>Math.round((Date.parse(dateValue+"T00:00:00Z")-Date.parse(today+"T00:00:00Z"))/86400000);
 const kinds={individual:"Pessoa Física",mei:"MEI",business:"Pessoa Jurídica"};
-let state={clients:[],invoices:[],events:[],today:""};
+let state={clients:[],invoices:[],events:[],today:"",alerts:null};
 function notify(m,bad){const x=$("notice");x.className="notice "+(bad?"error":"success");x.style.display="block";x.textContent=m;x.scrollIntoView({behavior:"smooth",block:"nearest"})}
 function cell(row,t){const td=row.insertCell();td.textContent=String(t??"");return td}
 async function call(path,body){const r=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-COMVERXA-Billing-Lab":"sandbox","X-COMVERXA-Billing-CSRF":BILLING_LAB_CSRF},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Operação recusada.");return d}
@@ -64,17 +88,26 @@ state=d;render();
 function render(){
 const all=state.invoices||[],paid=all.filter(x=>x.status==="PAID_SIMULATED"),pending=all.filter(x=>x.status==="PENDING"),overdue=pending.filter(x=>x.due_date<state.today);
 $("k-total").textContent=all.length;$("k-pending").textContent=pending.length;$("k-paid").textContent=fmt(paid.reduce((sum,x)=>sum+Number(x.amount_cents),0));$("k-overdue").textContent=overdue.length;
+const alerts=state.alerts||{due_soon_count:0,due_soon_cents:0,overdue_count:0,overdue_cents:0,aging:[]};
+$("k-soon").textContent=alerts.due_soon_count;$("k-soon-value").textContent=fmt(alerts.due_soon_cents)+" em aberto";
+$("k-debt").textContent=alerts.overdue_count;$("k-debt-value").textContent=fmt(alerts.overdue_cents)+" (fictício)";
+$("k-renew").textContent=paid.length;
+(alerts.aging||[]).forEach(x=>{const node=$("aging-"+x.key);if(node)node.textContent=x.count+" · "+fmt(x.amount_cents)});
+const filter=$("invoice-filter").value;
+const shown=all.filter(x=>filter==="all"||filter==="pending"&&x.status==="PENDING"||filter==="paid"&&x.status==="PAID_SIMULATED"||filter==="canceled"&&x.status==="CANCELED"||filter==="overdue"&&x.status==="PENDING"&&x.due_date<state.today||filter==="due-soon"&&x.status==="PENDING"&&daysUntil(x.due_date,state.today)>=0&&daysUntil(x.due_date,state.today)<=7);
 const select=$("company"),old=select.value;select.replaceChildren();const none=document.createElement("option");none.value="";none.textContent="Selecione um cliente";select.add(none);
 (state.clients||[]).forEach(x=>{const option=document.createElement("option");option.value=x.id;option.textContent=x.name+" — "+(kinds[x.customer_type]||"Cliente");select.add(option)});select.value=(state.clients||[]).some(x=>x.id===old)?old:"";
-const tbody=$("rows");tbody.replaceChildren();all.forEach(x=>{
+const tbody=$("rows");tbody.replaceChildren();shown.forEach(x=>{
 const row=tbody.insertRow();cell(row,x.company_name);cell(row,x.reference);cell(row,fmt(x.amount_cents));cell(row,date(x.due_date));
 const label=x.status==="PENDING"&&x.due_date<state.today?"OVERDUE":x.status;const status=cell(row,({PENDING:"Pendente",OVERDUE:"Vencido",PAID_SIMULATED:"Pago (SIMULADO)",CANCELED:"Cancelado"})[label]);status.className="pill "+label;
-const td=row.insertCell();if(x.status==="PENDING"){const controls=document.createElement("div");controls.className="actions";const pay=document.createElement("button");pay.textContent="Simular pagamento";pay.className="small";pay.onclick=async()=>{if(!confirm("SIMULAÇÃO: marcar esta cobrança como paga de forma FICTÍCIA, sem receber dinheiro e sem liberar acesso?"))return;pay.disabled=true;try{await call("/api/master/billing-lab/mark-paid",{id:x.id});notify("Pagamento de teste registrado. Nenhum valor foi recebido.");await load()}catch(err){notify(err.message,true)}finally{pay.disabled=false}};const cancel=document.createElement("button");cancel.textContent="Cancelar teste";cancel.className="cancel small";cancel.onclick=async()=>{if(!confirm("Cancelar esta cobrança FICTÍCIA?"))return;cancel.disabled=true;try{await call("/api/master/billing-lab/cancel",{id:x.id});notify("Cobrança fictícia cancelada.");await load()}catch(err){notify(err.message,true)}finally{cancel.disabled=false}};controls.append(pay,cancel);td.append(controls)}else td.textContent="—";
+const td=row.insertCell();if(x.status==="PENDING"){const controls=document.createElement("div");controls.className="actions";const pay=document.createElement("button");pay.textContent="Simular pagamento";pay.className="small";pay.onclick=async()=>{if(!confirm("SIMULAÇÃO: marcar esta cobrança como paga de forma FICTÍCIA, sem receber dinheiro e sem liberar acesso?"))return;pay.disabled=true;try{await call("/api/master/billing-lab/mark-paid",{id:x.id});notify("Pagamento de teste registrado. Nenhum valor foi recebido.");await load()}catch(err){notify(err.message,true)}finally{pay.disabled=false}};const cancel=document.createElement("button");cancel.textContent="Cancelar teste";cancel.className="cancel small";cancel.onclick=async()=>{if(!confirm("Cancelar esta cobrança FICTÍCIA?"))return;cancel.disabled=true;try{await call("/api/master/billing-lab/cancel",{id:x.id});notify("Cobrança fictícia cancelada.");await load()}catch(err){notify(err.message,true)}finally{cancel.disabled=false}};const remind=document.createElement("button");remind.textContent="Lembrete interno";remind.className="alt small";remind.onclick=async()=>{if(!confirm("Registrar apenas um lembrete FICTÍCIO no histórico? Nenhum WhatsApp ou e-mail será enviado."))return;remind.disabled=true;try{await call("/api/master/billing-lab/remind",{id:x.id});notify("Lembrete interno de teste registrado. Nenhuma mensagem foi enviada.");await load()}catch(err){notify(err.message,true)}finally{remind.disabled=false}};controls.append(pay,cancel,remind);td.append(controls)
+}else if(x.status==="PAID_SIMULATED"){const renew=document.createElement("button");renew.type="button";renew.className="alt small";renew.textContent="Simular renovação";renew.onclick=async()=>{if(!confirm("Criar próxima mensalidade FICTÍCIA, sem cobrar dinheiro nem alterar o acesso ao CRM?"))return;renew.disabled=true;try{const data=await call("/api/master/billing-lab/renew",{id:x.id});notify("Renovação fictícia "+data.invoice.reference+" criada para "+date(data.invoice.due_date)+". Nenhuma cobrança real enviada.");await load()}catch(err){notify(err.message,true)}finally{renew.disabled=false}};td.append(renew)}else td.textContent="—";
 });
-if(!all.length){const tr=tbody.insertRow();cell(tr,"Nenhuma cobrança simulada. Crie a primeira ao lado.").colSpan=6}
+if(!shown.length){const tr=tbody.insertRow();cell(tr,all.length?"Nenhuma cobrança corresponde a este filtro.":"Nenhuma cobrança simulada. Crie a primeira ao lado.").colSpan=6}
 const events=$("events");events.replaceChildren();(state.events||[]).forEach(x=>{const tr=events.insertRow();cell(tr,new Date(x.recorded_at).toLocaleString("pt-BR"));cell(tr,x.event_type);cell(tr,x.actor);cell(tr,x.note)});if(!(state.events||[]).length){const tr=events.insertRow();cell(tr,"Nenhuma simulação registrada.").colSpan=4}
 }
 $("create").onsubmit=async ev=>{ev.preventDefault();const button=$("btn-create");button.disabled=true;try{const cents=Math.round(Number($("amount").value)*100);if(!Number.isSafeInteger(cents)||cents<1)throw Error("Informe um valor válido.");await call("/api/master/billing-lab/invoices",{company_id:$("company").value,reference:$("reference").value,due_date:$("due").value,amount_cents:cents});notify("Cobrança fictícia criada. Nenhum boleto, PIX ou pagamento foi gerado.");await load()}catch(e){notify(e.message,true)}finally{button.disabled=false}};
 $("refresh").onclick=()=>load().catch(e=>notify(e.message,true));
+$("invoice-filter").onchange=()=>render();
 load().then(()=>{$("reference").value=state.today.slice(0,7);$("due").value=state.today}).catch(e=>notify(e.message,true));
 })();</script></body></html>
