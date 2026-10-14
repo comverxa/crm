@@ -1,6 +1,6 @@
 # COMVERXA — Renovação, alertas e inadimplência (LABORATÓRIO)
 
-**Status da versão:** preparada no GitHub e validada em CI; publicação do upgrade no Railway pendente. O CRM de produção continua com o ciclo básico de cobrança fictícia/pagamento fictício anteriormente validado.
+**Status da versão:** publicada em produção no Railway em 14/10/2026, com deploy e healthcheck bem-sucedidos. O teste automatizado de integração passou; as novas funções ainda precisam ser exercitadas manualmente em uma sessão ADM Master real antes da homologação final.
 
 ## Funcionalidades preparadas
 
@@ -23,4 +23,4 @@
 
 O teste `tests/billing-lab-auth.test.mjs` executa com Bun e valida autenticação, CSRF, data de vencimento, alertas, renovação, duplicação bloqueada, data bissexta, lembrete fictício e ausência de mutação nas APIs de clientes. O GitHub Actions `Testar seguranca de cobrancas no celular` e `Validar simulador de cobrancas COMVERXA` passaram na versão preparada.
 
-Para produção, exige implantação revisada no Railway da nova implementação de `backend/billing-lab-middleware.js` e `backend/billing-lab-ui.html`, **sem substituir a aplicação principal**. Confirmar implantação, healthcheck e testes de acesso negado antes de solicitar validação manual na sessão real. Não é necessário migrar tabelas financeiras principais, apagar volumes nem alterar contratos de clientes.
+Publicação concluída no Railway mantendo a aplicação principal e o controle de origem/CSRF. O teste operacional público `.github/workflows/crm-launch-acceptance.yml` confirmou bloqueio de usuários anônimos. **Ainda pendente:** teste de renovação e alerta por usuário autenticado ADM Master, bem como testes de restauração de backup e isolamento multiempresa. Não é necessário migrar tabelas financeiras principais, apagar volumes nem alterar contratos de clientes.
