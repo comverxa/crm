@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Financeiro e Contratos | COMVERXA ADM Master</title>
+<style>
+:root{font:15px/1.5 Inter,"Segoe UI",system-ui,Arial,sans-serif;color:#18364d;background:#f4f7fb}
+*{box-sizing:border-box}body{margin:0;-webkit-font-smoothing:antialiased}
+header{background:linear-gradient(115deg,#102a41,#174d53);color:#fff;padding:24px max(26px,5vw);display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+header h1{font-size:23px;margin:3px 0 0;letter-spacing:-.03em}header small{color:#a8d4d2;font-weight:700;letter-spacing:.13em}
+header a{color:#e8fff7;text-decoration:none;border:1px solid #ffffff45;border-radius:10px;padding:10px 14px;font-weight:700}
+main{max-width:1500px;margin:auto;padding:30px 28px 70px}
+.intro{display:flex;justify-content:space-between;align-items:start;gap:24px;flex-wrap:wrap}
+h2{font-size:26px;margin:0;color:#18374b;letter-spacing:-.04em}h3{font-size:19px;margin:0 0 12px;color:#19384c}
+p{color:#6c8292;margin:9px 0 16px}.subtle{font-size:13px;color:#778a99}
+button,.btn{background:#117969;border:1px solid #117969;color:white;border-radius:10px;padding:11px 16px;font:700 14px inherit;cursor:pointer;min-height:42px;font-weight:750;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+button:hover,.btn:hover{filter:brightness(.95)}button:disabled{opacity:.6;cursor:not-allowed}
+.secondary{background:#fff;color:#24485b;border-color:#d5e2eb}.danger{color:#a54242;background:#fff2f2;border-color:#f0cfcf}
+.statgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:24px 0}
+.stat{background:white;border:1px solid #e0e8ef;border-radius:17px;padding:22px;box-shadow:0 10px 22px #213f510c}
+.stat small{display:block;color:#70869a}.stat b{display:block;font-size:30px;color:#152f44;letter-spacing:-.05em;margin-top:8px;font-variant-numeric:tabular-nums}
+.stat:nth-child(1){border-top:3px solid #17b79b}.stat:nth-child(2){border-top:3px solid #4b96de}.stat:nth-child(3){border-top:3px solid #d49b4f}.stat:nth-child(4){border-top:3px solid #c57ca6}
+.panel{background:white;border:1px solid #e0e8ef;border-radius:18px;padding:24px;margin:19px 0;box-shadow:0 12px 28px #1f40510a}
+.bar{display:flex;gap:9px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.bar p{margin:0}.bar-actions{display:flex;gap:9px;flex-wrap:wrap}
+label{display:block;font-size:13px;color:#4c687a;font-weight:700;margin-bottom:6px}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid #d8e2ea;border-radius:10px;background:#fff;color:#1b374a;font:inherit;min-height:43px}
+input:focus,select:focus,textarea:focus{outline:3px solid #24b59b24;border-color:#1caa94}textarea{min-height:88px;resize:vertical}
+.fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.field-span2{grid-column:span 2}.field-span4{grid-column:span 4}
+.form-actions{display:flex;gap:10px;margin-top:17px;flex-wrap:wrap}
+.tabs{display:flex;gap:9px;flex-wrap:wrap;margin:28px 0 14px;border-bottom:1px solid #dde6ee;padding-bottom:12px}.tab{background:#e7edf3;border-color:#e7edf3;color:#435c6d}.tab.active{background:#163c50;color:#fff;border-color:#163c50}
+.section[hidden]{display:none}.scroll{overflow-x:auto;border:1px solid #e0e8ef;border-radius:12px}
+table{width:100%;border-spacing:0;border-collapse:separate;min-width:750px}th,td{padding:13px 15px;text-align:left;vertical-align:middle;border-bottom:1px solid #edf1f5}th{background:#f6f9fb;color:#688294;font-size:11px;letter-spacing:.08em;text-transform:uppercase}tr:last-child td{border-bottom:0}
+.pill{display:inline-block;background:#eef4f7;color:#4b6574;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:750}.pill.active{background:#e2f6ee;color:#147a5f}.pill.pending{background:#fff4dc;color:#936514}.pill.canceled,.pill.suspended{background:#fbe9e7;color:#af534a}
+.note{background:#ecf9f6;border-left:4px solid #20a892;border-radius:8px;padding:15px 18px;color:#476d67;font-size:13px}
+.error{color:#b03232;background:#fff0f0;border:1px solid #f3caca;border-radius:10px;padding:12px;display:none;margin:14px 0}
+.success{color:#086d55;background:#e8f8f1;border:1px solid #bde7d3;border-radius:10px;padding:12px;display:none;margin:14px 0}
+footer{font-size:12px;color:#8798a7;text-align:center;margin-top:28px}
+@media(max-width:900px){.statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.fields{grid-template-columns:repeat(2,minmax(0,1fr))}.field-span4{grid-column:span 2}}
+@media(max-width:550px){main{padding:23px 12px}.statgrid{gap:10px}.stat{padding:15px}.stat b{font-size:24px}.panel{padding:16px}.fields{grid-template-columns:1fr}.field-span2,.field-span4{grid-column:span 1}}
+</style></head>
+<body>
+<header><div><small>COMVERXA / ADMINISTRAÇÃO MASTER</small><h1>Financeiro e Contratos</h1></div><a href="/admin">← Voltar para ADM Master</a></header>
+<main>
+<div class="intro"><div><h2>Gestão comercial da plataforma</h2><p>Acompanhe contratos vendidos, pagamentos confirmados, vencimentos e movimentações registradas.</p></div><div class="bar-actions"><button class="secondary" id="refresh" type="button">↻ Atualizar</button><button class="secondary" id="export" type="button">↓ Exportar CSV</button></div></div>
+<div class="error" id="error" role="alert"></div><div class="success" id="success" role="status"></div>
+<section class="statgrid" aria-label="Indicadores do financeiro">
+ <div class="stat"><small>Contratos ativos registrados</small><b id="stat-contracts">—</b></div>
+ <div class="stat"><small>Recebido no mês</small><b id="stat-revenue">—</b></div>
+ <div class="stat"><small>Mensalidade prevista</small><b id="stat-projection">—</b></div>
+ <div class="stat"><small>Vencimentos até 7 dias</small><b id="stat-due">—</b></div>
+</section>
+<div class="note">Este módulo registra pagamentos <strong>manualmente confirmados</strong>. Os lançamentos não movimentam dinheiro, não enviam cobranças e não ativam o CRM automaticamente. Faça a liberação ou suspensão de acesso no ADM Master, após conferir o pagamento.</div>
+<nav class="tabs" aria-label="Seções financeiras">
+ <button type="button" class="tab active" data-tab="contracts">Contratos</button>
+ <button type="button" class="tab" data-tab="payments">Pagamentos</button>
+ <button type="button" class="tab" data-tab="audit">Histórico de alterações</button>
+</nav>
+<section id="section-contracts" class="section">
+ <div class="panel"><div class="bar"><div><h3>Cadastrar ou atualizar contrato</h3><p>Vincule cada contrato a uma conta já existente no CRM.</p></div></div>
+  <form id="contract-form"><div class="fields">
+   <div class="field-span2"><label for="company">Cliente PF, MEI ou PJ</label><select id="company" required><option value="">Selecione o cliente</option></select></div>
+   <div><label for="plan">Plano comercializado</label><select id="plan" required><option value="starter">Essencial</option><option value="professional">Profissional</option><option value="business">Empresarial</option></select></div>
+   <div><label for="contract-status">Situação do contrato</label><select id="contract-status"><option value="pending">Pendente</option><option value="active">Ativo</option><option value="suspended">Suspenso</option><option value="canceled">Cancelado</option></select></div>
+   <div><label for="monthly">Mensalidade (R$)</label><input type="number" id="monthly" min="0.01" max="10000000" step="0.01" required placeholder="149,90"></div>
+   <div><label for="start-date">Data da contratação</label><input type="date" id="start-date" required></div>
+   <div><label for="due-date">Próximo vencimento contratual</label><input type="date" id="due-date" required></div>
+   <div class="field-span4"><label for="contract-notes">Observações comerciais (opcional)</label><textarea id="contract-notes" maxlength="500" placeholder="Condições do plano e informações de acompanhamento. Não inclua dados de cartão."></textarea></div>
+  </div><div class="form-actions"><button type="submit">Salvar contrato financeiro</button><button class="secondary" id="clear-contract" type="button">Limpar campos</button></div></form>
+ </div>
+ <div class="panel"><div class="bar"><h3>Contratos cadastrados</h3><span class="subtle" id="contract-count"></span></div><div class="scroll"><table><thead><tr><th>Cliente</th><th>Tipo</th><th>Plano</th><th>Situação</th><th>Mensalidade</th><th>Vencimento</th><th>Ação</th></tr></thead><tbody id="contracts-body"></tbody></table></div></div>
+</section>
+<section id="section-payments" class="section" hidden>
+ <div class="panel"><h3>Registrar pagamento recebido</h3><p>Somente lance pagamentos realmente confirmados. Esse registro não realiza cobrança bancária.</p>
+  <form id="payment-form"><div class="fields">
+   <div class="field-span2"><label for="pay-company">Cliente contratado</label><select id="pay-company" required><option value="">Selecione o contrato</option></select></div>
+   <div><label for="reference">Competência (mês/ano)</label><input type="month" id="reference" required></div>
+   <div><label for="amount">Valor recebido (R$)</label><input type="number" id="amount" step="0.01" min="0.01" required></div>
+   <div><label for="paid-on">Data do recebimento</label><input type="date" id="paid-on" required></div>
+   <div><label for="method">Meio de pagamento</label><select id="method"><option>PIX</option><option>Boleto</option><option>Transferência</option><option>Cartão</option><option>Dinheiro</option><option>Outro</option></select></div>
+   <div class="field-span4"><label for="pay-notes">Referência do comprovante ou observações</label><textarea id="pay-notes" maxlength="400"></textarea></div>
+  </div><div class="form-actions"><button type="submit">Registrar recebimento</button></div></form>
+ </div>
+ <div class="panel"><div class="bar"><h3>Histórico de pagamentos</h3><span class="subtle" id="payment-count"></span></div><div class="scroll"><table><thead><tr><th>Cliente</th><th>Competência</th><th>Valor</th><th>Recebido em</th><th>Meio</th><th>Situação</th><th>Ação</th></tr></thead><tbody id="payments-body"></tbody></table></div></div>
+</section>
+<section id="section-audit" class="section" hidden>
+ <div class="panel"><h3>Auditoria financeira</h3><p>Últimas 100 movimentações. Não são armazenados dados de sessão, senhas ou tokens.</p><div class="scroll"><table><thead><tr><th>Data e hora</th><th>Responsável</th><th>Cliente</th><th>Ação</th><th>Registro</th></tr></thead><tbody id="audit-body"></tbody></table></div></div>
+</section>
+<footer>COMVERXA • Controle financeiro interno • Valores em BRL • Contratação e conciliação manual</footer>
+</main>
+<script>
+(function(){
+ "use strict";
+ const $=id=>document.getElementById(id);
+ let state={clients:[],contracts:[],payments:[],audit:[],today:""};
+ const money=n=>(Number(n||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+ const date=s=>s?String(s).slice(0,10).split("-").reverse().join("/"):"—";
+ const moneyCents=id=>Math.round(Number($(id).value)*100);
+ const txt=(v,limit=120)=>String(v??"").slice(0,limit);
+ const labelType=t=>({individual:"Pessoa física",mei:"MEI",business:"Pessoa jurídica"})[t]||"Pessoa jurídica";
+ const labelPlan=t=>({starter:"Essencial",professional:"Profissional",business:"Empresarial"})[t]||t;
+ const labelStatus=t=>({active:"Ativo",pending:"Pendente",suspended:"Suspenso",canceled:"Cancelado"})[t]||t;
+ const cell=(tr,value)=>{let c=tr.insertCell();c.textContent=txt(value,300);return c};
+ const notice=(id,message)=>{let e=$(id);e.textContent=message;e.style.display="block";setTimeout(()=>{e.style.display="none"},6500)};
+ const clearMessages=()=>{["error","success"].forEach(id=>$(id).style.display="none")};
+ const findClient=id=>state.clients.find(c=>c.id===id);
+ const submit=async(path,data)=>{const r=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-COMVERXA-Finance-Action":"1"},body:JSON.stringify(data)});const payload=await r.json().catch(()=>({}));if(!r.ok)throw Error(payload.error||"Operação recusada.");return payload};
+ const load=async()=>{
+  const r=await fetch("/api/master/finance/overview",{credentials:"same-origin"});
+  if(r.status===401){location.assign("/admin");return}
+  if(!r.ok)throw Error("Não foi possível consultar dados financeiros.");
+  state=await r.json();
+  render();
+ };
+ const mkOption=(select,value,label)=>{const opt=document.createElement("option");opt.value=value;opt.textContent=label;select.add(opt)};
+ const render=()=>{
+  const contracts=state.contracts||[],payments=(state.payments||[]).filter(p=>!p.voided_at),currentMonth=state.today.slice(0,7);
+  $("stat-contracts").textContent=contracts.filter(c=>c.status==="active").length;
+  $("stat-revenue").textContent=money(payments.filter(p=>String(p.paid_on).slice(0,7)===currentMonth).reduce((a,p)=>a+p.amount_cents,0));
+  $("stat-projection").textContent=money(contracts.filter(c=>c.status==="active").reduce((a,c)=>a+c.monthly_cents,0));
+  const next=new Date(state.today+"T12:00:00Z");next.setUTCDate(next.getUTCDate()+7);const max=next.toISOString().slice(0,10);
+  $("stat-due").textContent=contracts.filter(c=>c.status==="active"&&c.due_date>=state.today&&c.due_date<=max).length;
+  const current=$("company").value,paymentClient=$("pay-company").value;
+  $("company").replaceChildren();mkOption($("company"),"","Selecione o cliente");
+  (state.clients||[]).forEach(c=>mkOption($("company"),c.id,c.name+" — "+labelType(c.customer_type)));
+  $("company").value=(state.clients||[]).some(c=>c.id===current)?current:"";
+  $("pay-company").replaceChildren();mkOption($("pay-company"),"","Selecione o contrato");
+  contracts.forEach(c=>mkOption($("pay-company"),c.company_id,c.company_name+" — "+labelPlan(c.plan)));
+  $("pay-company").value=contracts.some(c=>c.company_id===paymentClient)?paymentClient:"";
+  $("contract-count").textContent=contracts.length+" registro(s)";
+  const body=$("contracts-body");body.replaceChildren();
+  contracts.forEach(c=>{
+   const tr=body.insertRow();cell(tr,c.company_name);cell(tr,labelType(c.customer_type));cell(tr,labelPlan(c.plan));
+   let status=cell(tr,labelStatus(c.status));status.className="pill "+c.status;
+   cell(tr,money(c.monthly_cents));cell(tr,date(c.due_date));
+   const action=tr.insertCell(),button=document.createElement("button");button.className="secondary";button.textContent="Editar";button.type="button";
+   button.onclick=()=>{switchTab("contracts");$("company").value=c.company_id;$("plan").value=c.plan;$("contract-status").value=c.status;$("monthly").value=(c.monthly_cents/100).toFixed(2);$("start-date").value=c.start_date;$("due-date").value=c.due_date;$("contract-notes").value=c.notes||"";$("contract-form").scrollIntoView({behavior:"smooth",block:"center"})};
+   action.append(button);
+  });
+  if(!contracts.length){let tr=body.insertRow();let td=tr.insertCell();td.colSpan=7;td.textContent="Nenhum contrato registrado. Cadastre o primeiro acima."}
+  const pb=$("payments-body");pb.replaceChildren();$("payment-count").textContent=(state.payments||[]).length+" lançamento(s)";
+  (state.payments||[]).forEach(p=>{
+   const tr=pb.insertRow();cell(tr,p.company_name);cell(tr,p.reference);cell(tr,money(p.amount_cents));cell(tr,date(p.paid_on));cell(tr,p.method);
+   const status=cell(tr,p.voided_at?"Estornado":"Confirmado");status.className="pill "+(p.voided_at?"suspended":"active");
+   const action=tr.insertCell();
+   if(!p.voided_at){let b=document.createElement("button");b.type="button";b.className="danger";b.textContent="Estornar";b.onclick=async()=>{const reason=prompt("Justificativa do estorno (mínimo 8 caracteres):");if(reason===null)return;try{await submit("/api/master/finance/payments/void",{id:p.id,reason});notice("success","Estorno registrado. O lançamento original foi preservado.");await load()}catch(e){notice("error",e.message)}};action.append(b)}
+  });
+  if(!(state.payments||[]).length){let tr=pb.insertRow(),td=tr.insertCell();td.colSpan=7;td.textContent="Nenhum pagamento registrado."}
+  const audit=$("audit-body");audit.replaceChildren();
+  (state.audit||[]).forEach(a=>{let tr=audit.insertRow();cell(tr,new Date(a.recorded_at).toLocaleString("pt-BR"));cell(tr,a.actor);cell(tr,(findClient(a.company_id)||{}).name||a.company_id);cell(tr,a.action);cell(tr,a.description)});
+  if(!(state.audit||[]).length){let tr=audit.insertRow(),td=tr.insertCell();td.colSpan=5;td.textContent="Nenhuma alteração registrada."}
+ };
+ function switchTab(name){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));document.querySelectorAll(".section").forEach(s=>s.hidden=s.id!=="section-"+name)}
+ document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+ $("refresh").onclick=()=>{clearMessages();load().catch(e=>notice("error",e.message))};
+ $("clear-contract").onclick=()=>{$("contract-form").reset();$("start-date").value=state.today};
+ $("contract-form").onsubmit=async ev=>{
+  ev.preventDefault();clearMessages();
+  const data={company_id:$("company").value,plan:$("plan").value,status:$("contract-status").value,monthly_cents:moneyCents("monthly"),start_date:$("start-date").value,due_date:$("due-date").value,notes:$("contract-notes").value};
+  try{if(!Number.isSafeInteger(data.monthly_cents)||data.monthly_cents<=0)throw Error("Informe uma mensalidade válida.");await submit("/api/master/finance/contracts",data);notice("success","Contrato salvo. O acesso ao CRM não foi alterado.");await load()}catch(e){notice("error",e.message)}
+ };
+ $("payment-form").onsubmit=async ev=>{
+  ev.preventDefault();clearMessages();
+  const data={company_id:$("pay-company").value,reference:$("reference").value,amount_cents:moneyCents("amount"),paid_on:$("paid-on").value,method:$("method").value,notes:$("pay-notes").value};
+  try{if(!Number.isSafeInteger(data.amount_cents)||data.amount_cents<=0)throw Error("Informe um valor válido.");if(!confirm("Você já confirmou o recebimento real de "+money(data.amount_cents)+"?"))return;await submit("/api/master/finance/payments",data);$("payment-form").reset();$("paid-on").value=state.today;$("reference").value=state.today.slice(0,7);notice("success","Pagamento registrado com sucesso. Nenhuma liberação de acesso foi feita.");await load()}catch(e){notice("error",e.message)}
+ };
+ $("export").onclick=async()=>{try{const r=await fetch("/api/master/finance/export",{credentials:"same-origin"});if(!r.ok)throw Error("Exportação não autorizada.");const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="comverxa-financeiro-"+(state.today||"dados")+".csv";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200)}catch(e){notice("error",e.message)}};
+ load().then(()=>{$("start-date").value=state.today;$("paid-on").value=state.today;$("reference").value=state.today.slice(0,7)}).catch(e=>notice("error",e.message));
+})();
+</script></body></html>
