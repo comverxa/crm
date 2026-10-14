@@ -39,6 +39,16 @@ Altere `site/index.html` e/ou `site/assets/style.css` e faça commit na branch `
 
 A página comercial não possui endpoint próprio de captura de leads. Para receber solicitações de contato sem exigir uma nova conta no CRM, é necessário configurar um canal comercial oficial e um endpoint/formulário com tratamento de dados e consentimento apropriados. Não anuncie essa função como existente antes de implementá-la.
 
+## Administração da plataforma (titular)
+
+- **Área protegida do proprietário:** https://app.comverxa.com.br/admin
+- O acesso é distinto do cadastro comum do CRM e exige autenticação própria; conhecer o endereço ou informar um e-mail não garante acesso.
+- O cadastro de empresas já diferencia **Pessoa Física, MEI e Pessoa Jurídica** e mantém dados e limites por cliente.
+- O backend possui gerenciamento administrativo de planos (teste, ativo, suspenso) e solicitações de contratação. Só marcar o status `active` após confirmação efetiva do pagamento.
+- A comercialização com renovação e pagamentos recorrentes automatizados depende de integração financeira. Não anunciar cobrança automática como disponível antes da validação.
+- Logs completos de login, alteração por usuário e relatórios de faturamento devem ser testados especificamente antes de oferecê-los como recursos contratados.
+- Nunca salvar chave de administração, token de acesso ou e-mail privado do titular no GitHub Pages nem neste repositório.
+
 ## Segurança e conteúdo
 
 **Nunca** envie para este repositório credenciais, tokens Meta, chaves API, dados reais de clientes, arquivos SQLite ou variáveis secretas. Evite usar depoimentos, resultados ou números de performance sem comprovação. Os números exibidos na prévia do sistema são fictícios, utilizados exclusivamente para ilustrar a interface.
