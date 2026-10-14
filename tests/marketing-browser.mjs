@@ -34,7 +34,7 @@ for(const size of [{width:390,height:844,name:"iPhone"},{width:1440,height:900,n
  }catch(error){problems.push(size.name+": "+error.message)}
  finally{await page.close()}
 }
-for(const relative of ["privacidade.html","termos.html"]){
+for(const relative of ["privacidade.html","termos.html","acesso.html"]){
  const page=await browser.newPage({viewport:{width:375,height:812}});
  try{
   const response=await page.goto(base+relative,{waitUntil:"domcontentloaded",timeout:30000});
