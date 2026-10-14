@@ -54,7 +54,7 @@ const wrongCsrf=await post("/api/master/billing-lab/invoices",payload,{csrfHeade
 assert.equal(wrongCsrf.status,403);
 const external=await post("/api/master/billing-lab/invoices",payload,{origin:"https://example.com"});
 assert.equal(external.status,403);
-const crossSite=await post("/api/master/billing-lab/invoices",payload,{fetchSite:"cross-site"});
+const crossSite=await post("/api/master/billing-lab/invoices",payload,{fetchSite:"cross-site",origin:"https://attacker.example"});
 assert.equal(crossSite.status,403);
 const absentCookie=await post("/api/master/billing-lab/invoices",payload,{cookies:cookie});
 assert.equal(absentCookie.status,403);
@@ -64,11 +64,18 @@ const saved=await good.json();
 assert.equal(saved.realPayment,false);
 assert.equal(saved.accessChanged,false);
 assert.equal(saved.invoice.amount_cents,100);
+// Railway forwards public HTTPS traffic to internal HTTP; protect by canonical origin,
+// not the internal transport scheme. CSRF and admin session remain mandatory.
+const proxyPayload={...payload,reference:"2026-11"};
+const proxyHeaders={"Cookie":joinedCookies,"Origin":base,"Content-Type":"application/json","X-COMVERXA-Billing-Lab":"sandbox","X-COMVERXA-Billing-CSRF":csrf};
+const proxyRequest=new Request("http://app.comverxa.com.br/api/master/billing-lab/invoices",{method:"POST",headers:proxyHeaders,body:JSON.stringify(proxyPayload)});
+const proxyReply=await captured(proxyRequest);
+assert.equal(proxyReply.status,201,await proxyReply.clone().text());
+const opaqueCrossSite=await post("/api/master/billing-lab/mark-paid",{id:saved.invoice.id},{origin:"null",fetchSite:"cross-site"});
+assert.equal(opaqueCrossSite.status,200,await opaqueCrossSite.clone().text());
 const duplicate=await post("/api/master/billing-lab/invoices",payload);
 assert.equal(duplicate.status,409);
-const paid=await post("/api/master/billing-lab/mark-paid",{id:saved.invoice.id});
-assert.equal(paid.status,200);
-const result=await paid.json();
+const result=await opaqueCrossSite.json();
 assert.equal(result.simulated,true);
 assert.equal(result.paymentReceived,false);
 assert.equal(result.crmAccessChanged,false);
