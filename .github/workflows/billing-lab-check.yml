@@ -21,7 +21,7 @@ jobs:
           const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
           if(scripts.length!==1)throw Error('Expected exactly one script');
           new Function(scripts[0][1]);
-          const markers=['COMVERXA_BILLING_MODE!=="sandbox"','/data/comverxa-billing-lab.sqlite','/api/master/me','/api/master/overview','realChargesEnabled:false','automaticAccessChanges:false','X-COMVERXA-Billing-Lab','PAID_SIMULATED'];
+          const markers=['COMVERXA_BILLING_MODE!=="sandbox"','/data/comverxa-billing-lab.sqlite','/api/master/me','/api/master/overview','realChargesEnabled:false','automaticAccessChanges:false','x-comverxa-billing-lab','PAID_SIMULATED'];
           for(const marker of markers)if(!middleware.includes(marker))throw Error('Missing sandbox invariant '+marker);
           if(middleware.includes('/api/master/plan')||middleware.includes('/api/master/finance/payments"'))throw Error('Unexpected changes to real billing/access paths');
           for(const marker of ['TESTE','FICTÍCIO','/api/master/billing-lab/overview','/api/master/billing-lab/mark-paid'])if(!html.includes(marker))throw Error('UI sandbox invariant '+marker);
