@@ -18,6 +18,8 @@ for(const size of [{width:390,height:844,name:"iPhone"},{width:1440,height:900,n
   const demo=page.getByRole("link",{name:/Solicitar demonstração por e-mail/i});
   assert.ok(await demo.count(),size.name+" demo CTA missing");
   assert.ok((await demo.first().getAttribute("href")).startsWith("mailto:"));
+  const customerLinks=await page.locator('a[href="./acesso.html"]').count();
+  assert.ok(customerLinks>=1,size.name+" customer access links missing");
   const links=await page.locator('a[href="./privacidade.html"],a[href="./termos.html"]').count();
   assert.ok(links>=2,size.name+" legal links absent");
   if(size.name==="iPhone"){
