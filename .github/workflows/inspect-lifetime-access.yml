@@ -1,0 +1,27 @@
+name: Inspecionar fluxo publico de licencas COMVERXA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/inspect-lifetime-access.yml
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspecionar apenas codigo frontend publicado
+        run: |
+          node - <<'NODE'
+          const r=await fetch('https://app.comverxa.com.br/');
+          const html=await r.text();
+          for(const term of ['paid_until','trial_until','activate','Ativar 30d','/api/master','/api/register','registerForm','function register','function login','planBadge','license','subscription']){
+           const loc=[];let pos=0;
+           while((pos=html.indexOf(term,pos))!==-1&&loc.length<9){
+            const snippet=html.slice(Math.max(0,pos-260),Math.min(html.length,pos+500)).replace(/\s+/g,' ').slice(0,720);
+            loc.push({at:pos,near:snippet});pos+=term.length;
+           }
+           console.log(JSON.stringify({term,hits:loc}));
+          }
+          const paths=[...new Set([...html.matchAll(/\/(?:api|admin)\/[A-Za-z0-9_/?=&-]+/g)].map(m=>m[0]))];
+          console.log(JSON.stringify({paths}));
+          NODE
