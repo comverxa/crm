@@ -14,7 +14,7 @@ jobs:
           node - <<'NODE'
           const r=await fetch('https://app.comverxa.com.br/');
           const html=await r.text();
-          for(const term of ['paid_until','trial_until','activate','Ativar 30d','/api/master','/api/register','registerForm','function register','function login','planBadge','license','subscription']){
+          for(const term of ['api/platform/clients/plan','async function renderPlatform','platformClients','/api/billing','company.status','/api/signup','owner','const api=','function api(']){
            const loc=[];let pos=0;
            while((pos=html.indexOf(term,pos))!==-1&&loc.length<9){
             const snippet=html.slice(Math.max(0,pos-260),Math.min(html.length,pos+500)).replace(/\s+/g,' ').slice(0,720);
