@@ -1,0 +1,27 @@
+name: Validar modulo financeiro COMVERXA
+on:
+  push:
+    paths:
+      - backend/finance-middleware.js
+      - backend/finance-ui.html
+      - .github/workflows/finance-check.yml
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar sintaxe do backend e do JavaScript da interface
+        run: |
+          node --check backend/finance-middleware.js
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const html=fs.readFileSync('backend/finance-ui.html','utf8');
+          const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+          if(scripts.length!==1)throw Error('Esperado script unico');
+          new Function(scripts[0][1]);
+          if(!html.includes('finance/overview')||!html.includes('finance/contracts')||!html.includes('finance/payments'))throw Error('Fluxo financeiro incompleto');
+          const code=fs.readFileSync('backend/finance-middleware.js','utf8');
+          for(const marker of ['"/api/master/me"','"/api/master/overview"','cvx_finance_audit','financialDb.transaction','FINANCE_HTML'])if(!code.includes(marker))throw Error('Guard missing: '+marker);
+          console.log('OK: sintaxe, rotas de autenticacao, transacoes e auditoria presentes');
+          NODE
