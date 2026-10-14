@@ -10,13 +10,15 @@ const ltNow=()=>new Date().toISOString();
 const ltUntil=253402300799; // 9999-12-31T23:59:59Z, platform storage in UNIX seconds.
 const ltEmail=x=>typeof x==="string"?x.trim().toLowerCase():"";
 const ltEmailValid=x=>/^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/.test(x)&&x.length<=254;
+const ltOwnerEmail=ltEmail(Bun.env.COMVERXA_COURTESY_EMAIL_1||"");
+if(!ltEmailValid(ltOwnerEmail))throw Error("Configuração da primeira licença indisponível.");
 const ltReply=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
 const ltErr=(msg,status=400)=>ltReply({error:msg},status);
 const ltGetUser=email=>ltDb.query("SELECT u.id,u.company_id,u.role,c.name as company_name FROM users u JOIN companies c ON c.id=u.company_id WHERE lower(u.email)=?").get(email);
 const ltUserCount=id=>ltDb.query("SELECT COUNT(*) as total FROM users WHERE company_id=?").get(id).total;
 const ltSeats=()=>ltDb.query("SELECT slot,email,company_id,status,initial_checked,activated_at FROM cxv_lifetime_seats ORDER BY slot").all();
 ltDb.transaction(()=>{
- ltDb.query("INSERT OR IGNORE INTO cxv_lifetime_seats(slot,email,company_id,status,initial_checked,created_at,updated_at) VALUES(1,'joaopaulo.loovi@gmail.com',NULL,'reserved',0,?,?)").run(ltNow(),ltNow());
+ ltDb.query("INSERT OR IGNORE INTO cxv_lifetime_seats(slot,email,company_id,status,initial_checked,created_at,updated_at) VALUES(1,?,NULL,'reserved',0,?,?)").run(ltOwnerEmail,ltNow(),ltNow());
  ltDb.query("INSERT OR IGNORE INTO cxv_lifetime_seats(slot,email,company_id,status,initial_checked,created_at,updated_at) VALUES(2,NULL,NULL,'reserved',1,?,?)").run(ltNow(),ltNow());
 })();
 const ltActivate=(slot,actor)=>{
