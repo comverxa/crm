@@ -1,0 +1,35 @@
+name: Testar financeiro COMVERXA em producao
+on:
+  push:
+    paths:
+      - .github/workflows/finance-live-smoke.yml
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checar disponibilidade, integracao e acesso restrito
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br';
+          const check=async(name,path,init,statuses)=>{
+            const response=await fetch(base+path,{redirect:'manual',signal:AbortSignal.timeout(12000),...init});
+            const ok=statuses.includes(response.status);
+            console.log((ok?'PASS':'FAIL')+' | '+name+' | HTTP '+response.status);
+            if(!ok)throw Error('Falha em '+name);
+            return response;
+          };
+          const h=await check('Healthcheck','/healthz',{},[200]);
+          const health=await h.json();
+          if(health.status!=='ok')throw Error('Saude inesperada');
+          const master=await check('ADM Master publico','/admin',{},[200]);
+          const page=await master.text();
+          if(!page.includes('/admin/finance'))throw Error('Link financeiro nao inserido no ADM Master');
+          await check('Financeiro sem login','/admin/finance',{},[301,302,303,401,403]);
+          await check('Dados protegidos','/api/master/finance/overview',{},[401,403]);
+          await check('Exportacao protegida','/api/master/finance/export',{},[401,403]);
+          await check('Contrato protegido','/api/master/finance/contracts',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','X-COMVERXA-Finance-Action':'1'},body:JSON.stringify({company_id:'fake',plan:'starter',status:'active',monthly_cents:5000,start_date:'2026-10-14',due_date:'2026-11-14'})},[401,403]);
+          await check('Pagamento protegido','/api/master/finance/payments',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','X-COMVERXA-Finance-Action':'1'},body:JSON.stringify({company_id:'fake',reference:'2026-10',amount_cents:5000,paid_on:'2026-10-14',method:'PIX'})},[401,403]);
+          console.log('COMVERXA Finance smoke test: todos os cenarios de superficie aprovados');
+          NODE
