@@ -70,7 +70,7 @@ assert.equal(overview.active,2);
 assert.equal(overview.seats.filter(x=>x.status==="active").length,2);
 assert.equal(chk.query("SELECT status,paid_until FROM companies WHERE id='c2'").get().paid_until,253402300799);
 assert.equal((await post("reserve",{slot:2,email:"third@example.test"})).status,409);
-const audit=chk.query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cvx%'").all().map(x=>x.name);
+const audit=chk.query("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'cxv%'").all().map(x=>x.name);
 assert.deepEqual(audit,["cxv_lifetime_seats"]);
 const seats=chk.query("SELECT slot,email,status FROM cxv_lifetime_seats ORDER BY slot").all();
 assert.deepEqual(seats.map(x=>x.slot),[1,2]);
