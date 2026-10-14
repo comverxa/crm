@@ -1,0 +1,21 @@
+name: COMVERXA - Teste visual premium
+on:
+  push:
+    paths:
+      - tests/marketing-browser.mjs
+      - site/index.html
+      - site/assets/style.css
+      - site/privacidade.html
+      - site/termos.html
+      - .github/workflows/marketing-browser.yml
+  workflow_dispatch:
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar navegador de testes
+        run: npm install --no-save playwright-core@1.56.1
+      - name: Verificar responsividade, CTAs e paginas legais
+        run: node tests/marketing-browser.mjs
