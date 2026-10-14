@@ -143,13 +143,14 @@ Bun.serve=function(labConfig){
     if(!current)return labError("Cobrança de teste não encontrada.",404);
     if(current.status!=="PAID_SIMULATED")return labError("Somente uma competência paga no simulador pode ser renovada.",409);
     const nextReference=labNextReference(current.reference),nextDueDate=labNextMonthDate(current.due_date);
-    const result=labDb.transaction(()=>{
+    let result;
+    try{result=labDb.transaction(()=>{
      // UNIQUE(company_id,reference) makes repeat clicks safely conflict.
      const row=labDb.query("INSERT INTO lab_invoices(company_id,company_name,customer_type,reference,amount_cents,due_date,status,created_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)").run(current.company_id,current.company_name,current.customer_type,nextReference,current.amount_cents,nextDueDate,"PENDING",labNow(),actor);
      const created=labDb.query("SELECT * FROM lab_invoices WHERE id=?").get(Number(row.lastInsertRowid));
      labEvent(created,actor,"RENOVACAO_FICTICIA","Renovação simulada de "+current.reference+" para "+nextReference+". Sem cobrança nem alteração de acesso.");
      return created;
-    })();
+    })();}catch(err){if(String(err).includes("UNIQUE"))return labError("A competência seguinte já possui cobrança de teste.",409);throw err}
     return labJSON({ok:true,sandbox:true,renewedFrom:id,invoice:result,realCharge:false,accessChanged:false},201);
    }
    if(route==="/api/master/billing-lab/remind"&&method==="POST"){
