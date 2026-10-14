@@ -18,3 +18,21 @@ jobs:
             console.log(JSON.stringify({path:path.split('?')[0],status:r.status,type:r.headers.get('content-type'),wrapper:r.headers.get('x-comverxa-wrapper-diagnostic'),verifyMarker:r.headers.get('x-comverxa-admin-verify'),csp:r.headers.get('content-security-policy'),starts:text.slice(0,90)}));
           }
           NODE
+
+      - name: Verify invalid admin tokens stay blocked
+        run: |
+          node - <<'NODE'
+          const url='https://app.comverxa.com.br/admin/confirm';
+          for(const origin of ['null','https://app.comverxa.com.br']){
+            const r=await fetch(url,{
+              method:'POST',
+              headers:{'content-type':'application/x-www-form-urlencoded',origin},
+              body:'token='+('0'.repeat(64)),
+              redirect:'manual',
+              signal:AbortSignal.timeout(15000)
+            });
+            console.log(JSON.stringify({kind:'invalid-admin-confirm',origin,status:r.status}));
+            if(origin==='null' && r.status!==403)process.exit(1);
+            if(origin!=='null' && (r.status!==400 && r.status!==403))process.exit(1);
+          }
+          NODE
