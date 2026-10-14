@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Laboratório de Cobranças | COMVERXA ADM Master</title>
+<style>
+:root{font:15px/1.5 Inter,system-ui,"Segoe UI",Arial,sans-serif;background:#f2f6fa;color:#18364a}*{box-sizing:border-box}body{margin:0;-webkit-font-smoothing:antialiased}
+header{background:linear-gradient(120deg,#102b40,#16534f);color:white;padding:23px max(18px,4.5vw);display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+header strong{font-size:23px;letter-spacing:.01em}header small{display:block;color:#abd8cc;letter-spacing:.14em;font-weight:800;margin-bottom:2px}
+header nav{display:flex;gap:9px;flex-wrap:wrap}header a{color:#ebfff9;border:1px solid #ffffff52;border-radius:11px;padding:9px 13px;text-decoration:none;font-weight:750}
+main{max-width:1440px;margin:auto;padding:30px 26px 55px}.tag{display:inline-block;background:#fff2cf;border:1px solid #f0d493;color:#875607;font-size:12px;padding:6px 10px;border-radius:99px;font-weight:900;letter-spacing:.06em}
+h1{font-size:clamp(25px,3vw,35px);margin:13px 0 8px;letter-spacing:-.04em}h2{margin:0 0 8px;font-size:20px;letter-spacing:-.03em}p{color:#657f90;margin:7px 0 20px;line-height:1.6}
+.info{background:#fff5da;border:1px solid #ecd69a;border-left:5px solid #d49d35;padding:15px 19px;border-radius:12px;margin:22px 0;color:#7b5916}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:22px 0}.stat{background:white;border:1px solid #dee8ef;border-top:3px solid #23aa94;border-radius:16px;padding:20px;box-shadow:0 6px 22px #1e3c4b0a}.stat:nth-child(2){border-top-color:#7a9bdd}.stat:nth-child(3){border-top-color:#e6b45a}.stat:nth-child(4){border-top-color:#aa92d8}.stat small{display:block;color:#72899c}.stat b{display:block;font-size:29px;letter-spacing:-.035em;margin-top:7px;font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:minmax(330px,.85fr) minmax(400px,1.4fr);gap:18px;align-items:start}.card{background:#fff;border:1px solid #dfe8ef;border-radius:17px;padding:24px;box-shadow:0 7px 24px #1d40530d;margin-bottom:20px}
+label{display:block;font-size:13px;font-weight:720;color:#557081;margin:16px 0 6px}input,select{width:100%;padding:12px;border:1px solid #cedde7;border-radius:10px;background:#fff;color:#18384d;font:inherit;min-height:44px}
+input:focus,select:focus{outline:3px solid #25b5aa32;border-color:#189e91}button{border:1px solid #0c8073;border-radius:10px;padding:11px 15px;background:#0e8678;color:white;font-size:14px;font-weight:800;cursor:pointer;min-height:43px}button:disabled{opacity:.5;cursor:not-allowed}button:hover:not(:disabled){filter:brightness(.96)}button.alt{background:#f1f7fa;color:#205061;border-color:#d2e2e9}button.cancel{background:#fff0ef;color:#ac4f47;border-color:#f2d8d5}button.small{padding:7px 10px;font-size:12px;min-height:34px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}.label{font-size:12px;color:#71899b}.pill{border-radius:99px;padding:5px 10px;display:inline-block;background:#eaf3f8;color:#3f6678;font-size:12px;font-weight:800}.pill.PAID_SIMULATED{background:#e4f7ed;color:#15725a}.pill.CANCELED{background:#fce9e7;color:#9c4c43}.pill.OVERDUE{background:#fff0d2;color:#976715}
+.scroller{width:100%;overflow-x:auto;border-radius:12px;border:1px solid #e0e8ee}table{border-collapse:separate;border-spacing:0;width:100%;min-width:680px}th{text-align:left;background:#f4f8fa;font-size:11px;letter-spacing:.055em;color:#708596;text-transform:uppercase;padding:13px}td{border-top:1px solid #edf2f5;padding:13px;vertical-align:middle}
+.notice{padding:11px 13px;border-radius:9px;margin:16px 0;display:none}.notice.error{background:#fff0ef;color:#a03f42}.notice.success{background:#e5f8ef;color:#137154}
+footer{text-align:center;color:#7d96a5;font-size:12px;padding:18px}.topline{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){main{padding:22px 12px}.card{padding:16px}.stat{padding:14px}.stat b{font-size:24px}header{padding:18px 15px}}
+</style></head>
+<body><header><div><small>COMVERXA / ADMIN MASTER</small><strong>Laboratório de Cobranças</strong></div><nav><a href="/admin/finance">← Financeiro e Contratos</a><a href="/admin">Painel Master</a></nav></header>
+<main><span class="tag">AMBIENTE DE TESTES · SEM PAGAMENTOS REAIS</span>
+<h1>Prepare suas cobranças com segurança</h1>
+<p>Simule mensalidades, pagamentos, vencimentos e cancelamentos sem conectar a bancos, criar PIX ou boleto, movimentar dinheiro ou liberar o acesso de clientes.</p>
+<div class="info"><strong>SIMULAÇÃO:</strong> todos os valores desta tela são fictícios e não entram no financeiro real da COMVERXA. O recebimento simulado não é comprovante de pagamento e não altera assinaturas.</div>
+<div class="stats" aria-label="Indicadores de teste">
+<div class="stat"><small>Cobranças simuladas</small><b id="k-total">—</b></div>
+<div class="stat"><small>Pendentes (TESTE)</small><b id="k-pending">—</b></div>
+<div class="stat"><small>Valor pago (FICTÍCIO)</small><b id="k-paid">—</b></div>
+<div class="stat"><small>Vencidas (TESTE)</small><b id="k-overdue">—</b></div>
+</div>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+<div class="grid">
+<section class="card"><h2>Criar cobrança fictícia</h2><p>Selecione um cliente já existente no CRM para testar seu ciclo de mensalidade.</p>
+<form id="create">
+<label for="company">Cliente PF, MEI ou PJ</label><select id="company" required><option value="">Carregando clientes...</option></select>
+<label for="reference">Competência</label><input id="reference" type="month" required>
+<label for="amount">Valor fictício (R$)</label><input id="amount" type="number" min="0.01" max="10000000" step="0.01" placeholder="99,90" required>
+<label for="due">Vencimento simulado</label><input id="due" type="date" required>
+<div class="actions" style="margin-top:22px"><button type="submit" id="btn-create">Criar cobrança de TESTE</button><button class="alt" id="refresh" type="button">Atualizar</button></div></form>
+</section>
+<section class="card"><div class="topline"><div><h2>Cobranças de teste</h2><p>Simule pagamento ou cancelamento. Os lançamentos e eventos permanecem registrados.</p></div><span class="pill">100% SANDBOX</span></div>
+<div class="scroller"><table><thead><tr><th>Cliente</th><th>Competência</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead><tbody id="rows"><tr><td colspan="6">Carregando...</td></tr></tbody></table></div></section></div>
+<section class="card"><div class="topline"><h2>Histórico das simulações</h2><span class="label">Últimos 150 eventos auditados</span></div><div class="scroller"><table><thead><tr><th>Data/hora</th><th>Evento</th><th>Responsável</th><th>Descrição</th></tr></thead><tbody id="events"><tr><td colspan="4">Carregando...</td></tr></tbody></table></div></section>
+<footer>COMVERXA · Simulador interno · Sem API bancária · Sem cobrança real · Sem alteração de acessos</footer>
+</main>
+<script>(function(){"use strict";
+const $=id=>document.getElementById(id);
+const fmt=x=>(Number(x||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const date=x=>x?String(x).slice(0,10).split("-").reverse().join("/"):"—";
+const kinds={individual:"Pessoa Física",mei:"MEI",business:"Pessoa Jurídica"};
+let state={clients:[],invoices:[],events:[],today:""};
+function notify(m,bad){const x=$("notice");x.className="notice "+(bad?"error":"success");x.style.display="block";x.textContent=m;x.scrollIntoView({behavior:"smooth",block:"nearest"})}
+function cell(row,t){const td=row.insertCell();td.textContent=String(t??"");return td}
+async function call(path,body){const r=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-COMVERXA-Billing-Lab":"sandbox"},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Operação recusada.");return d}
+async function load(){
+const r=await fetch("/api/master/billing-lab/overview",{credentials:"same-origin"});if(r.status===401){location.assign("/admin");return}
+if(!r.ok)throw Error("Laboratório indisponível. Verifique a sessão do ADM Master.");
+const d=await r.json();if(d.mode!=="SANDBOX"||d.realChargesEnabled!==false||d.automaticAccessChanges!==false)throw Error("Proteção do modo de testes indisponível.");
+state=d;render();
+}
+function render(){
+const all=state.invoices||[],paid=all.filter(x=>x.status==="PAID_SIMULATED"),pending=all.filter(x=>x.status==="PENDING"),overdue=pending.filter(x=>x.due_date<state.today);
+$("k-total").textContent=all.length;$("k-pending").textContent=pending.length;$("k-paid").textContent=fmt(paid.reduce((sum,x)=>sum+Number(x.amount_cents),0));$("k-overdue").textContent=overdue.length;
+const select=$("company"),old=select.value;select.replaceChildren();const none=document.createElement("option");none.value="";none.textContent="Selecione um cliente";select.add(none);
+(state.clients||[]).forEach(x=>{const option=document.createElement("option");option.value=x.id;option.textContent=x.name+" — "+(kinds[x.customer_type]||"Cliente");select.add(option)});select.value=(state.clients||[]).some(x=>x.id===old)?old:"";
+const tbody=$("rows");tbody.replaceChildren();all.forEach(x=>{
+const row=tbody.insertRow();cell(row,x.company_name);cell(row,x.reference);cell(row,fmt(x.amount_cents));cell(row,date(x.due_date));
+const label=x.status==="PENDING"&&x.due_date<state.today?"OVERDUE":x.status;const status=cell(row,({PENDING:"Pendente",OVERDUE:"Vencido",PAID_SIMULATED:"Pago (SIMULADO)",CANCELED:"Cancelado"})[label]);status.className="pill "+label;
+const td=row.insertCell();if(x.status==="PENDING"){const controls=document.createElement("div");controls.className="actions";const pay=document.createElement("button");pay.textContent="Simular pagamento";pay.className="small";pay.onclick=async()=>{if(!confirm("SIMULAÇÃO: marcar esta cobrança como paga de forma FICTÍCIA, sem receber dinheiro e sem liberar acesso?"))return;pay.disabled=true;try{await call("/api/master/billing-lab/mark-paid",{id:x.id});notify("Pagamento de teste registrado. Nenhum valor foi recebido.");await load()}catch(err){notify(err.message,true)}finally{pay.disabled=false}};const cancel=document.createElement("button");cancel.textContent="Cancelar teste";cancel.className="cancel small";cancel.onclick=async()=>{if(!confirm("Cancelar esta cobrança FICTÍCIA?"))return;cancel.disabled=true;try{await call("/api/master/billing-lab/cancel",{id:x.id});notify("Cobrança fictícia cancelada.");await load()}catch(err){notify(err.message,true)}finally{cancel.disabled=false}};controls.append(pay,cancel);td.append(controls)}else td.textContent="—";
+});
+if(!all.length){const tr=tbody.insertRow();cell(tr,"Nenhuma cobrança simulada. Crie a primeira ao lado.").colSpan=6}
+const events=$("events");events.replaceChildren();(state.events||[]).forEach(x=>{const tr=events.insertRow();cell(tr,new Date(x.recorded_at).toLocaleString("pt-BR"));cell(tr,x.event_type);cell(tr,x.actor);cell(tr,x.note)});if(!(state.events||[]).length){const tr=events.insertRow();cell(tr,"Nenhuma simulação registrada.").colSpan=4}
+}
+$("create").onsubmit=async ev=>{ev.preventDefault();const button=$("btn-create");button.disabled=true;try{const cents=Math.round(Number($("amount").value)*100);if(!Number.isSafeInteger(cents)||cents<1)throw Error("Informe um valor válido.");await call("/api/master/billing-lab/invoices",{company_id:$("company").value,reference:$("reference").value,due_date:$("due").value,amount_cents:cents});notify("Cobrança fictícia criada. Nenhum boleto, PIX ou pagamento foi gerado.");await load()}catch(e){notify(e.message,true)}finally{button.disabled=false}};
+$("refresh").onclick=()=>load().catch(e=>notify(e.message,true));
+load().then(()=>{$("reference").value=state.today.slice(0,7);$("due").value=state.today}).catch(e=>notify(e.message,true));
+})();</script></body></html>
