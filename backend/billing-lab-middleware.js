@@ -21,6 +21,33 @@ const labBody=async req=>{
  if(!data||Array.isArray(data)||typeof data!=="object")throw Error("Conteúdo inválido.");
  return data;
 };
+// Date-only arithmetic is done in UTC to avoid DST and timezone drift.
+const labDaysUntil=(date,today)=>Math.round((Date.parse(date+"T00:00:00Z")-Date.parse(today+"T00:00:00Z"))/86400000);
+const labNextMonthDate=date=>{
+ if(!labValidDate(date))throw Error("Vencimento inválido.");
+ const [y,m,d]=date.split("-").map(Number);
+ const next=new Date(Date.UTC(y,m,1));
+ const yy=next.getUTCFullYear(),mm=next.getUTCMonth()+1;
+ const end=new Date(Date.UTC(yy,mm,0)).getUTCDate();
+ return String(yy).padStart(4,"0")+"-"+String(mm).padStart(2,"0")+"-"+String(Math.min(d,end)).padStart(2,"0");
+};
+const labNextReference=reference=>{
+ if(!labReference(reference))throw Error("Competência inválida.");
+ const [yy,mm]=reference.split("-").map(Number);
+ const n=new Date(Date.UTC(yy,mm,1));
+ return n.toISOString().slice(0,7);
+};
+const labSummary=(invoices,today)=>{
+ const pending=invoices.filter(i=>i.status==="PENDING");
+ const overdue=pending.filter(i=>i.due_date<today);
+ const dueSoon=pending.filter(i=>labDaysUntil(i.due_date,today)>=0&&labDaysUntil(i.due_date,today)<=7);
+ const unpaid=(arr)=>arr.reduce((total,i)=>total+i.amount_cents,0);
+ const aging=[{key:"1_7",min:1,max:7},{key:"8_30",min:8,max:30},{key:"31_plus",min:31,max:365000}].map(b=>{
+  const group=overdue.filter(i=>{const days=-labDaysUntil(i.due_date,today);return days>=b.min&&days<=b.max});
+  return {key:b.key,count:group.length,amount_cents:unpaid(group)};
+ });
+ return {due_soon_count:dueSoon.length,due_soon_cents:unpaid(dueSoon),overdue_count:overdue.length,overdue_cents:unpaid(overdue),aging};
+};
 const labEvent=(invoice,actor,type,note)=>labDb.query("INSERT INTO lab_events(invoice_id,company_id,actor,event_type,recorded_at,note) VALUES(?,?,?,?,?,?)").run(invoice.id,invoice.company_id,actor,type,labNow(),note);
 const labUI=__COMVERXA_LAB_HTML__;
 const labTokenCookie="__Host-cvx-billing-csrf";
@@ -87,7 +114,8 @@ Bun.serve=function(labConfig){
     const r=await master(req,server,"/api/master/overview");
     if(r.status!==200)return labError("Não foi possível verificar a lista de clientes.",503);
     const d=await r.json();if(!Array.isArray(d.clients))return labError("Clientes indisponíveis.",503);
-    return labJSON({mode:"SANDBOX",provider:"SIMULADOR_INTERNO",realChargesEnabled:false,automaticAccessChanges:false,clients:d.clients.map(c=>({id:String(c.id),name:c.name,customer_type:c.customer_type,plan:c.plan})),invoices:labDb.query("SELECT * FROM lab_invoices ORDER BY id DESC LIMIT 2000").all(),events:labDb.query("SELECT * FROM lab_events ORDER BY id DESC LIMIT 150").all(),today:labDate()});
+    const all=labDb.query("SELECT * FROM lab_invoices ORDER BY id DESC LIMIT 2000").all(),today=labDate();
+    return labJSON({mode:"SANDBOX",provider:"SIMULADOR_INTERNO",realChargesEnabled:false,automaticAccessChanges:false,remindersSent:false,clients:d.clients.map(c=>({id:String(c.id),name:c.name,customer_type:c.customer_type,plan:c.plan})),invoices:all,events:labDb.query("SELECT * FROM lab_events ORDER BY id DESC LIMIT 150").all(),today,alerts:labSummary(all,today)});
    }
    if(route==="/api/master/billing-lab/invoices"&&method==="POST"){
     const body=await labBody(req),id=String(body.company_id||"").slice(0,70);
@@ -107,6 +135,36 @@ Bun.serve=function(labConfig){
       })();
       return labJSON({ok:true,sandbox:true,invoice:result,realPayment:false,accessChanged:false},201);
     }catch(e){if(String(e).includes("UNIQUE"))return labError("Já existe uma cobrança de teste para esta empresa e competência.",409);throw e}
+   }
+   if(route==="/api/master/billing-lab/renew"&&method==="POST"){
+    const body=await labBody(req),id=Number(body.id);
+    if(!Number.isSafeInteger(id)||id<1)throw Error("Cobrança de origem inválida.");
+    const current=labDb.query("SELECT * FROM lab_invoices WHERE id=?").get(id);
+    if(!current)return labError("Cobrança de teste não encontrada.",404);
+    if(current.status!=="PAID_SIMULATED")return labError("Somente uma competência paga no simulador pode ser renovada.",409);
+    const nextReference=labNextReference(current.reference),nextDueDate=labNextMonthDate(current.due_date);
+    const result=labDb.transaction(()=>{
+     // UNIQUE(company_id,reference) makes repeat clicks safely conflict.
+     const row=labDb.query("INSERT INTO lab_invoices(company_id,company_name,customer_type,reference,amount_cents,due_date,status,created_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)").run(current.company_id,current.company_name,current.customer_type,nextReference,current.amount_cents,nextDueDate,"PENDING",labNow(),actor);
+     const created=labDb.query("SELECT * FROM lab_invoices WHERE id=?").get(Number(row.lastInsertRowid));
+     labEvent(created,actor,"RENOVACAO_FICTICIA","Renovação simulada de "+current.reference+" para "+nextReference+". Sem cobrança nem alteração de acesso.");
+     return created;
+    })();
+    return labJSON({ok:true,sandbox:true,renewedFrom:id,invoice:result,realCharge:false,accessChanged:false},201);
+   }
+   if(route==="/api/master/billing-lab/remind"&&method==="POST"){
+    const body=await labBody(req),id=Number(body.id);
+    if(!Number.isSafeInteger(id)||id<1)throw Error("Cobrança inválida.");
+    const item=labDb.query("SELECT * FROM lab_invoices WHERE id=?").get(id);
+    if(!item)return labError("Cobrança não encontrada.",404);
+    if(item.status!=="PENDING")return labError("Somente cobranças pendentes podem gerar lembrete fictício.",409);
+    const today=labDate();
+    const reminderToday=labDb.query("SELECT count(*) AS n FROM lab_events WHERE invoice_id=? AND event_type='LEMBRETE_FICTICIO' AND substr(recorded_at,1,10)=?").get(id,new Date().toISOString().slice(0,10)).n;
+    if(reminderToday>=1)return labError("Um lembrete de teste já foi registrado hoje.",409);
+    labDb.transaction(()=>{
+     labEvent(item,actor,"LEMBRETE_FICTICIO","Aviso interno de teste para vencimento "+item.due_date+". Nenhum e-mail, WhatsApp, PIX ou boleto enviado.");
+    })();
+    return labJSON({ok:true,sandbox:true,delivered:false,emailSent:false,whatsappSent:false,accessChanged:false});
    }
    if(route==="/api/master/billing-lab/mark-paid"&&method==="POST"){
     const data=await labBody(req),id=Number(data.id);
