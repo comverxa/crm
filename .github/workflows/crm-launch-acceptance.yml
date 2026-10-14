@@ -1,0 +1,46 @@
+name: COMVERXA - Aceite operacional de producao
+on:
+  push:
+    paths:
+      - .github/workflows/crm-launch-acceptance.yml
+  workflow_dispatch:
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar SaaS e controles de acesso sem credenciais
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br';
+          let failures=0;
+          async function check(name,url,accepted,init){
+           const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(16000),...init});
+           console.log((accepted.includes(r.status)?'PASS':'FAIL')+' | '+name+' | '+r.status);
+           if(!accepted.includes(r.status))failures++;
+           return r;
+          }
+          const h=await check('Saude',base+'/healthz',[200]);
+          if((await h.json()).status!=='ok')failures++;
+          const app=await check('Aplicativo premium',base+'/',[200]);
+          const html=await app.text();
+          for(const mark of ['id="comverxa-premium-v2"','id="comverxa-premium-v2-js"']){
+           const ok=html.includes(mark);
+           console.log((ok?'PASS':'FAIL')+' | UI publicada | '+mark);
+           if(!ok)failures++;
+          }
+          if(app.headers.get('x-frame-options')!=='DENY')failures++;
+          await check('ADM Master',base+'/admin',[200]);
+          await check('Sessao master anonima bloqueada',base+'/api/master/me',[401,403]);
+          await check('Empresas protegidas',base+'/api/master/overview',[401,403]);
+          await check('Financeiro protegido',base+'/api/master/finance/overview',[401,403]);
+          await check('Laboratorio protegido',base+'/api/master/billing-lab/overview',[401,403]);
+          await check('Renovacao exige dono autenticado',base+'/api/master/billing-lab/renew',[401,403],{method:'POST',headers:{'content-type':'application/json','origin':base},body:'{"id":1}'});
+          await check('Lembrete exige dono autenticado',base+'/api/master/billing-lab/remind',[401,403],{method:'POST',headers:{'content-type':'application/json','origin':base},body:'{"id":1}'});
+          await check('Contrato restrito',base+'/api/master/finance/contracts',[401,403],{method:'POST',headers:{'content-type':'application/json','origin':base},body:'{"company_id":"no-such-company"}'});
+          for(const path of ['','acesso.html','privacidade.html','termos.html']){
+           await check('Website '+(path||'home'),'https://comverxa.github.io/crm/'+path,[200]);
+          }
+          console.log('Resultado: '+failures+' falha(s). Teste NAO comprova isolamento entre dois clientes autenticados ou restauracao de backup.');
+          if(failures)process.exit(1);
+          NODE
