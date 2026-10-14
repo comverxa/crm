@@ -14,3 +14,78 @@
 @media(max-width:900px){.nav-links{display:none;position:absolute;top:109px;left:0;right:0;padding:16px 24px 22px;background:#fff;border-bottom:1px solid #e0eae7;box-shadow:0 20px 35px #153c3926;flex-direction:column;align-items:flex-start;gap:17px}.nav-links.open{display:flex}.menu-toggle{display:flex}.nav-actions{margin-left:auto}.hero-grid{grid-template-columns:1fr;padding-block:73px 75px;gap:64px}.hero h1{max-width:850px;font-size:clamp(3.1rem,7vw,5.1rem)}.hero-copy>p{max-width:710px}.visual{max-width:650px;margin:auto;width:100%}.feature-grid{grid-template-columns:repeat(2,1fr)}.showcase-grid{grid-template-columns:1fr;gap:34px}.showcase-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.showcase-tab{font-size:.79rem;padding:10px 8px}.steps{gap:20px}.pricing-grid{gap:12px}.plan{padding:26px 18px}.security-inner{gap:20px}}
 @media(max-width:640px){html{scroll-padding-top:78px}.container{width:calc(100% - 34px)}.topline{font-size:.62rem;height:25px}.nav-shell{height:62px}.nav-links{top:87px}.wordmark{gap:7px}.brand-icon{width:34px;height:34px;border-radius:10px;font-size:.92rem}.brand-text{font-size:1.02rem;letter-spacing:.05em}.nav-actions .login-link{display:none}.nav-actions .btn{display:none}.menu-toggle{width:40px;height:40px}.hero-grid{padding-block:60px 64px;gap:43px}.hero h1{font-size:clamp(2.75rem,12.2vw,4.1rem);letter-spacing:-.06em;margin:18px 0}.hero-copy>p{font-size:.96rem}.hero-actions{align-items:stretch;flex-direction:column;gap:9px}.hero-actions .btn{width:100%}.hero-meta{gap:8px 18px}.hero-sticker{top:-22px;right:0;font-size:.65rem}.visual{transform:none}.app-body{grid-template-columns:72px 1fr;min-height:0}.app-aside{padding:13px 5px}.mini-brand{font-size:.54rem;margin:0 2px 12px}.app-aside .side-link{font-size:.47rem;padding:8px 3px}.app-main{padding:11px 8px}.app-main-head b{font-size:.7rem}.app-main-head span{font-size:.45rem}.app-stats{grid-template-columns:repeat(2,1fr)}.app-stat{padding:6px}.app-stat small{font-size:.46rem}.app-stat strong{font-size:1rem;margin:2px 0}.app-stat em{font-size:.46rem}.app-bottom{grid-template-columns:1fr 1fr;gap:6px}.app-card{padding:7px}.app-chart{height:68px;gap:3px}.app-pipeline{gap:6px;margin-top:6px}.app-pipeline .row{font-size:.45rem}.app-card-title{font-size:.54rem}.illustration-note{font-size:.62rem}.audience-inner{justify-content:center;text-align:center}.audience-list{justify-content:center}.audience-list span{font-size:.71rem;padding:6px 11px}.section{padding-block:74px}.section-title{font-size:clamp(2rem,8vw,2.8rem)}.section-intro{font-size:.94rem;margin-top:15px}.feature-grid{grid-template-columns:1fr;gap:12px;margin-top:30px}.feature{padding:24px}.feature h3{margin:15px 0 8px}.showcase-tabs{grid-template-columns:1fr}.showcase-tab{font-size:.87rem}.showcase-visual{padding:14px;min-height:365px}.kanban-grid{gap:5px}.demo-lane{padding:7px 4px;min-height:175px}.demo-lane-title{font-size:.55rem}.demo-ticket{font-size:.54rem;padding:7px 4px}.steps{grid-template-columns:1fr;gap:26px;margin-top:35px}.step{padding-top:18px}.step h3{margin:9px 0}.pricing-grid{grid-template-columns:1fr;gap:21px}.plan{padding:28px}.plan-desc{min-height:0}.plan h3{margin-top:10px}.security-inner{grid-template-columns:1fr;gap:30px;padding-block:64px}.faq-list{margin-top:27px}.faq-list summary{font-size:.88rem;padding:18px 4px}.end-cta{padding:64px 19px}.end-cta .btn{width:100%;max-width:390px}.footer-top{grid-template-columns:1fr 1fr;gap:25px}.footer-top .footer-brand{grid-column:1/-1}.footer-bottom{flex-direction:column}.btn{min-height:47px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.feature{transition:none!important}}
+
+/* COMVERXA_SITE_CONVERSION_2026 — Experiência comercial original inspirada em boas práticas de SaaS */
+.cx-pain-section{padding:105px 0;background:#f8fbfa;border-bottom:1px solid #eaf1ee}
+.cx-pain-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:clamp(35px,6vw,90px);align-items:center}
+.cx-pain-copy h2{font-size:clamp(2.15rem,4.1vw,3.7rem);margin:20px 0 20px;max-width:540px;letter-spacing:-.055em}
+.cx-pain-copy p{font-size:1.03rem;max-width:480px;line-height:1.85;margin-bottom:25px}
+.cx-pain-copy .btn{min-height:49px}
+.cx-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+.cx-compare-card{padding:27px 25px 24px;background:#fff;border:1px solid #dfebe8;border-radius:21px;box-shadow:0 14px 45px -28px #0f384c3c}
+.cx-compare-card.cx-before{background:#f3f6f7;color:#304d59}
+.cx-compare-card.cx-after{background:#0e3945;color:#ecfffa;border-color:#245b5c;box-shadow:0 20px 55px -29px #083a4a8c;transform:translateY(17px)}
+.cx-compare-header{display:flex;gap:12px;align-items:center;margin-bottom:24px;font-size:.79rem;letter-spacing:.055em;text-transform:uppercase;font-weight:850}
+.cx-compare-badge{font-size:1.1rem;display:grid;place-items:center;width:35px;height:35px;border-radius:11px;background:#e4ebef;color:#566b78}
+.cx-after .cx-compare-badge{background:#1d615e;color:#a7f8e7}
+.cx-compare-card ul{display:grid;gap:21px}
+.cx-compare-card li{display:flex;gap:11px;align-items:flex-start;font-size:.91rem;line-height:1.58}
+.cx-compare-card li:before{content:"×";font-size:1.25rem;font-weight:850;line-height:1;color:#a4b0b6}
+.cx-after li:before{content:"✓";color:#6fe7c7}
+.cx-after li{color:#d2ede8}
+.cx-trust-strip{display:flex;align-items:center;justify-content:center;gap:25px;flex-wrap:wrap;margin-top:22px;color:#8198a0;font-weight:700;font-size:.77rem}
+.cx-trust-strip span{display:flex;align-items:center;gap:8px}
+.cx-trust-strip span:before{content:"✓";color:#138875;font-size:.96rem}
+.cx-diagnosis{position:relative;padding:102px 0;background:linear-gradient(137deg,#0a2938,#0a3440 57%,#105351);color:#fff;overflow:hidden}
+.cx-diagnosis:before{content:"";position:absolute;right:-190px;top:-150px;width:530px;height:530px;border-radius:50%;border:1px solid #7ce1c42c;box-shadow:0 0 0 64px #9bf7db0b,0 0 0 138px #9bf7db07;pointer-events:none}
+.cx-diagnosis-inner{position:relative;display:grid;grid-template-columns:1fr 1.02fr;gap:55px;align-items:center}
+.cx-diagnosis .eyebrow{color:#8eead1}
+.cx-diagnosis h2{font-size:clamp(2.2rem,4.1vw,3.65rem);color:#fff;margin:18px 0 20px;max-width:540px}
+.cx-diagnosis-copy p{color:#b8d6dc;font-size:1.02rem;line-height:1.8;max-width:470px}
+.cx-diagnosis-points{display:grid;gap:15px;margin-top:29px}
+.cx-diagnosis-points li{display:flex;gap:12px;align-items:center;font-size:.9rem;color:#d9f0ee}
+.cx-diagnosis-points li:before{content:"✓";display:grid;place-items:center;background:#3ab79a26;border:1px solid #52d3b44b;border-radius:50%;color:#70edd0;width:27px;height:27px;flex-shrink:0}
+.cx-diagnosis-card{background:#fff;color:#1b3946;border-radius:24px;border:1px solid #dfeee9;box-shadow:0 30px 85px -30px #0000009c;padding:34px 34px 30px}
+.cx-diagnosis-card h3{font-size:1.43rem;letter-spacing:-.04em;margin-bottom:6px}
+.cx-diagnosis-card>p{font-size:.86rem;margin-bottom:20px;color:#748c96}
+.cx-plan-form{display:grid;gap:16px}
+.cx-field{display:grid;gap:7px}
+.cx-field label{font-size:.79rem;font-weight:800;color:#3c5762;letter-spacing:.012em}
+.cx-field input,.cx-field select{width:100%;min-width:0;min-height:49px;border:1px solid #d6e5e3;border-radius:11px;background:#fff;color:#264857;padding:11px 13px;font:inherit;font-size:.91rem}
+.cx-field input:focus-visible,.cx-field select:focus-visible{outline:3px solid #33d7b766;border-color:#20b39d}
+.cx-field small{font-size:.72rem;color:#6d858b}
+.cx-plan-result{margin-top:22px;padding:19px;background:linear-gradient(120deg,#ebf8f4,#f5fbfa);border-radius:15px;border:1px solid #cde9e0}
+.cx-plan-result .cx-plan-kicker{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#137d6a}
+.cx-plan-result .cx-plan-title{display:flex;flex-wrap:wrap;gap:9px;align-items:center;font-size:1.67rem;line-height:1.2;margin:8px 0 7px;color:#123c42;font-weight:880;letter-spacing:-.04em}
+.cx-plan-result p{font-size:.83rem;color:#577781;line-height:1.65}
+.cx-plan-result strong{font-weight:830;color:#185f55}
+.cx-plan-cta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:15px;flex-wrap:wrap}
+.cx-plan-cta .btn{flex:1;white-space:normal;text-align:center}
+.cx-plan-cta a{font-size:.84rem;color:#0d836f;font-weight:800}
+.cx-diagnosis-card .cx-disclaimer{font-size:.72rem;color:#85999e;line-height:1.65;margin-top:17px}
+.cx-nudge{margin-top:16px;text-align:center;color:#b5d5d9;font-size:.8rem;max-width:450px}
+.cx-steps-summary{background:#fff;padding:31px 0;border-bottom:1px solid #edf1ee}
+.cx-steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.cx-steps-grid .cx-steps-unit{display:flex;gap:13px;align-items:center;border-right:1px solid #e1eae7;padding-right:15px}
+.cx-steps-grid .cx-steps-unit:last-child{border-right:0}
+.cx-steps-grid .cx-steps-icon{display:grid;place-items:center;flex:0 0 auto;width:44px;height:44px;background:#e9f8f2;color:#149b84;border-radius:13px;font-size:1.25rem}
+.cx-steps-unit b{display:block;font-size:.87rem;color:#174151}
+.cx-steps-unit span{display:block;color:#789096;font-size:.77rem;line-height:1.6}
+.cx-floating-cta{display:none}
+@media(max-width:950px){.cx-pain-grid,.cx-diagnosis-inner{grid-template-columns:1fr;gap:38px}.cx-compare{max-width:740px}.cx-diagnosis-inner{max-width:760px}.cx-steps-grid{gap:12px}}
+@media(max-width:640px){
+.cx-pain-section,.cx-diagnosis{padding:72px 0}
+.cx-pain-copy h2,.cx-diagnosis h2{font-size:clamp(2.05rem,9vw,2.85rem)}
+.cx-compare{grid-template-columns:1fr;gap:13px}
+.cx-compare-card.cx-after{transform:none}
+.cx-compare-card{padding:25px 23px}
+.cx-diagnosis-inner{gap:29px}
+.cx-diagnosis-card{padding:24px 19px;border-radius:18px}
+.cx-steps-grid{grid-template-columns:1fr;gap:15px}
+.cx-steps-grid .cx-steps-unit{border-right:0;border-bottom:1px solid #edf0ee;padding-bottom:15px}
+.cx-steps-grid .cx-steps-unit:last-child{border-bottom:0;padding-bottom:0}
+.cx-trust-strip{justify-content:flex-start;gap:11px 20px}
+.cx-floating-cta{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:48;background:#ffffffeb;backdrop-filter:blur(14px);padding:10px 13px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -5px 28px #0d394920;gap:10px;border-top:1px solid #dcece6}
+.cx-floating-cta .btn{flex:1;min-height:42px;font-size:.77rem;padding:8px 10px}
+body{padding-bottom:62px}
+}
