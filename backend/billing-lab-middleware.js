@@ -1,6 +1,7 @@
 // COMVERXA — Billing Lab v1.0 (SIMULADOR, SEM PAGAMENTOS REAIS).
 // Rodar apenas com COMVERXA_BILLING_MODE=sandbox; nunca acessa gateway, não gera boletos, PIX, nem ativa planos.
 import {Database as BillingDb} from "bun:sqlite";
+import {randomBytes,timingSafeEqual} from "node:crypto";
 const labDb=new BillingDb("/data/comverxa-billing-lab.sqlite",{create:true});
 labDb.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000");
 labDb.exec("CREATE TABLE IF NOT EXISTS lab_invoices(id INTEGER PRIMARY KEY AUTOINCREMENT,company_id TEXT NOT NULL,company_name TEXT NOT NULL,customer_type TEXT NOT NULL,reference TEXT NOT NULL,amount_cents INTEGER NOT NULL CHECK(amount_cents>0),due_date TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('PENDING','PAID_SIMULATED','CANCELED')),created_at TEXT NOT NULL,paid_at TEXT,canceled_at TEXT,created_by TEXT NOT NULL,UNIQUE(company_id,reference))");
@@ -22,6 +23,9 @@ const labBody=async req=>{
 };
 const labEvent=(invoice,actor,type,note)=>labDb.query("INSERT INTO lab_events(invoice_id,company_id,actor,event_type,recorded_at,note) VALUES(?,?,?,?,?,?)").run(invoice.id,invoice.company_id,actor,type,labNow(),note);
 const labUI=__COMVERXA_LAB_HTML__;
+const labTokenCookie="__Host-cvx-billing-csrf";
+const labCsrfCookieValue=req=>{const found=(req.headers.get("cookie")||"").match(/(?:^|;\s*)__Host-cvx-billing-csrf=([a-f0-9]{48})(?:;|$)/);return found?.[1]||"";};
+const labMatches=(a,b)=>/^[a-f0-9]{48}$/.test(a)&&/^[a-f0-9]{48}$/.test(b)&&timingSafeEqual(Buffer.from(a,"hex"),Buffer.from(b,"hex"));
 const labPreviousServe=Bun.serve;
 Bun.serve=function(labConfig){
  const previousFetch=labConfig.fetch;
@@ -54,12 +58,17 @@ Bun.serve=function(labConfig){
   }
   if(route==="/admin/billing-lab"){
    if(method!=="GET")return labError("Método não permitido.",405);
-   return new Response(labUI,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin"}});
+   const csrf=randomBytes(24).toString("hex");
+   const safeUi=labUI.replace('const $=id=>document.getElementById(id);','const BILLING_LAB_CSRF='+JSON.stringify(csrf)+';const $=id=>document.getElementById(id);');
+   if(safeUi===labUI)return labError("A proteção da sessão não foi inicializada.",503);
+   return new Response(safeUi,{headers:{"Set-Cookie":labTokenCookie+"="+csrf+"; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600","Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin"}});
   }
   if(method!=="GET"){
     const origin=req.headers.get("origin"),same=new URL(req.url).origin,fetchSite=req.headers.get("sec-fetch-site");
-    if(origin!==same||fetchSite==="cross-site")return labError("Origem recusada.",403);
+    if((origin&&origin!==same&&origin!=="null")||fetchSite==="cross-site")return labError("Origem recusada.",403);
     if(req.headers.get("x-comverxa-billing-lab")!=="sandbox")return labError("Confirmação do laboratório ausente.",403);
+    const supplied=req.headers.get("x-comverxa-billing-csrf")||"";
+    if(!labMatches(supplied,labCsrfCookieValue(req)))return labError("Sessão de teste expirada. Atualize a página antes de tentar novamente.",403);
     if(!(req.headers.get("content-type")||"").toLowerCase().includes("application/json"))return labError("Formato não permitido.",415);
   }
   const actor=String(identity?.email||identity?.user?.email||"ADM Master").slice(0,100);
