@@ -1,0 +1,36 @@
+name: Testar sandbox de cobrancas em producao
+on:
+  push:
+    paths:
+      - .github/workflows/billing-lab-live-smoke.yml
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Conferir saude e bloqueios sem credenciais
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br';
+          const tests=[
+            ['saude','/healthz','GET',null,[200]],
+            ['painel proprietario','/admin','GET',null,[200]],
+            ['financeiro restrito','/admin/finance','GET',null,[301,302,303,401,403]],
+            ['laboratorio restrito','/admin/billing-lab','GET',null,[301,302,303,401,403]],
+            ['dados sandbox restritos','/api/master/billing-lab/overview','GET',null,[401,403]],
+            ['criacao de teste restrita','/api/master/billing-lab/invoices','POST',{company_id:'nao_existe',reference:'2026-10',amount_cents:10000,due_date:'2026-11-10'},[401,403]],
+            ['simular pagamento restrito','/api/master/billing-lab/mark-paid','POST',{id:999999999},[401,403]],
+            ['cancelar teste restrito','/api/master/billing-lab/cancel','POST',{id:999999999},[401,403]],
+            ['financeiro real protegido','/api/master/finance/overview','GET',null,[401,403]],
+            ['CRM protegido','/api/me','GET',null,[401,403]]
+          ];
+          for(const [name,path,method,body,statuses] of tests){
+            const r=await fetch(base+path,{method,redirect:'manual',headers:body?{'Content-Type':'application/json','Origin':base,'X-COMVERXA-Billing-Lab':'sandbox'}:{},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(12000)});
+            const ok=statuses.includes(r.status);
+            console.log((ok?'PASS':'FAIL')+' | '+name+' | HTTP '+r.status);
+            if(!ok)throw Error('Falha no controle de acesso: '+name);
+            if(path==='/healthz'&&(await r.json()).status!=='ok')throw Error('CRM indisponivel');
+          }
+          console.log('PASS: simulador isolado, ambiente principal e rotas privadas protegidos');
+          NODE
