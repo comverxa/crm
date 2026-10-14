@@ -5,7 +5,7 @@
 Site oficial de apresentação e comercialização da **COMVERXA**, plataforma de gestão comercial na nuvem para profissionais, MEIs, equipes e empresas.
 
 - **Site comercial (GitHub Pages):** https://comverxa.github.io/crm/
-- **Acesso e cadastro no CRM:** https://conecta-crm-saas-production.up.railway.app/
+- **Acesso e cadastro no CRM:** https://app.comverxa.com.br/
 - **Repositório:** https://github.com/comverxa/crm
 
 ## Experiência do site comercial
