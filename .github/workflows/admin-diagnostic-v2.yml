@@ -1,0 +1,20 @@
+name: Diagnose COMVERXA Admin Middleware
+on:
+  push:
+    paths:
+      - .github/workflows/admin-diagnostic-v2.yml
+  workflow_dispatch:
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect admin response
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br';
+          for(const path of ['/healthz','/admin','/admin/verify?token='+('0'.repeat(64))]){
+            const r=await fetch(base+path,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+            const text=await r.text();
+            console.log(JSON.stringify({path:path.split('?')[0],status:r.status,type:r.headers.get('content-type'),wrapper:r.headers.get('x-comverxa-wrapper-diagnostic'),verifyMarker:r.headers.get('x-comverxa-admin-verify'),csp:r.headers.get('content-security-policy'),starts:text.slice(0,90)}));
+          }
+          NODE
