@@ -29,9 +29,36 @@ function cvxAuthenticated(req){
  return Number.isSafeInteger(exp)&&exp>Date.now()&&cvxSafeEqual(parts[1],cvxSignature(parts[0]));
 }
 const cvxLoginPage=String.raw`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>COMVERXA Prospect IA | Acesso</title><style>*{box-sizing:border-box}body{margin:0;display:grid;place-items:center;min-height:100vh;padding:20px;color:#23324c;font-family:Inter,system-ui,sans-serif;background:linear-gradient(140deg,#0c1934,#064a57)}main{width:min(100%,425px);background:#fff;border-radius:20px;padding:34px;box-shadow:0 18px 75px #0005}small{color:#0b8d86;font-weight:800;letter-spacing:.14em}h1{font-size:29px;letter-spacing:-.03em}p{color:#5c6d82;font-size:14px;line-height:1.6}label{display:block;font-size:13px;margin:17px 0 7px;font-weight:750}input{width:100%;padding:14px;border:1px solid #d6e1ee;border-radius:10px;font:inherit}button{margin-top:20px;background:#075d67;color:#fff;padding:15px;width:100%;border:0;border-radius:10px;font-weight:750;cursor:pointer}a{color:#075d67;text-decoration:none;font-size:13px}.error{color:#a12626}</style></head><body><main><small>COMVERXA / PROSPECT IA</small><h1>Entrar no painel</h1><p>Painel piloto com acesso independente, reservado ao responsável da plataforma.</p><form method="post" action="/login"><label>E-mail administrador</label><input name="email" type="email" required autocomplete="username"><label>Senha</label><input name="password" type="password" required autocomplete="current-password"><button type="submit">Acessar painel</button></form><p>Solicitações inválidas não fornecem acesso. Contate o administrador para redefinir as credenciais.</p><a href="https://app.comverxa.com.br/">Voltar ao COMVERXA CRM</a></main></body></html>`;
+const cvxCapturePage=String.raw`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Solicite uma demonstração | COMVERXA</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f6fa;color:#20334b;font:16px Inter,system-ui,sans-serif;padding:20px;min-height:100vh;display:grid;place-items:center}main{width:min(100%,590px);background:#fff;padding:32px;border-radius:20px;border:1px solid #e2e9f0;box-shadow:0 16px 45px #132f4610}small{color:#048b82;font-weight:800;letter-spacing:.13em}h1{font-size:30px;letter-spacing:-.03em;line-height:1.2}p{color:#607189;line-height:1.6;font-size:14px}label{display:block;font-size:13px;font-weight:750;margin:16px 0 6px}input,select{display:block;width:100%;border:1px solid #d7e0ec;border-radius:10px;padding:12px;font:inherit;font-size:15px}button{background:#075f66;color:#fff;padding:15px;border:0;border-radius:10px;font-weight:750;margin-top:18px;cursor:pointer;width:100%}.checkbox{display:flex;gap:9px;align-items:start}.checkbox input{width:16px;margin-top:17px;flex-shrink:0}.checkbox span{font-weight:400;line-height:1.6}.hide{position:absolute;left:-9999px}a{color:#066c72}</style></head><body><main><small>COMVERXA / CONTATO COMERCIAL</small><h1>Solicite uma demonstração.</h1><p>Conte como podemos ajudar sua operação comercial com CRM, inteligência de leads e campanhas de relacionamento.</p><form method="post" action="/captar"><label for="name">Seu nome ou empresa</label><input id="name" name="name" maxlength="120" autocomplete="name" required><label for="phone">WhatsApp com DDD</label><input id="phone" name="phone" type="tel" maxlength="18" placeholder="(31) 99999-9999" autocomplete="tel" required><label for="city">Cidade</label><input id="city" name="city" maxlength="90"><label for="uf">Estado (UF)</label><input id="uf" name="uf" maxlength="2"><label for="product">Assunto</label><select id="product" name="product"><option value="CRM para seguradora">CRM para seguradora</option><option value="CRM para proteção veicular">CRM para proteção veicular</option><option value="CRM para corretora">CRM para corretora</option></select><div class="hide" aria-hidden="true"><label>Não preencha este campo</label><input name="website" tabindex="-1" autocomplete="off"></div><label class="checkbox"><input type="checkbox" name="consent" value="yes" required><span>Concordo em receber mensagens comerciais da <strong>COMVERXA</strong> pelo WhatsApp informado sobre esta solicitação. Sei que posso solicitar o encerramento dos contatos a qualquer momento.</span></label><button type="submit">Solicitar demonstração</button><p>Os dados serão usados para responder à sua solicitação comercial. <a href="https://comverxa.github.io/crm/privacidade.html">Aviso de privacidade</a>.</p></form></main></body></html>`;
+const cvxCaptureLimits=new Map();
+function cvxCaptureAllowed(req){
+ const ip=String(req.headers.get("x-forwarded-for")||"unknown").split(",")[0].slice(0,80);
+ const now=Date.now();
+ if(cvxCaptureLimits.size>1000)cvxCaptureLimits.clear();
+ const entry=cvxCaptureLimits.get(ip)||{count:0,until:now+3600000};
+ if(now>entry.until){entry.count=0;entry.until=now+3600000;}
+ entry.count++;cvxCaptureLimits.set(ip,entry);
+ return entry.count<=12;
+}
+
 async function cvxFallback(req){
  const u=new URL(req.url),p=u.pathname;
  if(p==="/healthz")return new Response("healthy",{status:200,headers:{"Content-Type":"text/plain","Cache-Control":"no-store"}});
+
+ if(p==="/captar"&&req.method==="GET")return new Response(cvxCapturePage,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
+ if(p==="/captar"&&req.method==="POST"){
+  const origin=req.headers.get("origin");if(origin&&origin!==u.origin)return new Response("Origem inválida",{status:403});
+  if(!cvxCaptureAllowed(req))return new Response("Limite temporário de solicitações atingido",{status:429});
+  try{
+   const form=await req.formData();
+   if(String(form.get("website")||""))return new Response("Solicitação recebida",{status:200});
+   if(form.get("consent")!=="yes")return new Response("É necessário autorizar o contato para concluir a solicitação",{status:400});
+   const lead=prospectImport({name:form.get("name"),phone:form.get("phone"),city:form.get("city"),uf:form.get("uf"),product:form.get("product"),origin:"formulario_site_comverxa",notes:"Solicitou demonstração pelo formulário público",consent:true,consent_evidence:"Consentimento explícito enviado no formulário COMVERXA em "+prospectNow()});
+   prospectAudit("lead.selfcapture",lead.id,"Solicitação de demonstração com aceite específico");
+   return new Response("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Obrigado | COMVERXA</title><body style='font:17px system-ui;background:#f2f6fa;padding:10vh 20px;text-align:center;color:#20334b'><h1>Solicitação recebida</h1><p>Obrigado pelo contato. Nossa equipe poderá responder à sua solicitação.</p><p><a href='https://comverxa.github.io/crm/'>Conhecer o COMVERXA</a></p></body></html>",{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+  }catch(e){return new Response("Não foi possível registrar. Revise seus dados e tente novamente.",{status:400})}
+ }
+
  if(p==="/api/master/me")return cvxAuthenticated(req)?new Response(JSON.stringify({role:"owner",authenticated:true}),{headers:{"Content-Type":"application/json","Cache-Control":"no-store"}}):new Response(JSON.stringify({error:"Não autorizado"}),{status:401,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
  if(p==="/"||p==="/login"&&req.method==="GET"){
   if(cvxAuthenticated(req))return Response.redirect(new URL("/prospect-ia",req.url),302);
@@ -188,7 +215,12 @@ Bun.serve=function(cfg){
     const queued=prospectDb.query("SELECT q.id, l.phone,l.consent,l.opt_out,l.consent_evidence FROM prospect_outbox q JOIN prospect_leads l ON l.id=q.lead_id WHERE q.campaign_id=? AND q.status='pending' ORDER BY q.id LIMIT 8").all(id);
     let sent=0,failed=0,skipped=0;
     for(const q of queued){
-     if(!q.consent||q.opt_out||!q.consent_evidence){prospectDb.query("UPDATE prospect_outbox SET status='cancelled',error='Sem autorização' WHERE id=?").run(q.id);skipped++;continue}
+     // Atomic claim prevents parallel operators from dispatching the same queue item twice.
+     const claim=prospectDb.query("UPDATE prospect_outbox SET status='processing' WHERE id=? AND status='pending'").run(q.id);
+     if(claim.changes!==1){skipped++;continue}
+     // Re-check immediately before a network send, after claiming the queue item.
+     const current=prospectDb.query("SELECT consent,opt_out,consent_evidence FROM prospect_leads WHERE id=(SELECT lead_id FROM prospect_outbox WHERE id=?)").get(q.id);
+     if(!current?.consent||current.opt_out||!current.consent_evidence){prospectDb.query("UPDATE prospect_outbox SET status='cancelled',error='Sem autorização' WHERE id=?").run(q.id);skipped++;continue}
      let result;
      try{const r=await fetch("https://graph.facebook.com/v23.0/"+encodeURIComponent(Bun.env.META_PHONE_NUMBER_ID)+"/messages",{method:"POST",headers:{"Authorization":"Bearer "+Bun.env.META_ACCESS_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:q.phone,type:"template",template:{name:c.template_name,language:{code:c.language}}}),signal:AbortSignal.timeout(12000)});const data=await r.json().catch(()=>({}));result={ok:r.ok,id:data.messages?.[0]?.id||null,error:r.ok?"":prospectText(data.error?.message||"Falha da Meta",180)}}catch(e){result={ok:false,error:prospectText(e.message,140)}}
      prospectDb.query("UPDATE prospect_outbox SET status=?,provider_id=?,error=?,sent_at=? WHERE id=?").run(result.ok?"sent":"failed",result.id||null,result.error||null,result.ok?prospectNow():null,q.id);
