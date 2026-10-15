@@ -64,8 +64,9 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.ok((csvResponse.headers.get("content-type")||"").includes("text/csv"));
   assert.match(csvResponse.headers.get("content-disposition")||"",/attachment/);
   assert.equal(csvResponse.headers.get("cache-control"),"private, no-store");
-  const csvText=await csvResponse.text();
-  assert.ok(csvText.startsWith("\\ufeff")||csvText.startsWith("\ufeff"),"UTF-8 CSV BOM expected");
+  const csvBytes=Buffer.from(await csvResponse.arrayBuffer());
+  assert.deepEqual([...csvBytes.subarray(0,3)],[0xef,0xbb,0xbf],"UTF-8 CSV BOM expected");
+  const csvText=csvBytes.toString("utf8");
   assert.match(csvText,/Sem Permissão/);
   assert.match(csvText,/consentimento/);
 
