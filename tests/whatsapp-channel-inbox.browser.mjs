@@ -5,6 +5,13 @@ const addon=fs.readFileSync("backend/whatsapp-channel-inbox.js","utf8");
 const browser=await chromium.launch({headless:true,executablePath:"/usr/bin/google-chrome",args:["--no-sandbox"]});
 try{
  const page=await browser.newPage({viewport:{width:1365,height:768}});
+ await page.route("https://app.comverxa.com.br/",async route=>{
+   const remote=await route.fetch();
+   const html=await remote.text();
+   const marker=/<script id="cvx-inbox-channel-patch">[\s\S]*?<\/script>/;
+   assert.ok(marker.test(html),"production patch marker missing");
+   await route.fulfill({response:remote,body:html.replace(marker,()=>'<script id="cvx-inbox-channel-patch">'+addon+'</script>')});
+ });
  const response=await page.goto("https://app.comverxa.com.br/",{waitUntil:"domcontentloaded",timeout:30000});
  assert.equal(response.status(),200);
  await page.evaluate(()=>{
