@@ -1,0 +1,16 @@
+name: COMVERXA - WhatsApp Inbox Channel QA
+on:
+  push:
+    paths:
+      - backend/whatsapp-channel-inbox.js
+      - tests/whatsapp-channel-inbox.browser.mjs
+      - .github/workflows/whatsapp-channel-inbox-qa.yml
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --no-save playwright-core@1.56.1
+      - run: node tests/whatsapp-channel-inbox.browser.mjs
