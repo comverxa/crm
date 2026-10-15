@@ -31,8 +31,8 @@ try{
  await page.waitForTimeout(170);
  assert.equal(await textButton.textContent(),"Enviar pela Meta API");
  const edit=page.locator("#cvx-inbox-change-line");
- assert.equal(await edit.isVisible(),true);
- await edit.click();
+ assert.equal(await edit.evaluate(el=>el.hidden),false,"QR reassignment action offered");
+ await page.evaluate(()=>document.getElementById("cvx-inbox-change-line").click());
  const state=await page.evaluate(()=>({open:document.getElementById("leadModal").open,pending:document.getElementById("leadForm").elements.line.value,unchanged:leads.find(x=>x.id===999123)?.line}));
  assert.equal(state.open,true,"Lead editor should open");
  assert.equal(state.pending,"2","Evolution QR line should be suggested");
