@@ -58,7 +58,11 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.ok(cookie?.startsWith("__Host-cvxprospect="),"Expected HttpOnly owner session cookie");
   assert.match(r.headers.get("set-cookie"),/HttpOnly/);
   assert.match(r.headers.get("set-cookie"),/SameSite=Strict/);
-  assert.equal((await fetch(base+"/prospect-ia",{headers:{Cookie:cookie}})).status,200);
+  const dashboardPage=await fetch(base+"/prospect-ia",{headers:{Cookie:cookie}});
+  assert.equal(dashboardPage.status,200);
+  const dashboardHTML=await dashboardPage.text();
+  assert.ok(dashboardHTML.includes("cvx-sales-id"),"Live commercial funnel form displayed");
+  assert.ok(dashboardHTML.includes("Etapa:"),"Lead table includes commercial stage");
 
   let overview=await mustJson(await fetch(base+"/api/master/prospect/overview",{headers:{Cookie:cookie}}),200);
   assert.equal(overview.counts.total,1);
