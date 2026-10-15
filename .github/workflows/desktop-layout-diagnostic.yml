@@ -39,9 +39,9 @@ jobs:
              });
              console.log('DESKTOP_LAYOUT '+JSON.stringify({status:resp.status(),w,...d}));
              const html=await resp.text();
-             console.log('LIVE_HTML_DIAGNOSTIC '+JSON.stringify({w,status:resp.status(),contentType:resp.headers()['content-type'],bytes:html.length,idAppDouble:html.includes('id="app"'),idAppSingle:html.includes("id='app'"),fix:html.includes('cvx-desktop-layout-hotfix'),premium:html.includes('comverxa-premium-v2'),headEnd:html.includes('</head>')}));
-             const publishedCss=await page.locator('#cvx-desktop-layout-hotfix').count();
-             if(publishedCss!==1)throw new Error('CRM production desktop hotfix not published');
+             console.log('LIVE_HTML_DIAGNOSTIC '+JSON.stringify({w,status:resp.status(),contentType:resp.headers()['content-type'],bytes:html.length,idAppDouble:html.includes('id="app"'),idAppSingle:html.includes("id='app'"),fix:html.includes('COMVERXA Desktop Sidebar Correction 2026-10-15'),premium:html.includes('comverxa-premium-v2'),headEnd:html.includes('</head>')}));
+             const publishedCss=await page.evaluate(()=>[...document.querySelectorAll('style')].some(x=>x.textContent.includes('COMVERXA Desktop Sidebar Correction 2026-10-15')));
+             if(!publishedCss)throw new Error('CRM production desktop stylesheet not delivered');
              const fixed=await page.evaluate(()=>{
                document.querySelector('#marketing')?.classList.add('hide');
                document.querySelector('#app')?.classList.remove('hide');
