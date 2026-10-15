@@ -14,17 +14,18 @@ try{
    document.querySelectorAll("#app .screen").forEach(x=>x.classList.add("hide"));
    document.getElementById("inbox").classList.remove("hide");
    lines=[{slot:1,name:"Meta QA",mode:"api"},{slot:2,name:"Evolution QR QA",mode:"qr"}];
-   leads=[{id:999123,name:"Lead QA fictício",phone:"5531000000000",line:1}];
+   leads=[{id:999123,name:"Lead QA fictício",phone:"5531000000000",line:2}];
    document.getElementById("lineSelect").innerHTML='<option value="1">Meta QA</option><option value="2">Evolution QR QA</option>';
-   selected={id:999123,name:"Lead QA fictício",phone:"5531000000000",line:2};
+   selected={id:999123,name:"Lead QA fictício",phone:"5531000000000",line:1};
    document.getElementById("chatHeader").textContent="Lead QA Evolution";
  });
  await page.waitForTimeout(170);
  const textButton=page.locator('#inbox button[onclick="sendReply(\'text\')"]');
  assert.equal(await textButton.textContent(),"Enviar pela Evolution API (QR)");
+ assert.equal(await page.evaluate(()=>selected.line),2,"Open thread must reconcile to saved QR line");
  assert.equal(await page.locator('#inbox button[onclick="sendReply(\'template\')"]').isVisible(),false,"QR hides Meta templates");
  await page.evaluate(()=>{
-   selected={id:999123,name:"Lead QA fictício",phone:"5531000000000",line:1};
+   leads[0].line=1;selected={id:999123,name:"Lead QA fictício",phone:"5531000000000",line:1};
    document.getElementById("chatHeader").textContent="Lead QA Meta";
  });
  await page.waitForTimeout(170);
