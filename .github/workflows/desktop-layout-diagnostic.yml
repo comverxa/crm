@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
+      - uses: actions/checkout@v4
       - name: Install browser driver
         run: npm install --no-save playwright-core@1.56.1
       - name: Analyze live app layout without customer data
@@ -37,6 +38,26 @@ jobs:
               return {scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,nodes,extra,cardVisibleAtPoint:center?{tag:center.tagName,id:center.id,cls:String(center.className).slice(0,100),text:center.textContent.slice(0,60)}:null,styles};
              });
              console.log('DESKTOP_LAYOUT '+JSON.stringify({status:resp.status(),w,...d}));
+             await page.addStyleTag({content:require('node:fs').readFileSync('backend/desktop-layout.css','utf8')});
+             const fixed=await page.evaluate(()=>{
+               const rect=s=>{const el=document.querySelector(s);if(!el)return null;const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width,height:r.height}};
+               const card=document.querySelector('#dashboardStats .stat');const r=card?.getBoundingClientRect();
+               const at=r?document.elementFromPoint(r.x+30,r.y+30):null;
+               return {nav:rect('#app nav.tabs'),firstMenu:rect('#app nav.tabs > button'),main:rect('#app main'),header:rect('#app header.top'),card:rect('#dashboardStats .stat'),documentWidth:document.documentElement.scrollWidth,visibleFirstCard:!!(at&&card?.contains(at))};
+             });
+             console.log('FIXED_LAYOUT '+JSON.stringify({w,...fixed}));
+             const assert=require('node:assert/strict');
+             assert.ok(fixed.documentWidth<=w+2,'Page overflow at '+w);
+             assert.ok(fixed.visibleFirstCard,'First stat blocked at '+w);
+             if(w>=1101){
+               assert.ok(fixed.nav.width===252,'Sidebar width wrong');
+               assert.ok(fixed.main.x>=252,'Main section remains behind sidebar');
+               assert.ok(fixed.card.x>=252,'Dashboard card remains behind sidebar');
+               assert.ok(fixed.firstMenu.y>=100,'First navigation item overlaps COMVERXA logo');
+               assert.ok(fixed.main.right<=w+2,'Main panel runs off screen');
+             }else{
+               assert.ok(fixed.main.x<30,'Non-desktop content moved incorrectly');
+             }
              await page.close();
             }
            }finally{await browser.close()}
