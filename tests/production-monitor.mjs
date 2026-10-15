@@ -59,6 +59,22 @@ for (const [name, url, allowed, bodyCheck] of checks) {
     failures++;
   }
 }
+
+try {
+  const backup = await fetch(prospect + "/api/master/prospect/backup", {
+    method:"POST",
+    redirect:"manual",
+    headers: {"X-COMVERXA-Prospect":"1"},
+    signal:AbortSignal.timeout(15000)
+  });
+  const protectedBackup=[401,403].includes(backup.status);
+  console.log((protectedBackup?"PASS":"FAIL")+" | Prospect: backup exige autenticação | HTTP "+backup.status);
+  if(!protectedBackup)failures++;
+}catch(error){
+  console.log("FAIL | Prospect: proteção do backup | "+String(error.name||"request_error"));
+  failures++;
+}
+
 console.log(`SUMMARY | ${checks.length - failures}/${checks.length} public checks passed | failures=${failures}`);
 console.log("LIMITS | Sem login real, teste entre empresas, backup/restauração, envio WhatsApp ou pagamentos.");
 if (failures) process.exitCode = 1;
