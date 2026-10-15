@@ -1,0 +1,10 @@
+# Separate COMVERXA Prospect IA service. Not the existing CRM backend.
+FROM oven/bun:1.2.22
+WORKDIR /app
+COPY backend/prospect-standalone.ts /app/prospect-standalone.ts
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV PROSPECT_DATA_DIR=/data
+RUN mkdir -p /data
+EXPOSE 3000
+CMD ["bun","run","/app/prospect-standalone.ts"]
