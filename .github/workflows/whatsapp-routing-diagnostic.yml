@@ -16,7 +16,7 @@ jobs:
           const res=await fetch('https://app.comverxa.com.br/',{signal:AbortSignal.timeout(20000)});
           const html=await res.text();
           console.log('HTTP '+res.status+' HTML_BYTES '+html.length);
-          const queries=['Enviar resposta Meta API','Meta Cloud API não configurada','/api/inbox','/api/lines','sendMeta','sendEvolution','sendReply','replyText','replyBtn','chatSend','lineMode','evolution','Responder dentro do CRM'];
+          const queries=['Enviar resposta Meta API','Meta Cloud API não configurada','/api/inbox','/api/lines','sendMeta','sendEvolution','sendReply','replyText','replyBtn','chatSend','lineMode','evolution','Responder dentro do CRM','function editLead','function openLead','function renderLeads','function saveLead','function openThread','let selected','let leads','const lines','function updateLead','function switchTab'];
           for(const query of queries){
            const matches=[...html.matchAll(new RegExp(query.replace(/[.*+?^\${}()|[\]\\]/g,'\\$&'),'gi'))].slice(0,6);
            const context=matches.map(m=>{
