@@ -34,6 +34,12 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.ok(ok,"Bun startup failed: "+output);
   assert.equal((await fetch(base+"/healthz")).status,200);
   assert.equal((await fetch(base+"/captar")).status,200);
+  const special='promo" <test>';
+  const utmPage=await(await fetch(base+"/captar?utm_source=instagram&utm_campaign="+encodeURIComponent(special))).text();
+  assert.ok(utmPage.includes('name="utm_source" value="instagram"'),"Attribution source preserved");
+  assert.ok(utmPage.includes("promo&quot; &lt;test&gt;"),"UTM values must be HTML escaped");
+  assert.ok(!utmPage.includes(special),"Raw unescaped UTM content must not appear in form");
+
   assert.equal((await fetch(base+"/prospect-ia")).status,401);
   assert.equal((await fetch(base+"/api/master/prospect/overview")).status,401);
   assert.equal((await fetch(base+"/api/master/prospect/export.csv")).status,401);
@@ -41,7 +47,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
 
   let r=await fetch(base+"/captar",{method:"POST",body:new URLSearchParams({name:"Ana Teste",phone:"5531999990001",city:"Contagem",uf:"MG",product:"CRM para corretora"})});
   assert.equal(r.status,400,"Without express authorization a form must not capture");
-  r=await fetch(base+"/captar",{method:"POST",body:new URLSearchParams({name:"Ana Teste",phone:"5531999990001",city:"Contagem",uf:"MG",product:"CRM para corretora",consent:"yes"})});
+  r=await fetch(base+"/captar",{method:"POST",body:new URLSearchParams({name:"Ana Teste",phone:"5531999990001",city:"Contagem",uf:"MG",product:"CRM para corretora",consent:"yes",utm_source:"instagram",utm_medium:"paid",utm_campaign:"Outubro 2026"})});
   assert.equal(r.status,200,"Own opted-in form must capture a lead");
 
   const invalid=await fetch(base+"/login",{method:"POST",body:new URLSearchParams({email:"owner@example.invalid",password:"wrong"})});
@@ -122,6 +128,8 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal(before.queued,0,"Public form consent alone must not authorize a marketing send");
   const captured=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(x=>x.phone==="5531999990001");
   assert.ok(captured&&!captured.approved);
+  assert.equal(captured.ad_campaign,"Outubro 2026");
+  assert.equal(captured.origin,"formulario_site_comverxa/instagram/paid");
   assert.equal((await post("/api/master/prospect/leads/"+captured.id+"/approve",{verification:"fraca"},cookie)).status,400,"Approval must require evidence");
   const reviewed=await mustJson(await post("/api/master/prospect/leads/"+captured.id+"/approve",{verification:"Verificado pelo responsável em canal oficial com documento de opt-in."},cookie),200);
   assert.equal(reviewed.ok,true);
