@@ -22,7 +22,7 @@
 O bloqueio anterior de recursos foi superado. O **COMVERXA Prospect IA** está publicado
 como serviço independente `comverxa-prospect-ia`, conectado ao repositório
 `comverxa/crm` (branch `main`). O deploy mais recente foi concluído com sucesso
-em 15/10/2026 às 11:07 UTC; há uma instância online com volume persistente
+em 15/10/2026 às 14:25 UTC; há uma instância online com volume persistente
 `/data` de 500 MB.
 
 - Painel de login: https://comverxa-prospect-ia-production.up.railway.app/login
@@ -77,4 +77,15 @@ Esta é uma entrega técnica verificável em piloto, **não uma certificação d
 - Foi adicionado ao painel autenticado um botão para **download manual de backup SQLite** do Prospect IA. O servidor usa `VACUUM INTO`, confirma `PRAGMA integrity_check = ok`, gera nome de arquivo local e rejeita downloads sem autenticação ou proteção de requisição. Teste de integração com restauração em banco isolado passou no [GitHub Actions](https://github.com/comverxa/crm/actions/runs/38745416688).
 - O arquivo contém dados pessoais e deve ser armazenado pelo administrador fora do Railway, com proteção e controle de acesso. **Não é backup automático externo**: operação humana de download, retenção, criptografia, frequência e teste de restauração real em produção continuam pendentes.
 - O Prospect IA continua **separado** da autenticação e do banco do CRM principal. Não declarar integração de leads ou disparos Meta/OpenAI em produção sem testes autenticados e credenciais externas verificadas.
+
+
+## Entrega de 15/10/2026 — direitos dos titulares e saúde da base
+
+- **Exportação individual de dados do lead (administrador):** `GET /api/master/prospect/leads/:id/export`, com JSON e histórico de campanhas relacionadas. Não há acesso sem sessão autenticada.
+- **Eliminação individual na base ativa:** `POST /api/master/prospect/leads/:id/erase`, com justificativa selecionada, token de proteção do painel e confirmação literal `EXCLUIR :id`. Elimina registros associados da fila de campanhas e registra auditoria mínima. Não apaga conteúdo de terceiros nem backups já transferidos.
+- Controles de acesso, CSRF, confirmação e tratamento de registros inexistentes aprovados no [teste de integração](https://github.com/comverxa/crm/actions/runs/38750653354).
+- O `/healthz` consulta a tabela `prospect_leads` e retorna **503** se o banco falhar, em vez de responder falsamente saudável. Testes de integração e do contêiner aprovados no commit `4b79d04`.
+- O Railway confirmou implantação **SUCCESS** do commit `4b79d04` às 14:25 UTC, sem substituição do volume `/data`.
+- O site comercial informa a finalidade e as condições da captação voluntária no seu aviso de privacidade, com revisão técnica ainda sujeita à identificação jurídica e ao contrato final.
+- **Limitações:** os recursos não constituem procedimento integral de atendimento à LGPD; pedidos em bases externas, cópias locais, contratos e provedores parceiros exigem tratamento próprio. O CRM principal continua independente, e a integração de contatos não foi implementada.
 
