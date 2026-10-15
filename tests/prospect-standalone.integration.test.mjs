@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { Database } from "bun:sqlite";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { scryptSync,createHmac } from "node:crypto";
@@ -59,6 +60,24 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal(overview.counts.opted,1);
   const create=await mustJson(await post("/api/master/prospect/leads",{name:"Sem Permissão",phone:"5531999990002",notes:"Pedido de cotação",consent:false},cookie),201);
   assert.ok(create.id);
+
+  // Consistent database snapshot: authenticated only, CSRF header enforced.
+  assert.equal((await post("/api/master/prospect/backup",{})).status,401,"Anon must not download backup");
+  assert.equal((await fetch(base+"/api/master/prospect/backup",{method:"POST",headers:{Cookie:cookie}})).status,403,"Missing CSRF header must block backup");
+  const backupRes=await post("/api/master/prospect/backup",{},cookie);
+  assert.equal(backupRes.status,200,"Owner should download a consistent SQLite backup");
+  assert.match(backupRes.headers.get("content-disposition")||"",/attachment/);
+  assert.match(backupRes.headers.get("cache-control")||"",/no-store/);
+  const backup=Buffer.from(await backupRes.arrayBuffer());
+  assert.equal(backup.subarray(0,15).toString(),"SQLite format 3","Backup must contain SQLite header");
+  const backupPath=join(dir,"backup-verified.sqlite");
+  writeFileSync(backupPath,backup);
+  const testBackupDb=new Database(backupPath,{readonly:true});
+  try{
+    assert.equal(testBackupDb.query("PRAGMA integrity_check").get().integrity_check,"ok");
+    assert.equal(testBackupDb.query("SELECT COUNT(*) AS n FROM prospect_leads").get().n,1);
+  }finally{testBackupDb.close()}
+
   const csvResponse=await fetch(base+"/api/master/prospect/export.csv",{headers:{Cookie:cookie}});
   assert.equal(csvResponse.status,200,"CSV export requires authenticated owner");
   assert.ok((csvResponse.headers.get("content-type")||"").includes("text/csv"));
@@ -118,6 +137,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   const logout=await fetch(base+"/logout",{method:"POST",headers:{Cookie:cookie},redirect:"manual"});
   assert.equal(logout.status,303,"Logout must succeed");
   assert.equal((await fetch(base+"/prospect-ia",{headers:{Cookie:cookie}})).status,401,"Logged-out cookie must be revoked server-side");
+  assert.equal((await post("/api/master/prospect/backup",{},cookie)).status,401,"Revoked session must not download backup");
   console.log("PASS: health, capture, revocable owner auth, verified opt-in, score, deduplication, campaign, Meta/AI fail-closed, opt-out");
  }finally{
   child.kill("SIGTERM");
