@@ -22,6 +22,17 @@ O simulador utiliza apenas valores informados no navegador para comparar os limi
 
 O simulador não envia informações pessoais nem contrata planos. A contratação e o preço são **sob consulta**. A integração WhatsApp (QR/Evolution ou Meta Cloud API) depende da configuração de cada canal e da disponibilidade de serviços externos. O cadastro no app permite teste de 14 dias e não inicia cobrança automática.
 
+## COMVERXA Prospect IA — módulo de prospecção em piloto (15/10/2026)
+
+Foi desenvolvido um módulo independente de captação e qualificação, com interface premium, cadastro e importação de leads, formulário de consentimento, pontuação por regras, exclusão de listas de campanha, fila protegida contra envios paralelos, suporte condicional à API Oficial Meta e orientação de IA opcional.
+
+- Código da aplicação: [backend/prospect-standalone.ts](./backend/prospect-standalone.ts)
+- Formulário de captação (após implantação): `/captar`
+- Painel administrativo (após implantação e login independente): `/prospect-ia`
+- Testes automatizados e preparação Docker/Railway: [status verificado](./docs/PROSPECT-IA-STATUS-2026-10-15.md)
+
+**Este módulo ainda NÃO está implantado nem disponível no domínio COMVERXA.** O Railway negou a criação de novo serviço por `Free plan resource provision limit exceeded`. A aplicação anterior foi preservada. Testes de integração aprovados no GitHub Actions não substituem a homologação da plataforma hospedada nem a integração de credenciais Meta/OpenAI. O módulo é restrito a um administrador e **não** oferece ainda isolamento multiempresa ou operação comercial em escala.
+
 ## Prontidão comercial (outubro/2026)
 
 A COMVERXA dispõe de site comercial, domínio do CRM, painel ADM Master e módulo financeiro de registros manuais. O laboratório de cobranças é **simulação sem movimentação de dinheiro**. **O produto não deve ser descrito como totalmente homologado para vendas em escala até a conclusão dos requisitos P0.**

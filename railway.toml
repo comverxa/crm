@@ -1,0 +1,11 @@
+# Only used by a new Railway service connected to this GitHub repository.
+# The existing CRM Bun Function is not connected to this repo.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

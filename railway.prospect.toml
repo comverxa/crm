@@ -1,0 +1,10 @@
+# Apply only to a separate Railway service; do not change the existing production CRM service.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.prospect"
+
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

@@ -1,0 +1,40 @@
+name: COMVERXA Prospect Container Smoke
+on:
+  push:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'railway.toml'
+      - 'backend/prospect-standalone.ts'
+      - '.github/workflows/prospect-docker-smoke.yml'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'railway.toml'
+      - 'backend/prospect-standalone.ts'
+      - '.github/workflows/prospect-docker-smoke.yml'
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build release candidate
+        run: docker build -t comverxa-prospect-ia:ci .
+      - name: Start without credentials (fail closed)
+        run: docker run -d --name comverxa-prospect-test -p 18471:3000 -e PORT=3000 comverxa-prospect-ia:ci
+      - name: Validate healthy service and blocked unauthenticated operations
+        run: |
+          for i in $(seq 1 50); do
+            if curl -sf http://127.0.0.1:18471/healthz; then break; fi
+            sleep 1
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18471/healthz)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18471/captar)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18471/prospect-ia)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18471/api/master/prospect/overview)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18471/login)" = "503"
+      - name: Cleanup
+        if: always()
+        run: docker rm -f comverxa-prospect-test || true

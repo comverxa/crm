@@ -1,0 +1,29 @@
+name: COMVERXA Prospect IA Integration
+on:
+  push:
+    paths:
+      - 'backend/prospect-standalone.ts'
+      - 'backend/prospect-ia-extension.js'
+      - 'backend/prospect-dashboard.html'
+      - 'tests/prospect-standalone.integration.test.mjs'
+      - '.github/workflows/prospect-standalone-integration.yml'
+  pull_request:
+    paths:
+      - 'backend/prospect-standalone.ts'
+      - 'backend/prospect-ia-extension.js'
+      - 'backend/prospect-dashboard.html'
+      - 'tests/prospect-standalone.integration.test.mjs'
+      - '.github/workflows/prospect-standalone-integration.yml'
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/prospect-standalone.integration.test.mjs
