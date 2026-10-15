@@ -17,15 +17,25 @@
 - GitHub Actions \`COMVERXA Prospect IA Integration\`: aprovado em execução de 15/10/2026 com Bun real, login, lead público autorizado, criação, pontuação, deduplicação, filtro de campanhas, descadastro, ausência de Meta/OpenAI e controles de acesso.
 - O teste não comprova homologação de produção, segurança multiempresa nem disponibilidade contínua.
 
-## Bloqueio de hospedagem confirmado
+## Implantação no Railway confirmada em 15/10/2026
 
-A chamada de criação de nova Railway Function em \`Conecta CRM SaaS\` foi negada pelo provedor com \`Free plan resource provision limit exceeded. Please upgrade to provision more resources!\`.
+O bloqueio anterior de recursos foi superado. O **COMVERXA Prospect IA** está publicado
+como serviço independente `comverxa-prospect-ia`, conectado ao repositório
+`comverxa/crm` (branch `main`). O deploy mais recente foi concluído com sucesso
+em 15/10/2026 às 11:07 UTC; há uma instância online com volume persistente
+`/data` de 500 MB.
 
-Por esse motivo, NÃO há endereço de serviço publicado para o Prospect IA standalone. A função principal existente permaneceu inalterada. Mesmo após respostas afirmativas de atualização e commit no conector Railway, a releitura do código implantado não mostrou a nova extensão; portanto, não considerar o endpoint \`/prospect-ia\` ativo no domínio principal.
+- Painel de login: https://comverxa-prospect-ia-production.up.railway.app/login
+- Formulário público (a submissão depende da configuração de captação): https://comverxa-prospect-ia-production.up.railway.app/captar
+- Integração **não implementada** com o banco de dados e sessões do CRM principal.
+- Credenciais de Meta Cloud API/OpenAI ainda não verificadas como configuradas; nenhum disparo ou análise por IA generativa deve ser anunciado como disponível.
+- A disponibilidade das páginas e do serviço não substitui testes autenticados de negócio, isolamento de dados ou cópia/restauração externa.
 
-**Ação necessária do responsável pela conta:** habilitar capacidade suficiente no Railway para um novo serviço e volume persistente, conferindo custo e forma de cobrança. Não excluir serviços existentes que contenham dados ou integrem WhatsApp.
+O monitor de produção não destrutivo roda a cada seis horas ou manualmente:
+[`COMVERXA - Monitor de producao`](../.github/workflows/production-monitor.yml).
+Confere saúde HTTP e bloqueios anônimos do CRM, do Prospect IA e dos documentos comerciais. **Não confirma integração WhatsApp ou prontidão de vendas em escala.**
 
-## Preparação para futura publicação
+## Configuração e próximos passos da publicação
 
 - Serviço isolado: \`backend/prospect-standalone.ts\`
 - Contêiner: \`Dockerfile.prospect\`
