@@ -125,7 +125,12 @@ Bun.serve=function(cfg){
     const queued=prospectDb.query("SELECT q.id, l.phone,l.consent,l.opt_out,l.consent_evidence FROM prospect_outbox q JOIN prospect_leads l ON l.id=q.lead_id WHERE q.campaign_id=? AND q.status='pending' ORDER BY q.id LIMIT 8").all(id);
     let sent=0,failed=0,skipped=0;
     for(const q of queued){
-     if(!q.consent||q.opt_out||!q.consent_evidence){prospectDb.query("UPDATE prospect_outbox SET status='cancelled',error='Sem autorização' WHERE id=?").run(q.id);skipped++;continue}
+     // Atomic claim prevents parallel operators from dispatching the same queue item twice.
+     const claim=prospectDb.query("UPDATE prospect_outbox SET status='processing' WHERE id=? AND status='pending'").run(q.id);
+     if(claim.changes!==1){skipped++;continue}
+     // Re-check immediately before a network send, after claiming the queue item.
+     const current=prospectDb.query("SELECT consent,opt_out,consent_evidence FROM prospect_leads WHERE id=(SELECT lead_id FROM prospect_outbox WHERE id=?)").get(q.id);
+     if(!current?.consent||current.opt_out||!current.consent_evidence){prospectDb.query("UPDATE prospect_outbox SET status='cancelled',error='Sem autorização' WHERE id=?").run(q.id);skipped++;continue}
      let result;
      try{const r=await fetch("https://graph.facebook.com/v23.0/"+encodeURIComponent(Bun.env.META_PHONE_NUMBER_ID)+"/messages",{method:"POST",headers:{"Authorization":"Bearer "+Bun.env.META_ACCESS_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:q.phone,type:"template",template:{name:c.template_name,language:{code:c.language}}}),signal:AbortSignal.timeout(12000)});const data=await r.json().catch(()=>({}));result={ok:r.ok,id:data.messages?.[0]?.id||null,error:r.ok?"":prospectText(data.error?.message||"Falha da Meta",180)}}catch(e){result={ok:false,error:prospectText(e.message,140)}}
      prospectDb.query("UPDATE prospect_outbox SET status=?,provider_id=?,error=?,sent_at=? WHERE id=?").run(result.ok?"sent":"failed",result.id||null,result.error||null,result.ok?prospectNow():null,q.id);
