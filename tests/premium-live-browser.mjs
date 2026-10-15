@@ -36,6 +36,7 @@ try{
   billingPage.on("pageerror",e=>console.log("BILLING_PAGE_ERROR",String(e.message).slice(0,250)));
   await billingPage.route("**/api/me",route=>route.fulfill({status:200,contentType:"application/json",body:'{"email":"qa@example.invalid"}'}));
   await billingPage.route("**/api/billing",route=>route.fulfill({status:200,contentType:"application/json",body:'{"plan":"business","status":"active","paid_until":253402300799}'}));
+  await billingPage.route("**/api/cvx-license",route=>route.fulfill({status:200,contentType:"application/json",body:'{"lifetime":true}'}));
   const billingResponse=await billingPage.goto(base,{waitUntil:"domcontentloaded",timeout:30000});
   assert.equal(billingResponse.status(),200);
   await billingPage.evaluate(()=>{
@@ -45,7 +46,7 @@ try{
     section.innerHTML='<h2>Minha assinatura</h2><h3>Plano atual: business</h3><p>Situação: active</p><form><button type="button">Solicitar contratação</button></form>';
     root.appendChild(section);
   });
-  await billingPage.waitForTimeout(1400);
+  await billingPage.waitForTimeout(2100);
   const billingState=await billingPage.evaluate(()=>({
     text:document.querySelector("#cvx-qa-billing")?.textContent?.slice(0,250),
     banner:document.querySelector("#cvx-lifetime-banner")?.textContent,
