@@ -230,7 +230,7 @@ function prospectImport(row){
  const existing=prospectDb.query("SELECT id,consent,opt_out FROM prospect_leads WHERE phone=?").get(phone);
  if(existing){
   // Never resurrect opt-outs or upgrade permission through a duplicated import.
-  prospectDb.query("UPDATE prospect_leads SET name=?,email=?,city=?,uf=?,product=?,origin=?,notes=?,score=?,temperature=?,updated_at=? WHERE id=?").run(name,data.email,data.city,data.uf,data.product,data.origin,data.notes,r.score,r.temperature,prospectNow(),existing.id);
+  prospectDb.query("UPDATE prospect_leads SET name=?,email=?,city=?,uf=?,product=?,origin=CASE WHEN origin='manual' THEN ? ELSE origin END,notes=?,score=?,temperature=?,updated_at=? WHERE id=?").run(name,data.email,data.city,data.uf,data.product,data.origin,data.notes,r.score,r.temperature,prospectNow(),existing.id);
   return {id:existing.id,updated:true};
  }
  const q=prospectDb.query("INSERT INTO prospect_leads(name,phone,email,city,uf,product,origin,notes,temperature,score,consent,consent_evidence,consent_at,opt_out,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(name,phone,data.email,data.city,data.uf,data.product,data.origin,data.notes,r.temperature,r.score,consent?1:0,data.consent_evidence,data.consent_at,0,prospectNow(),prospectNow());
