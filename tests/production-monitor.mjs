@@ -16,6 +16,8 @@ const checks = [
   ["CRM: licenças vitalícias restritas", crm + "/api/master/lifetime/overview", [401,403]],
   ["CRM: financeiro restrito", crm + "/api/master/finance/overview", [401,403]],
   ["CRM: leads restritos", crm + "/api/leads", [401,403]],
+  ["CRM: diagnóstico somente autenticado", crm + "/operacao", [301,302,303,401,403]],
+  ["CRM: API de diagnóstico restrita", crm + "/api/cvx/operacao", [401,403]],
   ["Prospect: healthz", prospect + "/healthz", [200], "healthy"],
   ["Prospect: login", prospect + "/login", [200]],
   ["Prospect: formulário", prospect + "/captar", [200]],
