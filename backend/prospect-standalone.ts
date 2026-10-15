@@ -58,6 +58,7 @@ async function cvxFallback(req){
    }).join("");
    const page=cvxCapturePage.replace('<form method="post" action="/captar">','<form method="post" action="/captar">'+hidden);
    return new Response(page,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
+ }
  if(p==="/captar"&&req.method==="POST"){
   const origin=req.headers.get("origin");if(!cvxOriginOk(origin,u.origin))return new Response("Origem inválida",{status:403});
   if(!cvxCaptureAllowed(req))return new Response("Limite temporário de solicitações atingido",{status:429});
