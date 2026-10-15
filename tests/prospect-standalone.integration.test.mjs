@@ -13,7 +13,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
  const password="LocalTest!Only_2026";
  const salt="e82b3db763ae180a3b56de4a140cc303";
  const passHash=scryptSync(password,Buffer.from(salt,"hex"),32,{N:16384,r:8,p:1}).toString("hex");
- const env={...process.env,PORT:String(port),PROSPECT_DATA_DIR:dir,
+ const env={...process.env,PORT:String(port),PROSPECT_DATA_DIR:dir,PROSPECT_PUBLIC_CAPTURE_ENABLED:"true",
   PROSPECT_ADMIN_EMAIL:"owner@example.invalid",
   PROSPECT_ADMIN_PASSWORD_SCRYPT:salt+":"+passHash,
   PROSPECT_SESSION_SECRET:"local-test-only-session-secret-please-do-not-deploy", META_APP_SECRET:"test_meta_app_secret",META_VERIFY_TOKEN:"test_meta_verify_token",META_PHONE_NUMBER_ID:"987654321"};
