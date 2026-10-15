@@ -78,6 +78,8 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal((await fetch(base+"/api/master/prospect/leads/"+create.id+"/pipeline",{method:"POST",headers:{Cookie:cookie,"Content-Type":"application/json"},body:JSON.stringify({stage:"perdido",loss_reason:"Escolheu concorrente"})})).status,403,"CSRF required");
   assert.equal((await post("/api/master/prospect/leads/"+create.id+"/pipeline",{stage:"perdido",loss_reason:"Sem retorno",ad_spend_brl:"11,25",ad_campaign:"Meta Outubro"},cookie)).status,200,"Valid loss and ad spend");
   const win=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(x=>x.phone==="5531999990001");
+  assert.equal(win.ad_campaign,"Outubro 2026","UTM campaign initially captured");
+  assert.equal(win.origin,"formulario_site_comverxa/instagram/paid");
   assert.equal((await post("/api/master/prospect/leads/"+win.id+"/pipeline",{stage:"ganho",sale_brl:"200,00",ad_spend_brl:"20.75",ad_campaign:"Google Pesquisa"},cookie)).status,200);
   metrics=await mustJson(await fetch(base+"/api/master/prospect/overview",{headers:{Cookie:cookie}}),200);
   assert.equal(metrics.performance.won,1);
@@ -128,8 +130,8 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal(before.queued,0,"Public form consent alone must not authorize a marketing send");
   const captured=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(x=>x.phone==="5531999990001");
   assert.ok(captured&&!captured.approved);
-  assert.equal(captured.ad_campaign,"Outubro 2026");
-  assert.equal(captured.origin,"formulario_site_comverxa/instagram/paid");
+  assert.equal(captured.ad_campaign,"Google Pesquisa","Administrative campaign change should persist");
+  assert.equal(captured.origin,"formulario_site_comverxa/instagram/paid","Original acquisition source preserved");
   assert.equal((await post("/api/master/prospect/leads/"+captured.id+"/approve",{verification:"fraca"},cookie)).status,400,"Approval must require evidence");
   const reviewed=await mustJson(await post("/api/master/prospect/leads/"+captured.id+"/approve",{verification:"Verificado pelo responsável em canal oficial com documento de opt-in."},cookie),200);
   assert.equal(reviewed.ok,true);
