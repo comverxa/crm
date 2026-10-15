@@ -204,6 +204,7 @@ function prospectImport(row){
  return {id:Number(q.lastInsertRowid),updated:false};
 }
 const CVX_PROSPECT_BACKUP_UI="<div style=\"max-width:1150px;margin:22px auto;padding:0 20px 30px;font:14px system-ui;color:#203748\"><div style=\"padding:18px;background:white;border:1px solid #dce8ee;border-radius:14px\"><strong>Backup dos leads e campanhas</strong><p>Baixe uma cópia consistente do banco do Prospect IA e guarde em local seguro, fora do Railway. O arquivo contém dados pessoais.</p><button id=\"cvxBackupButton\" type=\"button\" style=\"border:0;border-radius:8px;padding:12px 16px;color:white;background:#117969;cursor:pointer\">Baixar backup SQLite</button> <span id=\"cvxBackupStatus\" role=\"status\"></span></div></div><script>(function(){const button=document.getElementById('cvxBackupButton'),msg=document.getElementById('cvxBackupStatus');if(!button)return;button.addEventListener('click',async()=>{button.disabled=true;msg.textContent='Gerando backup...';try{const res=await fetch('/api/master/prospect/backup',{method:'POST',headers:{'X-COMVERXA-Prospect':'1'}});if(!res.ok)throw Error('Não foi possível gerar o backup. HTTP '+res.status);const blob=await res.blob(),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='comverxa-prospect-backup-'+new Date().toISOString().slice(0,10)+'.sqlite';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);msg.textContent='Cópia gerada. Armazene fora do Railway.'}catch(e){msg.textContent=e.message||'Falha no backup'}finally{button.disabled=false}})})();</script>";
+const CVX_PROSPECT_PRIVACY_UI="<section id=\"cvx-privacy\" style=\"max-width:1150px;margin:0 auto 22px;padding:0 20px;font:14px system-ui;color:#1d3d50\"><div style=\"border-radius:14px;border:1px solid #dce7ed;background:white;padding:18px\"><strong>Privacidade, acesso e eliminação de dados (LGPD)</strong><p>Ferramenta restrita ao administrador. Informe o identificador numérico de um lead para exportar seus dados ou, quando houver solicitação válida, excluí-lo definitivamente da base do Prospect IA.</p><label for=\"cvx-privacy-id\">ID do lead</label> <input id=\"cvx-privacy-id\" inputmode=\"numeric\" type=\"number\" min=\"1\" step=\"1\" style=\"width:110px;padding:10px;border:1px solid #ccd7df;border-radius:7px\"> <button type=\"button\" id=\"cvx-privacy-export\" style=\"padding:10px 14px;border:0;border-radius:8px;background:#0b7668;color:white;cursor:pointer\">Exportar dados</button> <button type=\"button\" id=\"cvx-privacy-erase\" style=\"padding:10px 14px;border:1px solid #bd5858;border-radius:8px;background:white;color:#9d2828;cursor:pointer\">Excluir mediante confirmação</button><p id=\"cvx-privacy-message\" role=\"status\"></p><small>Exclusão neste módulo não elimina arquivos já baixados, cópias externas ou registros de outros provedores. Verifique obrigações legais de retenção antes de excluir.</small></div></section>\n<script>(function(){const idEl=document.getElementById('cvx-privacy-id'),msg=document.getElementById('cvx-privacy-message');if(!idEl||!msg)return;function value(){const n=Number(idEl.value);if(!Number.isSafeInteger(n)||n<1){msg.textContent='Informe um ID de lead válido.';return null}return n}document.getElementById('cvx-privacy-export').addEventListener('click',async()=>{const id=value();if(!id)return;msg.textContent='Preparando exportação...';try{const r=await fetch('/api/master/prospect/leads/'+id+'/export');if(!r.ok)throw Error('Lead indisponível. HTTP '+r.status);const u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download='comverxa-lead-'+id+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);msg.textContent='Exportação concluída.'}catch(e){msg.textContent=e.message}});document.getElementById('cvx-privacy-erase').addEventListener('click',async()=>{const id=value();if(!id)return;const reason=prompt('Motivo da exclusão: titular, retencao, duplicado ou outro.');if(!reason)return;const confirmation=prompt('EXCLUSÃO IRREVERSÍVEL. Para confirmar, digite exatamente: EXCLUIR '+id);if(!confirmation)return;msg.textContent='Solicitando exclusão...';try{const r=await fetch('/api/master/prospect/leads/'+id+'/erase',{method:'POST',headers:{'Content-Type':'application/json','X-COMVERXA-Prospect':'1'},body:JSON.stringify({confirmation,request_basis:reason.trim().toLowerCase()})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Exclusão indisponível');msg.textContent='Lead excluído deste módulo. Faça a conferência dos demais sistemas e backups.';idEl.value='';}catch(e){msg.textContent=e.message}})})()</script>";
 const prospectServeOriginal=Bun.serve;
 Bun.serve=function(cfg){
  const next=cfg.fetch;
@@ -219,7 +220,7 @@ Bun.serve=function(cfg){
     if(!cvxOriginOk(origin,u.origin))return prospectJson({error:"Origem não autorizada"},403);
     if(req.headers.get("X-COMVERXA-Prospect")!=="1")return prospectJson({error:"Proteção contra requisição não autorizada"},403);
    }
-   if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE.replace("</body>",CVX_PROSPECT_BACKUP_UI+"</body>"),{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+   if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE.replace("</body>",CVX_PROSPECT_BACKUP_UI+CVX_PROSPECT_PRIVACY_UI+"</body>"),{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
    if(path==="/api/master/prospect/overview"&&req.method==="GET"){
     const counts=prospectDb.query("SELECT COUNT(*) total,SUM(CASE WHEN temperature='quente' THEN 1 ELSE 0 END) hot,SUM(CASE WHEN temperature='morno' THEN 1 ELSE 0 END) warm,SUM(CASE WHEN temperature='frio' THEN 1 ELSE 0 END) cold,SUM(CASE WHEN consent=1 AND opt_out=0 THEN 1 ELSE 0 END) opted,SUM(CASE WHEN consent=1 AND opt_out=0 AND approved=1 THEN 1 ELSE 0 END) approved FROM prospect_leads").get();
     const sent=prospectDb.query("SELECT COUNT(*) n FROM prospect_outbox WHERE status='sent'").get().n;
@@ -241,6 +242,35 @@ Bun.serve=function(cfg){
        prospectAudit("backup.download",null,"Snapshot íntegro solicitado pelo administrador");
        return new Response(bytes,{status:200,headers:{"Content-Type":"application/vnd.sqlite3","Content-Disposition":'attachment; filename="comverxa-prospect-backup-'+prospectNow().slice(0,10)+'.sqlite"',"Content-Length":String(bytes.byteLength),"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY"}});
      }finally{try{prospectUnlinkSync(temp)}catch{}}
+   }
+
+   // LGPD: data portability and erasure, strictly for the authenticated owner.
+   // Exports only this record. No third-party CRM credentials are ever requested.
+   if(/^\/api\/master\/prospect\/leads\/\d+\/export$/.test(path)&&req.method==="GET"){
+     const id=Number(path.split("/")[5]);
+     if(!Number.isSafeInteger(id)||id<1)return prospectJson({error:"Identificador inválido"},400);
+     const lead=prospectDb.query("SELECT * FROM prospect_leads WHERE id=?").get(id);
+     if(!lead)return prospectJson({error:"Lead não encontrado"},404);
+     const campaignEvents=prospectDb.query("SELECT c.name,c.template_name,q.status,q.sent_at FROM prospect_outbox q JOIN prospect_campaigns c ON c.id=q.campaign_id WHERE q.lead_id=? ORDER BY q.id DESC LIMIT 200").all(id);
+     prospectAudit("privacy.export",id,"Cópia individual solicitada pelo administrador");
+     return new Response(JSON.stringify({purpose:"Direito de acesso e portabilidade - COMVERXA Prospect IA",generated_at:prospectNow(),lead:prospectLeadPublic(lead),campaignEvents},null,2),{headers:{"Content-Type":"application/json; charset=utf-8","Content-Disposition":'attachment; filename="comverxa-lead-'+id+'.json"',"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY"}});
+   }
+   if(/^\/api\/master\/prospect\/leads\/\d+\/erase$/.test(path)&&req.method==="POST"){
+     const id=Number(path.split("/")[5]);
+     if(!Number.isSafeInteger(id)||id<1)return prospectJson({error:"Identificador inválido"},400);
+     const input=await req.json().catch(()=>null);
+     if(input?.confirmation!=="EXCLUIR "+id)return prospectJson({error:"Confirmação inválida: digite EXCLUIR "+id},400);
+     if(!input?.request_basis||!["titular","retencao","duplicado","outro"].includes(input.request_basis))return prospectJson({error:"Indique a justificativa do pedido"},400);
+     const remove=prospectDb.transaction(()=>{
+       const exists=prospectDb.query("SELECT id FROM prospect_leads WHERE id=?").get(id);
+       if(!exists)return false;
+       prospectDb.query("DELETE FROM prospect_outbox WHERE lead_id=?").run(id);
+       prospectDb.query("DELETE FROM prospect_leads WHERE id=?").run(id);
+       prospectAudit("privacy.erase",id,"Exclusão confirmada; justificativa:"+input.request_basis);
+       return true;
+     });
+     if(!remove())return prospectJson({error:"Lead não encontrado"},404);
+     return prospectJson({ok:true,erased_id:id,scope:"Prospect IA",warning:"Esta operação não exclui dados armazenados em outros sistemas, backups já baixados ou provedores externos."});
    }
    if(path==="/api/master/prospect/export.csv"&&req.method==="GET"){
     const rows=prospectDb.query("SELECT name,phone,email,city,uf,product,origin,temperature,score,consent,approved,opt_out,created_at,notes FROM prospect_leads ORDER BY id DESC LIMIT 10000").all();
