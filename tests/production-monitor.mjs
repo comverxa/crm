@@ -9,6 +9,7 @@ const marketing = "https://comverxa.github.io/crm";
 const checks = [
   ["CRM: healthz", crm + "/healthz", [200], "health"],
   ["CRM: login público", crm + "/", [200], "comverxa"],
+  ["CRM: layout notebook corrigido", crm + "/", [200], "desktop-css"],
   ["CRM: ADM Master", crm + "/admin", [200,302,303]],
   ["CRM: sessão exige login", crm + "/api/me", [401,403]],
   ["CRM: licença exige login", crm + "/api/cvx-license", [401,403]],
@@ -52,6 +53,10 @@ for (const [name, url, allowed, bodyCheck] of checks) {
     if (passed && bodyCheck === "comverxa") {
       const html = await response.text();
       passed = /comverxa/i.test(html);
+    }
+    if (passed && bodyCheck === "desktop-css") {
+      const html = await response.text();
+      passed = html.includes("COMVERXA Desktop Sidebar Correction 2026-10-15");
     }
     console.log(`${passed ? "PASS" : "FAIL"} | ${name} | HTTP ${response.status} | ${Date.now() - start}ms`);
     if (!passed) failures++;
