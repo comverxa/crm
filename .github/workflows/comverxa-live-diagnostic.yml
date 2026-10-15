@@ -23,7 +23,7 @@ jobs:
                 bytes:Buffer.byteLength(body),
                 contentSecurityPolicy:csp.slice(0,450),
                 markers:{premium:body.includes('comverxa-premium-v2'),
-                         uxScript:body.includes('cvx-ui.js'),vip:body.includes('cvxVip'),
+                         uxScript:body.includes('cvx-ui.js'),billingV8:body.includes('cvx-billing-v8'),billingAddon:body.includes('cvxBillingAddon'),vip:body.includes('cvxVip'),
                          business:body.includes('Plano atual: business'),
                          title:body.includes('<title>')},
                 scriptTags:(body.match(/<script/gi)||[]).length
