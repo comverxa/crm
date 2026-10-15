@@ -72,7 +72,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   const backupPath=join(dir,"backup-verified.sqlite");
   writeFileSync(backupPath,backup);
   const checkedBackup=spawnSync("bun",["-e",
-    "import {Database} from 'bun:sqlite';const db=new Database(process.argv[1],{readonly:true});if(db.query('PRAGMA integrity_check').get().integrity_check!=='ok'||db.query('SELECT COUNT(*) AS n FROM prospect_leads').get().n!==1)process.exit(7);db.close();",backupPath],{encoding:"utf8"});
+    "import {Database} from 'bun:sqlite';const db=new Database(process.argv[1],{readonly:true});if(db.query('PRAGMA integrity_check').get().integrity_check!=='ok'||db.query('SELECT COUNT(*) AS n FROM prospect_leads').get().n!==2)process.exit(7);db.close();",backupPath],{encoding:"utf8"});
   assert.equal(checkedBackup.status,0,"SQLite restore verification failed: "+checkedBackup.stderr);
 
   const csvResponse=await fetch(base+"/api/master/prospect/export.csv",{headers:{Cookie:cookie}});
