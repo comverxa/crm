@@ -22,6 +22,7 @@ const checks = [
   ["Prospect: painel restrito", prospect + "/prospect-ia", [401,403]],
   ["Prospect: contatos restritos", prospect + "/api/master/prospect/leads", [401,403]],
   ["Prospect: exportação restrita", prospect + "/api/master/prospect/export.csv", [401,403]],
+  ["Prospect: portabilidade individual restrita", prospect + "/api/master/prospect/leads/1/export", [401,403]],
   ["Site comercial", marketing + "/", [200], "comverxa"],
   ["Privacidade / LGPD", marketing + "/privacidade.html", [200]],
   ["Termos comerciais", marketing + "/termos.html", [200]],
@@ -73,6 +74,19 @@ try {
 }catch(error){
   console.log("FAIL | Prospect: proteção do backup | "+String(error.name||"request_error"));
   failures++;
+}
+
+
+for (const [name, path, payload] of [
+ ["funil comercial restrito", "/api/master/prospect/leads/1/pipeline",{stage:"ganho",sale_brl:"1.00"}],
+ ["exclusão LGPD restrita", "/api/master/prospect/leads/1/erase",{confirmation:"EXCLUIR 1",request_basis:"titular"}]
+]){
+ try{
+  const r=await fetch(prospect+path,{method:"POST",redirect:"manual",headers:{"Content-Type":"application/json","X-COMVERXA-Prospect":"1"},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});
+  const ok=[401,403].includes(r.status);
+  console.log((ok?"PASS":"FAIL")+" | Prospect: "+name+" | HTTP "+r.status);
+  if(!ok)failures++;
+ }catch(error){console.log("FAIL | Prospect: "+name+" | "+String(error.name||"request_error"));failures++}
 }
 
 console.log(`SUMMARY | ${checks.length - failures}/${checks.length} public checks passed | failures=${failures}`);
