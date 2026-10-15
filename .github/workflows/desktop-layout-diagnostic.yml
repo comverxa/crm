@@ -38,6 +38,8 @@ jobs:
               return {scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,nodes,extra,cardVisibleAtPoint:center?{tag:center.tagName,id:center.id,cls:String(center.className).slice(0,100),text:center.textContent.slice(0,60)}:null,styles};
              });
              console.log('DESKTOP_LAYOUT '+JSON.stringify({status:resp.status(),w,...d}));
+             const html=await resp.text();
+             console.log('LIVE_HTML_DIAGNOSTIC '+JSON.stringify({w,status:resp.status(),contentType:resp.headers()['content-type'],bytes:html.length,idAppDouble:html.includes('id="app"'),idAppSingle:html.includes("id='app'"),fix:html.includes('cvx-desktop-layout-hotfix'),premium:html.includes('comverxa-premium-v2'),headEnd:html.includes('</head>')}));
              const publishedCss=await page.locator('#cvx-desktop-layout-hotfix').count();
              if(publishedCss!==1)throw new Error('CRM production desktop hotfix not published');
              const fixed=await page.evaluate(()=>{
