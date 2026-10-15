@@ -157,7 +157,7 @@ const COMVERXA_PROSPECT_PAGE = "<!doctype html><html lang=\"pt-BR\"><head><meta 
 // COMVERXA Prospect IA (pilot master-only). No credentials in source.
 // Installed before original Bun.serve startup; wraps routes without replacing the CRM.
 import { Database as ProspectDatabase } from "bun:sqlite";
-import { mkdirSync as prospectMkdirSync } from "node:fs";
+import { mkdirSync as prospectMkdirSync, readFileSync as prospectReadFileSync, unlinkSync as prospectUnlinkSync, statSync as prospectStatSync } from "node:fs";
 
 const prospectStorageDir=Bun.env.PROSPECT_DATA_DIR||"/data";
 prospectMkdirSync(prospectStorageDir, {recursive:true});
@@ -203,6 +203,7 @@ function prospectImport(row){
  const q=prospectDb.query("INSERT INTO prospect_leads(name,phone,email,city,uf,product,origin,notes,temperature,score,consent,consent_evidence,consent_at,opt_out,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(name,phone,data.email,data.city,data.uf,data.product,data.origin,data.notes,r.temperature,r.score,consent?1:0,data.consent_evidence,data.consent_at,0,prospectNow(),prospectNow());
  return {id:Number(q.lastInsertRowid),updated:false};
 }
+const CVX_PROSPECT_BACKUP_UI="<div style=\"max-width:1150px;margin:22px auto;padding:0 20px 30px;font:14px system-ui;color:#203748\"><div style=\"padding:18px;background:white;border:1px solid #dce8ee;border-radius:14px\"><strong>Backup dos leads e campanhas</strong><p>Baixe uma cópia consistente do banco do Prospect IA e guarde em local seguro, fora do Railway. O arquivo contém dados pessoais.</p><button id=\"cvxBackupButton\" type=\"button\" style=\"border:0;border-radius:8px;padding:12px 16px;color:white;background:#117969;cursor:pointer\">Baixar backup SQLite</button> <span id=\"cvxBackupStatus\" role=\"status\"></span></div></div><script>(function(){const button=document.getElementById('cvxBackupButton'),msg=document.getElementById('cvxBackupStatus');if(!button)return;button.addEventListener('click',async()=>{button.disabled=true;msg.textContent='Gerando backup...';try{const res=await fetch('/api/master/prospect/backup',{method:'POST',headers:{'X-COMVERXA-Prospect':'1'}});if(!res.ok)throw Error('Não foi possível gerar o backup. HTTP '+res.status);const blob=await res.blob(),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='comverxa-prospect-backup-'+new Date().toISOString().slice(0,10)+'.sqlite';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);msg.textContent='Cópia gerada. Armazene fora do Railway.'}catch(e){msg.textContent=e.message||'Falha no backup'}finally{button.disabled=false}})})();</script>";
 const prospectServeOriginal=Bun.serve;
 Bun.serve=function(cfg){
  const next=cfg.fetch;
@@ -218,11 +219,28 @@ Bun.serve=function(cfg){
     if(!cvxOriginOk(origin,u.origin))return prospectJson({error:"Origem não autorizada"},403);
     if(req.headers.get("X-COMVERXA-Prospect")!=="1")return prospectJson({error:"Proteção contra requisição não autorizada"},403);
    }
-   if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+   if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE.replace("</body>",CVX_PROSPECT_BACKUP_UI+"</body>"),{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
    if(path==="/api/master/prospect/overview"&&req.method==="GET"){
     const counts=prospectDb.query("SELECT COUNT(*) total,SUM(CASE WHEN temperature='quente' THEN 1 ELSE 0 END) hot,SUM(CASE WHEN temperature='morno' THEN 1 ELSE 0 END) warm,SUM(CASE WHEN temperature='frio' THEN 1 ELSE 0 END) cold,SUM(CASE WHEN consent=1 AND opt_out=0 THEN 1 ELSE 0 END) opted,SUM(CASE WHEN consent=1 AND opt_out=0 AND approved=1 THEN 1 ELSE 0 END) approved FROM prospect_leads").get();
     const sent=prospectDb.query("SELECT COUNT(*) n FROM prospect_outbox WHERE status='sent'").get().n;
     return prospectJson({counts:{total:counts.total,hot:counts.hot||0,warm:counts.warm||0,cold:counts.cold||0,opted:counts.opted||0,approved:counts.approved||0,sent},integration:{openai:Boolean(Bun.env.OPENAI_API_KEY),meta:Boolean(Bun.env.META_ACCESS_TOKEN&&Bun.env.META_PHONE_NUMBER_ID),maps:Boolean(Bun.env.GOOGLE_MAPS_API_KEY)},mode:"piloto restrito ao administrador"});
+   }
+
+   // Authenticated owner-only snapshot; checks consistent SQLite integrity before download.
+   if(path==="/api/master/prospect/backup"&&req.method==="POST"){
+     const liveDbPath=prospectStorageDir+"/comverxa-prospect-ia.sqlite";
+     if(prospectStatSync(liveDbPath).size>64*1024*1024)return prospectJson({error:"Backup excede o limite de 64MB. Use exportação assistida."},413);
+     const temp=prospectStorageDir+"/.comverxa-backup-"+randomBytes(12).toString("hex")+".sqlite";
+     try{
+       prospectDb.exec("VACUUM INTO '"+temp.replaceAll("'","''")+"'");
+       const checkDb=new ProspectDatabase(temp,{readonly:true});
+       let check;
+       try{check=checkDb.query("PRAGMA integrity_check").get()?.integrity_check}finally{checkDb.close()}
+       if(check!=="ok")throw new Error("Falha de integridade do snapshot");
+       const bytes=prospectReadFileSync(temp);
+       prospectAudit("backup.download",null,"Snapshot íntegro solicitado pelo administrador");
+       return new Response(bytes,{status:200,headers:{"Content-Type":"application/vnd.sqlite3","Content-Disposition":'attachment; filename="comverxa-prospect-backup-'+prospectNow().slice(0,10)+'.sqlite"',"Content-Length":String(bytes.byteLength),"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY"}});
+     }finally{try{prospectUnlinkSync(temp)}catch{}}
    }
    if(path==="/api/master/prospect/export.csv"&&req.method==="GET"){
     const rows=prospectDb.query("SELECT name,phone,email,city,uf,product,origin,temperature,score,consent,approved,opt_out,created_at,notes FROM prospect_leads ORDER BY id DESC LIMIT 10000").all();
