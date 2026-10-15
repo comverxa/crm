@@ -6,7 +6,17 @@ window.__cvxInboxChannelInstalled=true;
 const byId=id=>document.getElementById(id);
 const getThread=()=>{try{return typeof selected!=="undefined"?selected:null}catch{return null}};
 const getLines=()=>{try{return typeof lines!=="undefined"&&Array.isArray(lines)?lines:[]}catch{return []}};
-const current=()=>{const thread=getThread();return {thread,line:getLines().find(x=>Number(x.slot)===Number(thread?.line))||null,qr:getLines().filter(x=>x.mode==="qr")}};
+/* Prefer the saved lead assignment over an openThread snapshot. The selected
+   thread may be stale after Save while its row already shows WhatsApp 2. */
+const current=()=>{
+ const thread=getThread(),available=getLines();
+ let registered=null;
+ try{registered=typeof leads!=="undefined"&&Array.isArray(leads)?leads.find(x=>Number(x.id)===Number(thread?.id)):null}catch{}
+ const raw=Number(registered?.line||thread?.line||0);
+ const slot=Number.isSafeInteger(raw)&&raw>0?raw:0;
+ if(thread&&slot&&Number(thread.line)!==slot)thread.line=slot; // UI cache only, never writes customer data
+ return {thread,line:available.find(x=>Number(x.slot)===slot)||null,qr:available.filter(x=>x.mode==="qr"),slot};
+};
 function ui(){
  const btn=document.querySelector('#inbox button[onclick="sendReply(\'text\')"]'),tpl=document.querySelector('#inbox button[onclick="sendReply(\'template\')"]');
  if(!btn)return null;
@@ -37,7 +47,7 @@ function ui(){
 }
 function sync(){
  const parts=ui();if(!parts)return;
- const {btn,tpl,n,edit}=parts,{thread,line,qr}=current();
+ const {btn,tpl,n,edit}=parts,{thread,line,qr,slot}=current();
  if(!thread){
   btn.textContent="Selecione uma conversa";btn.disabled=true;
   n.firstChild?.nodeType===3&&(n.firstChild.textContent="");
@@ -45,7 +55,6 @@ function sync(){
   if(tpl)tpl.hidden=false;
   return;
  }
- const slot=Number(thread.line);
  let desc="";
  if(line?.mode==="qr"){
   btn.textContent="Enviar pela Evolution API (QR)";btn.disabled=false;
@@ -77,6 +86,7 @@ if(typeof oldSend==="function")window.sendReply=async function(type){
  if(!thread){toast("Selecione uma conversa");return}
  if(type==="template"&&line?.mode==="qr"){toast("Modelos Meta não se aplicam à Evolution QR.");return}
  if(type==="text"&&line?.mode!=="qr"&&line?.mode!=="api"){toast("Esta conversa não está vinculada a uma linha de envio. Corrija no cadastro do lead.");sync();return}
+ /* Refresh cached selected line before the original send handler reads it. */
  return oldSend.call(this,type);
 };
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",sync,{once:true});else sync();
