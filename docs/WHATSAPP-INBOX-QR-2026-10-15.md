@@ -29,5 +29,15 @@ Arquivo-fonte: `backend/whatsapp-channel-inbox.js`.
 4. Quando aparecer **Enviar pela Evolution API (QR)**, enviar uma mensagem de teste para um número próprio/autorizado e responder pelo telefone.
 5. Se houver erro, registrar mensagem e status, evitando exposições de telefones, tokens e mensagens de clientes.
 
+## Correção adicional do atendimento que permanece aberto — 15/10/2026
+
+A captura real do usuário mostrou uma lista com contatos identificados como **WhatsApp 2**, enquanto o aviso do atendimento aberto ainda dizia **linha 1**. O motivo identificado foi a utilização de `selected.line` de uma cópia anterior da conversa, enquanto o usuário já havia salvado `leads[].line = 2` no CRM.
+
+- Atualizado `backend/whatsapp-channel-inbox.js`: a identificação do canal consulta primeiro a **linha atual do lead cadastrado**, usando ID exato; o cache da conversa aberta é reconciliado apenas em memória. O banco não é alterado e não há envio automático.
+- Com a linha efetiva em Evolution QR, o botão volta a ficar habilitado sem ser necessário encerrar a conversa.
+- Teste local e na página realmente publicada aprovado em https://github.com/comverxa/crm/actions/runs/38789582613, incluindo cenário em que a conversa está com linha 1 e o lead já foi salvo com linha 2.
+- Railway confirmou a implantação do patch v2 com estado SUCCESS; teste de navegador não executou POST/PUT/DELETE no CRM real.
+- **Atenção**: envio/entrega real ainda requer verificação com WhatsApp próprio ou destinatário autorizado; uma melhoria no botão não comprova sucesso da Evolution API.
+
 ## Limite de homologação
 A **seleção de canal e a correção visual estão verificadas**, mas o teste ponta a ponta de entrega e recebimento a partir de uma sessão real do usuário **ainda depende do envio autorizado em conta conectada**. A Evolution API é uma integração não oficial com riscos operacionais e restrições de uso. Não confundir status do QR ou HTTP 200 do webhook com entrega confirmada.
