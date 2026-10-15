@@ -12,9 +12,9 @@ try{
   document.querySelector("#app")?.classList.remove("hide");
   document.querySelectorAll("#app .screen").forEach(x=>x.classList.add("hide"));
   document.getElementById("inbox").classList.remove("hide");
-  selected={id:1,name:"Lead fictício de QA",phone:"5531000000000",line:2};
+  selected={id:1,name:"Lead fictício de QA",phone:"5531000000000",line:1};
   lines=[{slot:1,name:"Linha Meta",mode:"api"},{slot:2,name:"QR Evolution Teste",mode:"qr"}];
-  leads=[{id:1,name:"Lead fictício de QA",phone:"5531000000000",line:1}];
+  leads=[{id:1,name:"Lead fictício de QA",phone:"5531000000000",line:2}];
   document.getElementById("lineSelect").innerHTML='<option value="1">Meta</option><option value="2">Evolution QR</option>';
   window.__qaCalls=[];
   window.sendReply=(t)=>{window.__qaCalls.push(t)};
@@ -24,11 +24,12 @@ try{
  await page.waitForTimeout(120);
  const button=page.locator('#inbox button[onclick="sendReply(\'text\')"]');
  await assert.equal(await button.textContent(),"Enviar pela Evolution API (QR)");
+ assert.equal(await page.evaluate(()=>selected.line),2,"Stale thread line must synchronize from saved lead");
  assert.equal(await page.locator('#inbox button[onclick="sendReply(\'template\')"]').isVisible(),false,"Meta template hidden in QR mode");
  await button.click();
  assert.deepEqual(await page.evaluate(()=>window.__qaCalls),["text"],"QR text send dispatched to existing backend API only after click");
  await page.evaluate(()=>{
-  selected={id:1,name:"Lead fictício de QA",phone:"5531000000000",line:1};
+  leads[0].line=1;selected={id:1,name:"Lead fictício de QA",phone:"5531000000000",line:1};
   document.getElementById("chatHeader").textContent="Lead fictício de QA - Meta";
  });
  await page.waitForTimeout(120);
