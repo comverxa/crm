@@ -50,7 +50,14 @@ async function cvxFallback(req){
  if(p==="/captar"&&Bun.env.PROSPECT_PUBLIC_CAPTURE_ENABLED!=="true")return new Response("Captação desabilitada durante a homologação.",{status:503,headers:{"Cache-Control":"no-store","Content-Type":"text/plain; charset=utf-8"}});
  if(p==="/healthz"){try{prospectDb.query("SELECT COUNT(*) AS n FROM prospect_leads").get();return new Response("healthy",{status:200,headers:{"Content-Type":"text/plain","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}})}catch{return new Response("database unavailable",{status:503,headers:{"Content-Type":"text/plain","Cache-Control":"no-store"}})}}
 
- if(p==="/captar"&&req.method==="GET")return new Response(cvxCapturePage,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
+ if(p==="/captar"&&req.method==="GET"){
+   const htmlEsc=x=>String(x).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+   const hidden=["utm_source","utm_medium","utm_campaign"].map(key=>{
+     const value=prospectText(u.searchParams.get(key)||"",80);
+     return value?'<input type="hidden" name="'+key+'" value="'+htmlEsc(value)+'">':"";
+   }).join("");
+   const page=cvxCapturePage.replace('<form method="post" action="/captar">','<form method="post" action="/captar">'+hidden);
+   return new Response(page,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
  if(p==="/captar"&&req.method==="POST"){
   const origin=req.headers.get("origin");if(!cvxOriginOk(origin,u.origin))return new Response("Origem inválida",{status:403});
   if(!cvxCaptureAllowed(req))return new Response("Limite temporário de solicitações atingido",{status:429});
@@ -58,7 +65,12 @@ async function cvxFallback(req){
    const form=await req.formData();
    if(String(form.get("website")||""))return new Response("Solicitação recebida",{status:200});
    if(form.get("consent")!=="yes")return new Response("É necessário autorizar o contato para concluir a solicitação",{status:400});
-   const lead=prospectImport({name:form.get("name"),phone:form.get("phone"),city:form.get("city"),uf:form.get("uf"),product:form.get("product"),origin:"formulario_site_comverxa",notes:"Solicitou demonstração pelo formulário público",consent:true,consent_evidence:"Consentimento explícito enviado no formulário COMVERXA em "+prospectNow()});
+   const source=prospectText(form.get("utm_source")||"",35).replace(/[^a-zA-Z0-9_\-.]/g,"");
+   const medium=prospectText(form.get("utm_medium")||"",25).replace(/[^a-zA-Z0-9_\-.]/g,"");
+   const campaign=prospectText(form.get("utm_campaign")||"",120);
+   const attribution="formulario_site_comverxa"+(source?"/"+source:"")+(medium?"/"+medium:"");
+   const lead=prospectImport({name:form.get("name"),phone:form.get("phone"),city:form.get("city"),uf:form.get("uf"),product:form.get("product"),origin:attribution,notes:"Solicitou demonstração pelo formulário público",consent:true,consent_evidence:"Consentimento explícito enviado no formulário COMVERXA em "+prospectNow()});
+   if(campaign&&(!lead.updated||!prospectDb.query("SELECT ad_campaign FROM prospect_leads WHERE id=?").get(lead.id)?.ad_campaign))prospectDb.query("UPDATE prospect_leads SET ad_campaign=? WHERE id=?").run(campaign,lead.id);
    prospectAudit("lead.selfcapture",lead.id,"Solicitação de demonstração com aceite específico");
    return new Response("<!doctype html><html lang='pt-BR'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Obrigado | COMVERXA</title><body style='font:17px system-ui;background:#f2f6fa;padding:10vh 20px;text-align:center;color:#20334b'><h1>Solicitação recebida</h1><p>Obrigado pelo contato. Nossa equipe poderá responder à sua solicitação.</p><p><a href='https://comverxa.github.io/crm/'>Conhecer o COMVERXA</a></p></body></html>",{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
   }catch(e){return new Response("Não foi possível registrar. Revise seus dados e tente novamente.",{status:400})}
