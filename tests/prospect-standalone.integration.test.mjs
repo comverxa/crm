@@ -61,7 +61,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.ok(create.id);
   const csvResponse=await fetch(base+"/api/master/prospect/export.csv",{headers:{Cookie:cookie}});
   assert.equal(csvResponse.status,200,"CSV export requires authenticated owner");
-  assert.match(csvResponse.headers.get("content-type")||"",/text\\/csv/i);
+  assert.ok((csvResponse.headers.get("content-type")||"").includes("text/csv"));
   assert.match(csvResponse.headers.get("content-disposition")||"",/attachment/);
   assert.equal(csvResponse.headers.get("cache-control"),"private, no-store");
   const csvText=await csvResponse.text();
