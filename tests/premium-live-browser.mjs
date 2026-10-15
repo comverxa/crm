@@ -33,6 +33,7 @@ try{
   await page.close();
  }
   const billingPage=await browser.newPage({viewport:{width:390,height:844}});
+  billingPage.on("pageerror",e=>console.log("BILLING_PAGE_ERROR",String(e.message).slice(0,250)));
   await billingPage.route("**/api/me",route=>route.fulfill({status:200,contentType:"application/json",body:'{"email":"qa@example.invalid"}'}));
   await billingPage.route("**/api/billing",route=>route.fulfill({status:200,contentType:"application/json",body:'{"plan":"business","status":"active","paid_until":253402300799}'}));
   const billingResponse=await billingPage.goto(base,{waitUntil:"domcontentloaded",timeout:30000});
@@ -44,11 +45,18 @@ try{
     section.innerHTML='<h2>Minha assinatura</h2><h3>Plano atual: business</h3><p>Situação: active</p><form><button type="button">Solicitar contratação</button></form>';
     root.appendChild(section);
   });
-  await billingPage.waitForFunction(()=>{
-    const s=document.querySelector("#cvx-qa-billing");
-    return s?.textContent.includes("Plano atual: Empresarial")&&s?.textContent.includes("Situação: Ativo")&&
-      !!document.querySelector("#cvx-lifetime-banner")&&s.querySelector("form")?.hidden;
-  },{timeout:5000});
+  await billingPage.waitForTimeout(1400);
+  const billingState=await billingPage.evaluate(()=>({
+    text:document.querySelector("#cvx-qa-billing")?.textContent?.slice(0,250),
+    banner:document.querySelector("#cvx-lifetime-banner")?.textContent,
+    hidden:document.querySelector("#cvx-qa-billing form")?.hidden,
+    scripts:[...document.scripts].map(x=>({id:x.id,size:x.textContent?.length})).filter(x=>x.id.includes('premium'))
+  }));
+  console.log("BILLING_QA_STATE",JSON.stringify(billingState));
+  assert.ok(billingState.text?.includes("Plano atual: Empresarial"),"Plano nao traduzido");
+  assert.ok(billingState.text?.includes("Situação: Ativo"),"Situacao nao traduzida");
+  assert.ok(billingState.banner?.includes("Vitalício"),"Aviso vitalicio ausente");
+  assert.equal(billingState.hidden,true,"Formulario de contratacao nao foi ocultado");
   console.log("PASS | Plano Empresarial Vitalicio | traducao, aviso e formulario oculto com API simulada");
   await billingPage.close();
 }finally{await browser.close()}
