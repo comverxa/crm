@@ -16,7 +16,7 @@ const checks = [
   ["CRM: licenças vitalícias restritas", crm + "/api/master/lifetime/overview", [401,403]],
   ["CRM: financeiro restrito", crm + "/api/master/finance/overview", [401,403]],
   ["CRM: leads restritos", crm + "/api/leads", [401,403]],
-  ["Prospect: healthz", prospect + "/healthz", [200], "health"],
+  ["Prospect: healthz", prospect + "/healthz", [200], "healthy"],
   ["Prospect: login", prospect + "/login", [200]],
   ["Prospect: formulário", prospect + "/captar", [200]],
   ["Prospect: painel restrito", prospect + "/prospect-ia", [401,403]],
@@ -44,6 +44,9 @@ for (const [name, url, allowed, bodyCheck] of checks) {
     if (passed && bodyCheck === "health") {
       const payload = await response.json().catch(() => null);
       passed = payload?.status === "ok";
+    }
+    if (passed && bodyCheck === "healthy") {
+      passed = (await response.text()).trim() === "healthy";
     }
     if (passed && bodyCheck === "comverxa") {
       const html = await response.text();
