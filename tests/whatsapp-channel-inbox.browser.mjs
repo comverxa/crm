@@ -19,7 +19,9 @@ try{
   window.__qaCalls=[];
   window.sendReply=(t)=>{window.__qaCalls.push(t)};
  });
- await page.addScriptTag({content:addon});
+ if(!(await page.locator("#cvx-inbox-channel-patch").count()))await page.addScriptTag({content:addon});
+ await page.evaluate(()=>{document.getElementById("chatHeader").textContent="Lead QA Evolution inicial";});
+ await page.waitForTimeout(120);
  const button=page.locator('#inbox button[onclick="sendReply(\'text\')"]');
  await assert.equal(await button.textContent(),"Enviar pela Evolution API (QR)");
  assert.equal(await page.locator('#inbox button[onclick="sendReply(\'template\')"]').isVisible(),false,"Meta template hidden in QR mode");
