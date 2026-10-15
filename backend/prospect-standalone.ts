@@ -171,6 +171,26 @@ if(!prospectDb.query("PRAGMA table_info(prospect_leads)").all().some(x=>x.name==
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_campaigns (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, template_name TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'pt_BR', status TEXT NOT NULL DEFAULT 'draft', created_at TEXT NOT NULL)");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, campaign_id INTEGER NOT NULL, lead_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', provider_id TEXT, error TEXT, sent_at TEXT, created_at TEXT NOT NULL, UNIQUE(campaign_id,lead_id))");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, entity_id INTEGER, details TEXT, at TEXT NOT NULL)");
+
+// Commercial pipeline fields are additive; no existing lead or consent record is overwritten.
+for(const [field,sql] of [
+ ["stage","ALTER TABLE prospect_leads ADD COLUMN stage TEXT NOT NULL DEFAULT 'novo'"],
+ ["ad_spend_cents","ALTER TABLE prospect_leads ADD COLUMN ad_spend_cents INTEGER NOT NULL DEFAULT 0"],
+ ["sale_cents","ALTER TABLE prospect_leads ADD COLUMN sale_cents INTEGER NOT NULL DEFAULT 0"],
+ ["loss_reason","ALTER TABLE prospect_leads ADD COLUMN loss_reason TEXT NOT NULL DEFAULT ''"],
+ ["ad_campaign","ALTER TABLE prospect_leads ADD COLUMN ad_campaign TEXT NOT NULL DEFAULT ''"]
+]){
+ if(!prospectDb.query("PRAGMA table_info(prospect_leads)").all().some(x=>x.name===field))prospectDb.exec(sql);
+}
+const prospectStages=["novo","contato","qualificacao","negociacao","proposta","ganho","perdido"];
+const prospectMoney=(value)=>{
+ if(typeof value!=="string"&&typeof value!=="number")throw Error("Valor monetário inválido");
+ const v=String(value).trim().replace(",",".");
+ if(!/^\d{1,7}(?:\.\d{1,2})?$/.test(v))throw Error("Use valor em reais entre 0 e 9.999.999,99");
+ const [integer,decimal=""]=v.split(".");
+ return Number(integer)*100+Number(decimal.padEnd(2,"0"));
+};
+
 const prospectNow=()=>new Date().toISOString();
 const prospectJson=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
 const prospectText=(v,n=220)=>String(v==null?"":v).trim().slice(0,n);
@@ -205,6 +225,7 @@ function prospectImport(row){
 }
 const CVX_PROSPECT_BACKUP_UI="<div style=\"max-width:1150px;margin:22px auto;padding:0 20px 30px;font:14px system-ui;color:#203748\"><div style=\"padding:18px;background:white;border:1px solid #dce8ee;border-radius:14px\"><strong>Backup dos leads e campanhas</strong><p>Baixe uma cópia consistente do banco do Prospect IA e guarde em local seguro, fora do Railway. O arquivo contém dados pessoais.</p><button id=\"cvxBackupButton\" type=\"button\" style=\"border:0;border-radius:8px;padding:12px 16px;color:white;background:#117969;cursor:pointer\">Baixar backup SQLite</button> <span id=\"cvxBackupStatus\" role=\"status\"></span></div></div><script>(function(){const button=document.getElementById('cvxBackupButton'),msg=document.getElementById('cvxBackupStatus');if(!button)return;button.addEventListener('click',async()=>{button.disabled=true;msg.textContent='Gerando backup...';try{const res=await fetch('/api/master/prospect/backup',{method:'POST',headers:{'X-COMVERXA-Prospect':'1'}});if(!res.ok)throw Error('Não foi possível gerar o backup. HTTP '+res.status);const blob=await res.blob(),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='comverxa-prospect-backup-'+new Date().toISOString().slice(0,10)+'.sqlite';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);msg.textContent='Cópia gerada. Armazene fora do Railway.'}catch(e){msg.textContent=e.message||'Falha no backup'}finally{button.disabled=false}})})();</script>";
 const CVX_PROSPECT_PRIVACY_UI="<section id=\"cvx-privacy\" style=\"max-width:1150px;margin:0 auto 22px;padding:0 20px;font:14px system-ui;color:#1d3d50\"><div style=\"border-radius:14px;border:1px solid #dce7ed;background:white;padding:18px\"><strong>Privacidade, acesso e eliminação de dados (LGPD)</strong><p>Ferramenta restrita ao administrador. Informe o identificador numérico de um lead para exportar seus dados ou, quando houver solicitação válida, excluí-lo definitivamente da base do Prospect IA.</p><label for=\"cvx-privacy-id\">ID do lead</label> <input id=\"cvx-privacy-id\" inputmode=\"numeric\" type=\"number\" min=\"1\" step=\"1\" style=\"width:110px;padding:10px;border:1px solid #ccd7df;border-radius:7px\"> <button type=\"button\" id=\"cvx-privacy-export\" style=\"padding:10px 14px;border:0;border-radius:8px;background:#0b7668;color:white;cursor:pointer\">Exportar dados</button> <button type=\"button\" id=\"cvx-privacy-erase\" style=\"padding:10px 14px;border:1px solid #bd5858;border-radius:8px;background:white;color:#9d2828;cursor:pointer\">Excluir mediante confirmação</button><p id=\"cvx-privacy-message\" role=\"status\"></p><small>Exclusão neste módulo não elimina arquivos já baixados, cópias externas ou registros de outros provedores. Verifique obrigações legais de retenção antes de excluir.</small></div></section>\n<script>(function(){const idEl=document.getElementById('cvx-privacy-id'),msg=document.getElementById('cvx-privacy-message');if(!idEl||!msg)return;function value(){const n=Number(idEl.value);if(!Number.isSafeInteger(n)||n<1){msg.textContent='Informe um ID de lead válido.';return null}return n}document.getElementById('cvx-privacy-export').addEventListener('click',async()=>{const id=value();if(!id)return;msg.textContent='Preparando exportação...';try{const r=await fetch('/api/master/prospect/leads/'+id+'/export');if(!r.ok)throw Error('Lead indisponível. HTTP '+r.status);const u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download='comverxa-lead-'+id+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500);msg.textContent='Exportação concluída.'}catch(e){msg.textContent=e.message}});document.getElementById('cvx-privacy-erase').addEventListener('click',async()=>{const id=value();if(!id)return;const reason=prompt('Motivo da exclusão: titular, retencao, duplicado ou outro.');if(!reason)return;const confirmation=prompt('EXCLUSÃO IRREVERSÍVEL. Para confirmar, digite exatamente: EXCLUIR '+id);if(!confirmation)return;msg.textContent='Solicitando exclusão...';try{const r=await fetch('/api/master/prospect/leads/'+id+'/erase',{method:'POST',headers:{'Content-Type':'application/json','X-COMVERXA-Prospect':'1'},body:JSON.stringify({confirmation,request_basis:reason.trim().toLowerCase()})});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||'Exclusão indisponível');msg.textContent='Lead excluído deste módulo. Faça a conferência dos demais sistemas e backups.';idEl.value='';}catch(e){msg.textContent=e.message}})})()</script>";
+const CVX_PROSPECT_SALES_UI="<section id=\"cvx-sales\" style=\"max-width:1150px;margin:0 auto 22px;padding:0 20px;font:14px system-ui;color:#173a4c\"><div style=\"border:1px solid #d6e4ea;background:white;border-radius:15px;padding:22px\"><h2 style=\"margin:0 0 10px\">Gestão comercial · Funil, vendas, perdas e mídia paga</h2><div id=\"cvx-sales-stats\" style=\"padding:12px;background:#f0f7f8;border-radius:9px;margin-bottom:14px\">Carregando indicadores...</div><p>Etapas: Novo → Contato → Qualificação → Negociação → Proposta → Ganho ou Perdido. Informe o ID do lead para atualizar a oportunidade. Valores em reais; não são faturamento contábil nem custos obtidos automaticamente de plataformas de anúncios.</p><div style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:end\"><label>ID do lead <input id=\"cvx-sales-id\" min=\"1\" step=\"1\" type=\"number\" style=\"display:block;max-width:110px;padding:9px;border:1px solid #cadfe0;border-radius:6px\"></label><label>Etapa <select id=\"cvx-sales-stage\" style=\"display:block;padding:10px;border:1px solid #cadfe0;border-radius:6px\"><option value=\"novo\">Novo</option><option value=\"contato\">Contato</option><option value=\"qualificacao\">Qualificação</option><option value=\"negociacao\">Negociação</option><option value=\"proposta\">Proposta</option><option value=\"ganho\">Ganho</option><option value=\"perdido\">Perdido</option></select></label><label>Custo tráfego (R$) <input id=\"cvx-sales-cost\" type=\"text\" placeholder=\"12,50\" style=\"display:block;width:128px;padding:9px;border:1px solid #cadfe0;border-radius:6px\"></label><label>Venda (R$) <input id=\"cvx-sales-revenue\" type=\"text\" placeholder=\"250,00\" style=\"display:block;width:128px;padding:9px;border:1px solid #cadfe0;border-radius:6px\"></label><label>Campanha <input id=\"cvx-sales-campaign\" maxlength=\"140\" placeholder=\"Meta / Google\" style=\"display:block;width:150px;padding:9px;border:1px solid #cadfe0;border-radius:6px\"></label><label>Motivo da perda <input id=\"cvx-sales-loss\" maxlength=\"220\" placeholder=\"Preço, concorrência...\" style=\"display:block;max-width:180px;padding:9px;border:1px solid #cadfe0;border-radius:6px\"></label><button id=\"cvx-sales-save\" type=\"button\" style=\"padding:10px 15px;background:#0a7768;border:0;color:#fff;border-radius:7px;cursor:pointer;font-weight:bold\">Salvar resultado</button><button id=\"cvx-sales-refresh\" type=\"button\" style=\"padding:10px 15px;background:white;border:1px solid #0a7768;color:#0a7768;border-radius:7px;cursor:pointer\">Atualizar métricas</button></div><p id=\"cvx-sales-status\" role=\"status\"></p><div id=\"cvx-sales-regions\" style=\"font-size:13px\"></div></div></section>\n<script>(function(){const el=id=>document.getElementById('cvx-sales-'+id),brl=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(v)||0)/100);async function refresh(){try{const r=await fetch('/api/master/prospect/overview');if(!r.ok)throw Error('Sem sessão ativa');const j=await r.json(),p=j.performance||{},t=j.counts?.total||0;el('stats').textContent='Leads: '+t+' | Propostas: '+(p.proposals||0)+' | Ganhos: '+(p.won||0)+' | Perdidos: '+(p.lost||0)+' | Conversão: '+(t?((p.won||0)*100/t).toFixed(1):'0,0')+'% | Tráfego registrado: '+brl(p.ad_spend_cents)+' | Receita de ganhos: '+brl(p.revenue_cents);el('regions').textContent='Por estado: '+(j.regions||[]).map(x=>x.uf+' ('+x.leads+' leads, '+x.won+' ganhos, '+x.lost+' perdidos)').join(' · ')}catch(e){el('status').textContent=e.message}}el('refresh').addEventListener('click',refresh);el('save').addEventListener('click',async()=>{const id=Number(el('id').value);if(!Number.isSafeInteger(id)||id<1){el('status').textContent='Informe o ID numérico de um lead cadastrado.';return}const o={stage:el('stage').value};if(el('cost').value.trim())o.ad_spend_brl=el('cost').value.trim();if(el('revenue').value.trim())o.sale_brl=el('revenue').value.trim();if(el('campaign').value.trim())o.ad_campaign=el('campaign').value.trim();if(el('loss').value.trim())o.loss_reason=el('loss').value.trim();try{const r=await fetch('/api/master/prospect/leads/'+id+'/pipeline',{method:'POST',headers:{'Content-Type':'application/json','X-COMVERXA-Prospect':'1'},body:JSON.stringify(o)});const j=await r.json();if(!r.ok)throw Error(j.error||'Erro ao salvar');el('status').textContent='Lead #'+id+' atualizado para '+j.stage+'.';await refresh()}catch(e){el('status').textContent=e.message}});refresh()})()</script>";
 const prospectServeOriginal=Bun.serve;
 Bun.serve=function(cfg){
  const next=cfg.fetch;
@@ -220,11 +241,13 @@ Bun.serve=function(cfg){
     if(!cvxOriginOk(origin,u.origin))return prospectJson({error:"Origem não autorizada"},403);
     if(req.headers.get("X-COMVERXA-Prospect")!=="1")return prospectJson({error:"Proteção contra requisição não autorizada"},403);
    }
-   if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE.replace("</body>",CVX_PROSPECT_BACKUP_UI+CVX_PROSPECT_PRIVACY_UI+"</body>"),{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+   if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE.replace("</body>",CVX_PROSPECT_BACKUP_UI+CVX_PROSPECT_SALES_UI+CVX_PROSPECT_PRIVACY_UI+"</body>"),{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
    if(path==="/api/master/prospect/overview"&&req.method==="GET"){
     const counts=prospectDb.query("SELECT COUNT(*) total,SUM(CASE WHEN temperature='quente' THEN 1 ELSE 0 END) hot,SUM(CASE WHEN temperature='morno' THEN 1 ELSE 0 END) warm,SUM(CASE WHEN temperature='frio' THEN 1 ELSE 0 END) cold,SUM(CASE WHEN consent=1 AND opt_out=0 THEN 1 ELSE 0 END) opted,SUM(CASE WHEN consent=1 AND opt_out=0 AND approved=1 THEN 1 ELSE 0 END) approved FROM prospect_leads").get();
     const sent=prospectDb.query("SELECT COUNT(*) n FROM prospect_outbox WHERE status='sent'").get().n;
-    return prospectJson({counts:{total:counts.total,hot:counts.hot||0,warm:counts.warm||0,cold:counts.cold||0,opted:counts.opted||0,approved:counts.approved||0,sent},integration:{openai:Boolean(Bun.env.OPENAI_API_KEY),meta:Boolean(Bun.env.META_ACCESS_TOKEN&&Bun.env.META_PHONE_NUMBER_ID),maps:Boolean(Bun.env.GOOGLE_MAPS_API_KEY)},mode:"piloto restrito ao administrador"});
+    const performance=prospectDb.query("SELECT SUM(CASE WHEN stage='ganho' THEN 1 ELSE 0 END) won,SUM(CASE WHEN stage='perdido' THEN 1 ELSE 0 END) lost,SUM(CASE WHEN stage='proposta' THEN 1 ELSE 0 END) proposals,COALESCE(SUM(ad_spend_cents),0) ad_spend_cents,COALESCE(SUM(CASE WHEN stage='ganho' THEN sale_cents ELSE 0 END),0) revenue_cents FROM prospect_leads").get();
+     const regions=prospectDb.query("SELECT COALESCE(NULLIF(uf,''),'N/I') uf,COUNT(*) leads,SUM(CASE WHEN stage='ganho' THEN 1 ELSE 0 END) won,SUM(CASE WHEN stage='perdido' THEN 1 ELSE 0 END) lost FROM prospect_leads GROUP BY COALESCE(NULLIF(uf,''),'N/I') ORDER BY leads DESC LIMIT 40").all();
+     return prospectJson({counts:{total:counts.total,hot:counts.hot||0,warm:counts.warm||0,cold:counts.cold||0,opted:counts.opted||0,approved:counts.approved||0,sent},performance,regions,integration:{openai:Boolean(Bun.env.OPENAI_API_KEY),meta:Boolean(Bun.env.META_ACCESS_TOKEN&&Bun.env.META_PHONE_NUMBER_ID),maps:Boolean(Bun.env.GOOGLE_MAPS_API_KEY)},mode:"piloto restrito ao administrador"});
    }
 
    // Authenticated owner-only snapshot; checks consistent SQLite integrity before download.
@@ -273,15 +296,15 @@ Bun.serve=function(cfg){
      return prospectJson({ok:true,erased_id:id,scope:"Prospect IA",warning:"Esta operação não exclui dados armazenados em outros sistemas, backups já baixados ou provedores externos."});
    }
    if(path==="/api/master/prospect/export.csv"&&req.method==="GET"){
-    const rows=prospectDb.query("SELECT name,phone,email,city,uf,product,origin,temperature,score,consent,approved,opt_out,created_at,notes FROM prospect_leads ORDER BY id DESC LIMIT 10000").all();
-    const header=["nome","telefone","email","cidade","uf","produto","origem","temperatura","pontuacao","consentimento","aprovado","descadastrado","criado_em","observacoes"];
+    const rows=prospectDb.query("SELECT name,phone,email,city,uf,product,origin,temperature,score,consent,approved,opt_out,created_at,notes,stage,ad_campaign,ad_spend_cents,sale_cents,loss_reason FROM prospect_leads ORDER BY id DESC LIMIT 10000").all();
+    const header=["nome","telefone","email","cidade","uf","produto","origem","temperatura","pontuacao","consentimento","aprovado","descadastrado","criado_em","observacoes","etapa","campanha","custo_centos","receita_centos","motivo_perda"];
     const clean=value=>{
       let text=String(value==null?"":value).replace(/\r\n?/g,"\n");
       if(/^[\s]*[=+@\-]/.test(text))text="'"+text;
       return '"'+text.replace(/"/g,'""')+'"';
     };
     const body="\ufeff"+[header.join(";"),...rows.map(row=>[
-      row.name,row.phone,row.email,row.city,row.uf,row.product,row.origin,row.temperature,row.score,row.consent,row.approved,row.opt_out,row.created_at,row.notes
+      row.name,row.phone,row.email,row.city,row.uf,row.product,row.origin,row.temperature,row.score,row.consent,row.approved,row.opt_out,row.created_at,row.notes,row.stage,row.ad_campaign,row.ad_spend_cents,row.sale_cents,row.loss_reason
     ].map(clean).join(";"))].join("\r\n")+"\r\n";
     prospectAudit("leads.export_csv",null,"Exportação voluntária CSV: "+rows.length+" contatos");
     return new Response(body,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":'attachment; filename="comverxa-leads-'+prospectNow().slice(0,10)+'.csv"',"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"}});
@@ -303,6 +326,33 @@ Bun.serve=function(cfg){
     prospectAudit("leads.import",null,JSON.stringify({imported,updated,rejected:rejected.length}));
     return prospectJson({imported,updated,rejected});
    }
+
+    // Real sales funnel: negotiation precedes proposal; no messages are dispatched.
+    if(/^\/api\/master\/prospect\/leads\/\d+\/pipeline$/.test(path)&&req.method==="POST"){
+      const id=Number(path.split("/")[5]);
+      if(!Number.isSafeInteger(id)||id<1)return prospectJson({error:"Lead inválido"},400);
+      const body=await req.json().catch(()=>null);
+      const stage=String(body?.stage||"").trim().toLowerCase();
+      if(!prospectStages.includes(stage))return prospectJson({error:"Etapa inválida"},400);
+      const reason=prospectText(body?.loss_reason,220);
+      if(stage==="perdido"&&reason.length<3)return prospectJson({error:"Registre o motivo da perda"},400);
+      const campaign=prospectText(body?.ad_campaign,140);
+      if(body?.ad_campaign!==undefined&&campaign.length>140)return prospectJson({error:"Campanha muito longa"},400);
+      let spend,sale;
+      try{
+       spend=body?.ad_spend_brl==null?null:prospectMoney(body.ad_spend_brl);
+       sale=body?.sale_brl==null?null:prospectMoney(body.sale_brl);
+      }catch(ex){return prospectJson({error:ex.message},400)}
+      const old=prospectDb.query("SELECT id,stage,ad_spend_cents,sale_cents FROM prospect_leads WHERE id=?").get(id);
+      if(!old)return prospectJson({error:"Lead não encontrado"},404);
+      // Preserve prior spending and revenue if operator only changes the stage.
+      const amountSpend=spend??old.ad_spend_cents;
+      const amountSale=stage==="ganho"?(sale??old.sale_cents):0;
+      prospectDb.query("UPDATE prospect_leads SET stage=?,ad_spend_cents=?,sale_cents=?,loss_reason=?,ad_campaign=CASE WHEN ? THEN ? ELSE ad_campaign END,updated_at=? WHERE id=?")
+        .run(stage,amountSpend,amountSale,stage==="perdido"?reason:"",body?.ad_campaign!==undefined?1:0,campaign,prospectNow(),id);
+      prospectAudit("lead.pipeline",id,old.stage+" -> "+stage+"; custo centavos "+amountSpend+"; receita centavos "+amountSale);
+      return prospectJson({ok:true,id,stage,ad_spend_cents:amountSpend,sale_cents:amountSale});
+    }
    if(path==="/api/master/prospect/score"&&req.method==="POST"){
     const leads=prospectDb.query("SELECT * FROM prospect_leads").all();
     const put=prospectDb.query("UPDATE prospect_leads SET score=?,temperature=?,updated_at=? WHERE id=?");
