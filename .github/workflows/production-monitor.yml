@@ -1,0 +1,26 @@
+name: COMVERXA - Monitor de producao
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tests/production-monitor.mjs'
+      - '.github/workflows/production-monitor.yml'
+permissions:
+  contents: read
+concurrency:
+  group: comverxa-production-monitor
+  cancel-in-progress: false
+jobs:
+  monitor:
+    name: Verificar CRM, Prospect IA e acessos restritos
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Executar monitor nao destrutivo
+        run: node tests/production-monitor.mjs
