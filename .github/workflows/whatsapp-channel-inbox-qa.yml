@@ -4,6 +4,7 @@ on:
     paths:
       - backend/whatsapp-channel-inbox.js
       - tests/whatsapp-channel-inbox.browser.mjs
+      - tests/whatsapp-channel-inbox.live.mjs
       - .github/workflows/whatsapp-channel-inbox-qa.yml
   workflow_dispatch:
 jobs:
@@ -14,3 +15,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: npm install --no-save playwright-core@1.56.1
       - run: node tests/whatsapp-channel-inbox.browser.mjs
+      - run: node tests/whatsapp-channel-inbox.live.mjs
