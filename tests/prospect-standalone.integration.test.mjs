@@ -60,6 +60,31 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   const create=await mustJson(await post("/api/master/prospect/leads",{name:"Sem Permissão",phone:"5531999990002",notes:"Pedido de cotação",consent:false},cookie),201);
   assert.ok(create.id);
 
+
+  // Commercial pipeline, 2 companies' leads are not implied: this is admin-only prospect module.
+  let metrics=await mustJson(await fetch(base+"/api/master/prospect/overview",{headers:{Cookie:cookie}}),200);
+  assert.equal(metrics.performance.won,0);
+  assert.equal(metrics.performance.lost,0);
+  assert.ok(metrics.regions.some(x=>x.uf==="MG"&&x.leads===1));
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/pipeline",{stage:"perdido"},cookie)).status,400,"Loss reason required");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/pipeline",{stage:"other"},cookie)).status,400,"Unknown stage refused");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/pipeline",{stage:"perdido",loss_reason:"Escolheu concorrente"})).status,401,"Anon cannot change pipeline");
+  assert.equal((await fetch(base+"/api/master/prospect/leads/"+create.id+"/pipeline",{method:"POST",headers:{Cookie:cookie,"Content-Type":"application/json"},body:JSON.stringify({stage:"perdido",loss_reason:"Escolheu concorrente"})})).status,403,"CSRF required");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/pipeline",{stage:"perdido",loss_reason:"Sem retorno",ad_spend_brl:"11,25",ad_campaign:"Meta Outubro"},cookie)).status,200,"Valid loss and ad spend");
+  const win=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(x=>x.phone==="5531999990001");
+  assert.equal((await post("/api/master/prospect/leads/"+win.id+"/pipeline",{stage:"ganho",sale_brl:"200,00",ad_spend_brl:"20.75",ad_campaign:"Google Pesquisa"},cookie)).status,200);
+  metrics=await mustJson(await fetch(base+"/api/master/prospect/overview",{headers:{Cookie:cookie}}),200);
+  assert.equal(metrics.performance.won,1);
+  assert.equal(metrics.performance.lost,1);
+  assert.equal(metrics.performance.revenue_cents,20000);
+  assert.equal(metrics.performance.ad_spend_cents,3200);
+  assert.equal((await post("/api/master/prospect/leads/"+win.id+"/pipeline",{stage:"proposta"},cookie)).status,200,"Negotiation followed by proposal stage");
+  metrics=await mustJson(await fetch(base+"/api/master/prospect/overview",{headers:{Cookie:cookie}}),200);
+  assert.equal(metrics.performance.proposals,1);
+  assert.equal(metrics.performance.revenue_cents,0,"Unclosed deals do not count as revenue");
+  assert.equal(metrics.performance.ad_spend_cents,3200,"Cost persists after stage change");
+  assert.equal((await post("/api/master/prospect/leads/999999/pipeline",{stage:"contato"},cookie)).status,404);
+
   // Consistent database snapshot: authenticated only, CSRF header enforced.
   assert.equal((await post("/api/master/prospect/backup",{})).status,401,"Anon must not download backup");
   assert.equal((await fetch(base+"/api/master/prospect/backup",{method:"POST",headers:{Cookie:cookie}})).status,403,"Missing CSRF header must block backup");
