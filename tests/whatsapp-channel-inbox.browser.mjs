@@ -15,6 +15,7 @@ try{
   selected={id:1,name:"Lead fictício de QA",phone:"5531000000000",line:2};
   lines=[{slot:1,name:"Linha Meta",mode:"api"},{slot:2,name:"QR Evolution Teste",mode:"qr"}];
   leads=[{id:1,name:"Lead fictício de QA",phone:"5531000000000",line:1}];
+  document.getElementById("lineSelect").innerHTML='<option value="1">Meta</option><option value="2">Evolution QR</option>';
   window.__qaCalls=[];
   window.sendReply=(t)=>{window.__qaCalls.push(t)};
  });
