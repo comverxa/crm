@@ -93,8 +93,9 @@ const COMVERXA_PROSPECT_PAGE = "<!doctype html><html lang=\"pt-BR\"><head><meta 
 import { Database as ProspectDatabase } from "bun:sqlite";
 import { mkdirSync as prospectMkdirSync } from "node:fs";
 
-prospectMkdirSync("/data", {recursive:true});
-const prospectDb = new ProspectDatabase("/data/comverxa-prospect-ia.sqlite", {create:true});
+const prospectStorageDir=Bun.env.PROSPECT_DATA_DIR||"/data";
+prospectMkdirSync(prospectStorageDir, {recursive:true});
+const prospectDb = new ProspectDatabase(prospectStorageDir+"/comverxa-prospect-ia.sqlite", {create:true});
 prospectDb.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_leads (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, email TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', uf TEXT NOT NULL DEFAULT '', product TEXT NOT NULL DEFAULT 'auto', origin TEXT NOT NULL DEFAULT 'manual', notes TEXT NOT NULL DEFAULT '', temperature TEXT NOT NULL DEFAULT 'morno', score INTEGER NOT NULL DEFAULT 50, consent INTEGER NOT NULL DEFAULT 0, consent_evidence TEXT NOT NULL DEFAULT '', consent_at TEXT, opt_out INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_campaigns (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, template_name TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'pt_BR', status TEXT NOT NULL DEFAULT 'draft', created_at TEXT NOT NULL)");
