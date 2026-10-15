@@ -2,9 +2,9 @@
 // Published from the same source as backend/prospect-ia-extension.js and prospect-dashboard.html.
 // IMPORTANT: production login requires PROSPECT_ADMIN_PASSWORD_SCRYPT, PROSPECT_ADMIN_EMAIL,
 // PROSPECT_SESSION_SECRET. Absence fails closed.
-import {scryptSync,createHmac,timingSafeEqual} from "node:crypto";
+import {scryptSync,createHmac,timingSafeEqual,randomBytes} from "node:crypto";
 const CVX_OWNER_SESSION_COOKIE="__Host-cvxprospect";
-const cvxState={fails:0,window:0};
+const cvxState={loginAttempts:new Map(),sessions:new Map()};
 function cvxSafeEqual(a,b){
  const aa=Buffer.from(String(a)),bb=Buffer.from(String(b));
  return aa.length===bb.length && timingSafeEqual(aa,bb);
@@ -24,9 +24,9 @@ function cvxAuthenticated(req){
  const cookies=req.headers.get("cookie")||"";
  const value=new RegExp("(?:^|;\\s*)"+CVX_OWNER_SESSION_COOKIE+"=([^;]+)").exec(cookies)?.[1]||"";
  const parts=value.split(".");
- if(parts.length!==2||!/^[0-9]{13}$/.test(parts[0])||!/^[a-f0-9]{64}$/.test(parts[1]))return false;
+ if(parts.length!==3||!/^[0-9]{13}$/.test(parts[0])||!/^[a-f0-9]{48}$/.test(parts[1])||!/^[a-f0-9]{64}$/.test(parts[2]))return false;
  const exp=Number(parts[0]);
- return Number.isSafeInteger(exp)&&exp>Date.now()&&cvxSafeEqual(parts[1],cvxSignature(parts[0]));
+ return Number.isSafeInteger(exp)&&exp>Date.now()&&cvxState.sessions.get(parts[1])===exp&&cvxSafeEqual(parts[2],cvxSignature(parts[0]+"."+parts[1]));
 }
 const cvxLoginPage=String.raw`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>COMVERXA Prospect IA | Acesso</title><style>*{box-sizing:border-box}body{margin:0;display:grid;place-items:center;min-height:100vh;padding:20px;color:#23324c;font-family:Inter,system-ui,sans-serif;background:linear-gradient(140deg,#0c1934,#064a57)}main{width:min(100%,425px);background:#fff;border-radius:20px;padding:34px;box-shadow:0 18px 75px #0005}small{color:#0b8d86;font-weight:800;letter-spacing:.14em}h1{font-size:29px;letter-spacing:-.03em}p{color:#5c6d82;font-size:14px;line-height:1.6}label{display:block;font-size:13px;margin:17px 0 7px;font-weight:750}input{width:100%;padding:14px;border:1px solid #d6e1ee;border-radius:10px;font:inherit}button{margin-top:20px;background:#075d67;color:#fff;padding:15px;width:100%;border:0;border-radius:10px;font-weight:750;cursor:pointer}a{color:#075d67;text-decoration:none;font-size:13px}.error{color:#a12626}</style></head><body><main><small>COMVERXA / PROSPECT IA</small><h1>Entrar no painel</h1><p>Painel piloto com acesso independente, reservado ao responsável da plataforma.</p><form method="post" action="/login"><label>E-mail administrador</label><input name="email" type="email" required autocomplete="username"><label>Senha</label><input name="password" type="password" required autocomplete="current-password"><button type="submit">Acessar painel</button></form><p>Solicitações inválidas não fornecem acesso. Contate o administrador para redefinir as credenciais.</p><a href="https://app.comverxa.com.br/">Voltar ao COMVERXA CRM</a></main></body></html>`;
 const cvxCapturePage=String.raw`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Solicite uma demonstração | COMVERXA</title><style>*{box-sizing:border-box}body{margin:0;background:#f2f6fa;color:#20334b;font:16px Inter,system-ui,sans-serif;padding:20px;min-height:100vh;display:grid;place-items:center}main{width:min(100%,590px);background:#fff;padding:32px;border-radius:20px;border:1px solid #e2e9f0;box-shadow:0 16px 45px #132f4610}small{color:#048b82;font-weight:800;letter-spacing:.13em}h1{font-size:30px;letter-spacing:-.03em;line-height:1.2}p{color:#607189;line-height:1.6;font-size:14px}label{display:block;font-size:13px;font-weight:750;margin:16px 0 6px}input,select{display:block;width:100%;border:1px solid #d7e0ec;border-radius:10px;padding:12px;font:inherit;font-size:15px}button{background:#075f66;color:#fff;padding:15px;border:0;border-radius:10px;font-weight:750;margin-top:18px;cursor:pointer;width:100%}.checkbox{display:flex;gap:9px;align-items:start}.checkbox input{width:16px;margin-top:17px;flex-shrink:0}.checkbox span{font-weight:400;line-height:1.6}.hide{position:absolute;left:-9999px}a{color:#066c72}</style></head><body><main><small>COMVERXA / CONTATO COMERCIAL</small><h1>Solicite uma demonstração.</h1><p>Conte como podemos ajudar sua operação comercial com CRM, inteligência de leads e campanhas de relacionamento.</p><form method="post" action="/captar"><label for="name">Seu nome ou empresa</label><input id="name" name="name" maxlength="120" autocomplete="name" required><label for="phone">WhatsApp com DDD</label><input id="phone" name="phone" type="tel" maxlength="18" placeholder="(31) 99999-9999" autocomplete="tel" required><label for="city">Cidade</label><input id="city" name="city" maxlength="90"><label for="uf">Estado (UF)</label><input id="uf" name="uf" maxlength="2"><label for="product">Assunto</label><select id="product" name="product"><option value="CRM para seguradora">CRM para seguradora</option><option value="CRM para proteção veicular">CRM para proteção veicular</option><option value="CRM para corretora">CRM para corretora</option></select><div class="hide" aria-hidden="true"><label>Não preencha este campo</label><input name="website" tabindex="-1" autocomplete="off"></div><label class="checkbox"><input type="checkbox" name="consent" value="yes" required><span>Concordo em receber mensagens comerciais da <strong>COMVERXA</strong> pelo WhatsApp informado sobre esta solicitação. Sei que posso solicitar o encerramento dos contatos a qualquer momento.</span></label><button type="submit">Solicitar demonstração</button><p>Os dados serão usados para responder à sua solicitação comercial. <a href="https://comverxa.github.io/crm/privacidade.html">Aviso de privacidade</a>.</p></form></main></body></html>`;
@@ -67,21 +67,29 @@ async function cvxFallback(req){
  if(p==="/login"&&req.method==="POST"){
   const origin=req.headers.get("origin");if(origin&&origin!==u.origin)return new Response("Origem inválida",{status:403});
   if(!cvxAuthConfigured())return new Response("Credenciais administrativas não configuradas",{status:503});
-  if(Date.now()>cvxState.window){cvxState.fails=0;cvxState.window=Date.now()+15*60*1000;}
-  if(cvxState.fails>=10)return new Response("Acesso temporariamente suspenso",{status:429});
+  const clientKey=String(req.headers.get("x-forwarded-for")||req.headers.get("cf-connecting-ip")||"unknown").split(",")[0].slice(0,80);
+  if(cvxState.loginAttempts.size>10000)cvxState.loginAttempts.clear();
+  const attempt=cvxState.loginAttempts.get(clientKey)||{fails:0,until:Date.now()+15*60*1000};
+  if(Date.now()>attempt.until){attempt.fails=0;attempt.until=Date.now()+15*60*1000;}
+  cvxState.loginAttempts.set(clientKey,attempt);
+  if(attempt.fails>=10)return new Response("Acesso temporariamente suspenso",{status:429});
   const fd=await req.formData().catch(()=>null);
   const email=String(fd?.get("email")||"").trim().toLowerCase().slice(0,160);
   const password=String(fd?.get("password")||"").slice(0,200);
   if(!cvxSafeEqual(email,String(Bun.env.PROSPECT_ADMIN_EMAIL).toLowerCase())||!cvxValidPassword(password)){
-   cvxState.fails++;return new Response("Credenciais inválidas",{status:401,headers:{"Cache-Control":"no-store"}});
+   attempt.fails++;return new Response("Credenciais inválidas",{status:401,headers:{"Cache-Control":"no-store"}});
   }
-  cvxState.fails=0;
-  const exp=String(Date.now()+8*60*60*1000);
-  const cookie=CVX_OWNER_SESSION_COOKIE+"="+exp+"."+cvxSignature(exp)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800";
+  attempt.fails=0;
+  for(const [sid,until] of cvxState.sessions)if(until<=Date.now())cvxState.sessions.delete(sid);
+  const exp=String(Date.now()+8*60*60*1000),sid=randomBytes(24).toString("hex");
+  cvxState.sessions.set(sid,Number(exp));
+  const cookie=CVX_OWNER_SESSION_COOKIE+"="+exp+"."+sid+"."+cvxSignature(exp+"."+sid)+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800";
   return new Response(null,{status:303,headers:{"Location":"/prospect-ia","Set-Cookie":cookie,"Cache-Control":"no-store"}});
  }
  if(p==="/logout"&&req.method==="POST"){
   const origin=req.headers.get("origin");if(origin&&origin!==u.origin)return new Response("Origem inválida",{status:403});
+  const match=new RegExp("(?:^|;\\s*)"+CVX_OWNER_SESSION_COOKIE+"=([^;]+)").exec(req.headers.get("cookie")||"");
+  if(match){const sid=match[1].split(".")[1];if(sid)cvxState.sessions.delete(sid);}
   return new Response(null,{status:303,headers:{"Location":"/login","Set-Cookie":CVX_OWNER_SESSION_COOKIE+"=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0","Cache-Control":"no-store"}});
  }
  return new Response("Rota não encontrada",{status:404});
