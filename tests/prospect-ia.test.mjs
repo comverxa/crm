@@ -16,7 +16,8 @@ test("Master authorization before any prospect endpoint",()=>{
 });
 test("A campaign cannot enqueue unknown-consent contacts",()=>{
  assert.match(backend,/WHERE consent=1 AND opt_out=0 AND consent_evidence<>''/);
- assert.match(backend,/if\(!q\.consent\|\|q\.opt_out\|\|!q\.consent_evidence\)/);
+ assert.match(backend,/if\(!current\?\.consent\|\|current\.opt_out\|\|!current\.consent_evidence\)/);
+ assert.match(backend,/status=\x27processing\x27/);
  assert.ok(backend.includes("status='cancelled'"));
  assert.ok(backend.includes("lead.optout"));
 });
