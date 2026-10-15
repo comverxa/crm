@@ -89,3 +89,16 @@ Esta é uma entrega técnica verificável em piloto, **não uma certificação d
 - O site comercial informa a finalidade e as condições da captação voluntária no seu aviso de privacidade, com revisão técnica ainda sujeita à identificação jurídica e ao contrato final.
 - **Limitações:** os recursos não constituem procedimento integral de atendimento à LGPD; pedidos em bases externas, cópias locais, contratos e provedores parceiros exigem tratamento próprio. O CRM principal continua independente, e a integração de contatos não foi implementada.
 
+
+## Gestão comercial do Prospect IA — 15/10/2026
+
+O módulo independente de prospecção ganhou um funil de oportunidades com as etapas **Novo → Contato → Qualificação → Negociação → Proposta → Ganho/Perdido**. No painel autenticado o operador administrador registra a etapa de um lead usando seu ID, custo de tráfego em R$, valor fechado em R$, nome de campanha e motivo de perda (obrigatório para oportunidades perdidas). A grade de contatos mostra ID e etapa.
+
+- O relatório de desempenho consulta o SQLite real, contabiliza ganhos, perdas, propostas, custos e receita de negócios fechados. Também agrupa contatos/ganhos/perdas por UF. A conversão é calculada sobre o total de contatos; não é a mesma coisa que ROI contábil.
+- Os custos de mídia são **informados manualmente** por lead; não há API ativa de Meta Ads ou Google Ads, conciliação de campanhas ou garantia de atribuição publicitária.
+- O formulário público conserva `utm_source`, `utm_medium` e `utm_campaign` vindos da URL em campos ocultos escapados. Só há registro de lead após o aceite do próprio formulário; nenhuma coleta de contatos externos é feita.
+- A primeira origem conhecida do lead é preservada em atualizações posteriores, enquanto alterações intencionais na campanha pelo administrador são permitidas.
+- Migrações SQLite são aditivas e preservam registros anteriores. O teste integrado executa transições, autenticação, rejeição de solicitações anônimas, proteção do formulário, receitas, perdas e custos.
+- Teste CI de integração final: [GitHub Actions](https://github.com/comverxa/crm/actions/runs/38770814761), aprovado. O código está na branch `main`, commit `db6e133a`.
+- **Limitações não resolvidas:** isso não move contatos automaticamente para o CRM principal, não valida o WhatsApp conectado e não implementa hospedagem multiempresa no módulo de prospecção. Não anunciar essas integrações como concluídas.
+
