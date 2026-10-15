@@ -40,6 +40,11 @@ jobs:
              console.log('DESKTOP_LAYOUT '+JSON.stringify({status:resp.status(),w,...d}));
              await page.addStyleTag({content:require('node:fs').readFileSync('backend/desktop-layout.css','utf8')});
              const fixed=await page.evaluate(()=>{
+               document.querySelector('#marketing')?.classList.add('hide');
+               document.querySelector('#app')?.classList.remove('hide');
+               document.querySelectorAll('#app .screen').forEach(el=>el.classList.add('hide'));
+               document.querySelector('#dashboard')?.classList.remove('hide');
+               const stats=document.querySelector('#dashboardStats');if(stats)stats.innerHTML=[['Leads cadastrados','1'],['Negociações','0'],['Vendas ganhas','0'],['Follow-ups vencidos','0']].map(([a,b])=>'<div class="stat"><small>'+a+'</small><b>'+b+'</b></div>').join('');
                const rect=s=>{const el=document.querySelector(s);if(!el)return null;const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width,height:r.height}};
                const card=document.querySelector('#dashboardStats .stat');const r=card?.getBoundingClientRect();
                const at=r?document.elementFromPoint(r.x+30,r.y+30):null;
