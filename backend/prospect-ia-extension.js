@@ -8,6 +8,10 @@ prospectMkdirSync(prospectStorageDir, {recursive:true});
 const prospectDb = new ProspectDatabase(prospectStorageDir+"/comverxa-prospect-ia.sqlite", {create:true});
 prospectDb.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_leads (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL UNIQUE, email TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '', uf TEXT NOT NULL DEFAULT '', product TEXT NOT NULL DEFAULT 'auto', origin TEXT NOT NULL DEFAULT 'manual', notes TEXT NOT NULL DEFAULT '', temperature TEXT NOT NULL DEFAULT 'morno', score INTEGER NOT NULL DEFAULT 50, consent INTEGER NOT NULL DEFAULT 0, consent_evidence TEXT NOT NULL DEFAULT '', consent_at TEXT, opt_out INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
+// Approvals default to false, including records created before this migration.
+if(!prospectDb.query("PRAGMA table_info(prospect_leads)").all().some(x=>x.name==="approved"))prospectDb.exec("ALTER TABLE prospect_leads ADD COLUMN approved INTEGER NOT NULL DEFAULT 0");
+if(!prospectDb.query("PRAGMA table_info(prospect_leads)").all().some(x=>x.name==="approval_note"))prospectDb.exec("ALTER TABLE prospect_leads ADD COLUMN approval_note TEXT NOT NULL DEFAULT ''");
+if(!prospectDb.query("PRAGMA table_info(prospect_leads)").all().some(x=>x.name==="approved_at"))prospectDb.exec("ALTER TABLE prospect_leads ADD COLUMN approved_at TEXT");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_campaigns (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, template_name TEXT NOT NULL, language TEXT NOT NULL DEFAULT 'pt_BR', status TEXT NOT NULL DEFAULT 'draft', created_at TEXT NOT NULL)");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, campaign_id INTEGER NOT NULL, lead_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', provider_id TEXT, error TEXT, sent_at TEXT, created_at TEXT NOT NULL, UNIQUE(campaign_id,lead_id))");
 prospectDb.exec("CREATE TABLE IF NOT EXISTS prospect_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, entity_id INTEGER, details TEXT, at TEXT NOT NULL)");
@@ -25,7 +29,7 @@ function prospectRating(item){
  score=Math.max(0,Math.min(100,score));
  return {score,temperature:score>=67?"quente":score>=38?"morno":"frio"};
 }
-function prospectLeadPublic(r){return {...r,consent:Boolean(r.consent),opt_out:Boolean(r.opt_out)}}
+function prospectLeadPublic(r){return {...r,consent:Boolean(r.consent),opt_out:Boolean(r.opt_out),approved:Boolean(r.approved)}}
 function prospectImport(row){
  const name=prospectText(row.name||row.nome,120),phone=prospectPhone(row.phone||row.telefone||row.whatsapp);
  if(!name||phone.length<10||phone.length>15)throw Error("Nome e telefone válido são obrigatórios");
@@ -60,9 +64,9 @@ Bun.serve=function(cfg){
    }
    if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
    if(path==="/api/master/prospect/overview"&&req.method==="GET"){
-    const counts=prospectDb.query("SELECT COUNT(*) total,SUM(CASE WHEN temperature='quente' THEN 1 ELSE 0 END) hot,SUM(CASE WHEN temperature='morno' THEN 1 ELSE 0 END) warm,SUM(CASE WHEN temperature='frio' THEN 1 ELSE 0 END) cold,SUM(CASE WHEN consent=1 AND opt_out=0 THEN 1 ELSE 0 END) opted FROM prospect_leads").get();
+    const counts=prospectDb.query("SELECT COUNT(*) total,SUM(CASE WHEN temperature='quente' THEN 1 ELSE 0 END) hot,SUM(CASE WHEN temperature='morno' THEN 1 ELSE 0 END) warm,SUM(CASE WHEN temperature='frio' THEN 1 ELSE 0 END) cold,SUM(CASE WHEN consent=1 AND opt_out=0 THEN 1 ELSE 0 END) opted,SUM(CASE WHEN consent=1 AND opt_out=0 AND approved=1 THEN 1 ELSE 0 END) approved FROM prospect_leads").get();
     const sent=prospectDb.query("SELECT COUNT(*) n FROM prospect_outbox WHERE status='sent'").get().n;
-    return prospectJson({counts:{total:counts.total,hot:counts.hot||0,warm:counts.warm||0,cold:counts.cold||0,opted:counts.opted||0,sent},integration:{openai:Boolean(Bun.env.OPENAI_API_KEY),meta:Boolean(Bun.env.META_ACCESS_TOKEN&&Bun.env.META_PHONE_NUMBER_ID),maps:Boolean(Bun.env.GOOGLE_MAPS_API_KEY)},mode:"piloto restrito ao administrador"});
+    return prospectJson({counts:{total:counts.total,hot:counts.hot||0,warm:counts.warm||0,cold:counts.cold||0,opted:counts.opted||0,approved:counts.approved||0,sent},integration:{openai:Boolean(Bun.env.OPENAI_API_KEY),meta:Boolean(Bun.env.META_ACCESS_TOKEN&&Bun.env.META_PHONE_NUMBER_ID),maps:Boolean(Bun.env.GOOGLE_MAPS_API_KEY)},mode:"piloto restrito ao administrador"});
    }
    if(path==="/api/master/prospect/leads"&&req.method==="GET"){
     const rows=prospectDb.query("SELECT * FROM prospect_leads ORDER BY id DESC LIMIT 300").all();
@@ -88,9 +92,18 @@ Bun.serve=function(cfg){
     tx(); prospectAudit("leads.score",null,"Pontuação por regras com consentimento, sem modelo generativo");
     return prospectJson({updated:leads.length,mode:"regras"});
    }
+   if(path.match(/^\/api\/master\/prospect\/leads\/\d+\/approve$/)&&req.method==="POST"){
+    const id=Number(path.split("/")[5]),body=await req.json();
+    const verification=prospectText(body.verification,250);
+    if(verification.length<18)return prospectJson({error:"Registre como a autorização e a titularidade do contato foram verificadas (mínimo 18 caracteres)."},400);
+    const approved=prospectDb.query("UPDATE prospect_leads SET approved=1,approval_note=?,approved_at=?,updated_at=? WHERE id=? AND consent=1 AND opt_out=0 AND consent_evidence<>''").run(verification,prospectNow(),prospectNow(),id);
+    if(!approved.changes)return prospectJson({error:"Contato inexistente, sem autorização ou descadastrado."},409);
+    prospectAudit("lead.approve",id,verification);
+    return prospectJson({ok:true});
+   }
    if(path.match(/^\/api\/master\/prospect\/leads\/\d+\/optout$/)&&req.method==="POST"){
     const id=Number(path.split("/")[5]); 
-    const changed=prospectDb.query("UPDATE prospect_leads SET opt_out=1,consent=0,consent_at=NULL,updated_at=? WHERE id=?").run(prospectNow(),id);
+    const changed=prospectDb.query("UPDATE prospect_leads SET opt_out=1,consent=0,approved=0,approval_note='',approved_at=NULL,consent_at=NULL,updated_at=? WHERE id=?").run(prospectNow(),id);
     if(!changed.changes)return prospectJson({error:"Lead inexistente"},404);
     prospectDb.query("UPDATE prospect_outbox SET status='cancelled' WHERE lead_id=? AND status='pending'").run(id);
     prospectAudit("lead.optout",id,"Contato excluído das próximas campanhas");
@@ -115,7 +128,7 @@ Bun.serve=function(cfg){
     if(!name||!/^[a-z][a-z0-9_]{1,89}$/.test(template))return prospectJson({error:"Nome e template Meta aprovado são obrigatórios (nome minúsculo com sublinhado)."},400);
     const x=prospectDb.query("INSERT INTO prospect_campaigns(name,template_name,language,status,created_at) VALUES (?,?,?,'draft',?)").run(name,template,"pt_BR",prospectNow());
     const id=Number(x.lastInsertRowid);
-    prospectDb.query("INSERT OR IGNORE INTO prospect_outbox(campaign_id,lead_id,created_at) SELECT ?,id,? FROM prospect_leads WHERE consent=1 AND opt_out=0 AND consent_evidence<>''").run(id,prospectNow());
+    prospectDb.query("INSERT OR IGNORE INTO prospect_outbox(campaign_id,lead_id,created_at) SELECT ?,id,? FROM prospect_leads WHERE consent=1 AND opt_out=0 AND approved=1 AND consent_evidence<>''").run(id,prospectNow());
     prospectAudit("campaign.create",id,"Template "+template);
     return prospectJson({id,queued:prospectDb.query("SELECT COUNT(*) n FROM prospect_outbox WHERE campaign_id=?").get(id).n},201);
    }
@@ -130,8 +143,8 @@ Bun.serve=function(cfg){
      const claim=prospectDb.query("UPDATE prospect_outbox SET status='processing' WHERE id=? AND status='pending'").run(q.id);
      if(claim.changes!==1){skipped++;continue}
      // Re-check immediately before a network send, after claiming the queue item.
-     const current=prospectDb.query("SELECT consent,opt_out,consent_evidence FROM prospect_leads WHERE id=(SELECT lead_id FROM prospect_outbox WHERE id=?)").get(q.id);
-     if(!current?.consent||current.opt_out||!current.consent_evidence){prospectDb.query("UPDATE prospect_outbox SET status='cancelled',error='Sem autorização' WHERE id=?").run(q.id);skipped++;continue}
+     const current=prospectDb.query("SELECT consent,opt_out,approved,consent_evidence FROM prospect_leads WHERE id=(SELECT lead_id FROM prospect_outbox WHERE id=?)").get(q.id);
+     if(!current?.consent||current.opt_out||!current.approved||!current.consent_evidence){prospectDb.query("UPDATE prospect_outbox SET status='cancelled',error='Sem autorização' WHERE id=?").run(q.id);skipped++;continue}
      let result;
      try{const r=await fetch("https://graph.facebook.com/v23.0/"+encodeURIComponent(Bun.env.META_PHONE_NUMBER_ID)+"/messages",{method:"POST",headers:{"Authorization":"Bearer "+Bun.env.META_ACCESS_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({messaging_product:"whatsapp",to:q.phone,type:"template",template:{name:c.template_name,language:{code:c.language}}}),signal:AbortSignal.timeout(12000)});const data=await r.json().catch(()=>({}));result={ok:r.ok,id:data.messages?.[0]?.id||null,error:r.ok?"":prospectText(data.error?.message||"Falha da Meta",180)}}catch(e){result={ok:false,error:prospectText(e.message,140)}}
      prospectDb.query("UPDATE prospect_outbox SET status=?,provider_id=?,error=?,sent_at=? WHERE id=?").run(result.ok?"sent":"failed",result.id||null,result.error||null,result.ok?prospectNow():null,q.id);
