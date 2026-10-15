@@ -22,7 +22,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
  child.stdout.on("data",x=>{output+=String(x).slice(0,500)});
  child.stderr.on("data",x=>{output+=String(x).slice(0,500)});
  const jsonHeaders={"Content-Type":"application/json","X-COMVERXA-Prospect":"1"};
- const mustJson=async(r,status)=>{assert.equal(r.status,status,await r.text());return r.json()};
+ const mustJson=async(r,status)=>{if(r.status!==status)throw Error("HTTP "+r.status+" expected "+status+": "+await r.text());return r.json()};
  const post=async(path,data,cookie)=>fetch(base+path,{method:"POST",headers:{...jsonHeaders,...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(data)});
  try{
   let ok=false;
