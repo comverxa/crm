@@ -36,6 +36,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal((await fetch(base+"/captar")).status,200);
   assert.equal((await fetch(base+"/prospect-ia")).status,401);
   assert.equal((await fetch(base+"/api/master/prospect/overview")).status,401);
+  assert.equal((await fetch(base+"/api/master/prospect/export.csv")).status,401);
   assert.equal((await post("/api/master/prospect/leads",{name:"Bypass",phone:"5531999111100"})).status,401);
 
   let r=await fetch(base+"/captar",{method:"POST",body:new URLSearchParams({name:"Ana Teste",phone:"5531999990001",city:"Contagem",uf:"MG",product:"CRM para corretora"})});
@@ -58,6 +59,16 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal(overview.counts.opted,1);
   const create=await mustJson(await post("/api/master/prospect/leads",{name:"Sem Permissão",phone:"5531999990002",notes:"Pedido de cotação",consent:false},cookie),201);
   assert.ok(create.id);
+  const csvResponse=await fetch(base+"/api/master/prospect/export.csv",{headers:{Cookie:cookie}});
+  assert.equal(csvResponse.status,200,"CSV export requires authenticated owner");
+  assert.match(csvResponse.headers.get("content-type")||"",/text\\/csv/i);
+  assert.match(csvResponse.headers.get("content-disposition")||"",/attachment/);
+  assert.equal(csvResponse.headers.get("cache-control"),"private, no-store");
+  const csvText=await csvResponse.text();
+  assert.ok(csvText.startsWith("\\ufeff")||csvText.startsWith("\ufeff"),"UTF-8 CSV BOM expected");
+  assert.match(csvText,/Sem Permissão/);
+  assert.match(csvText,/consentimento/);
+
   const duplicate=await mustJson(await post("/api/master/prospect/leads",{name:"Ana Teste",phone:"5531999990001",notes:"Cliente tem urgência em seguro",consent:false},cookie),201);
   assert.equal(duplicate.updated,true,"Duplicate phone should update without changing opt-out");
   overview=await mustJson(await fetch(base+"/api/master/prospect/overview",{headers:{Cookie:cookie}}),200);
