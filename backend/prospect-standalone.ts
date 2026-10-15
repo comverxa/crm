@@ -59,6 +59,59 @@ async function cvxFallback(req){
   }catch(e){return new Response("Não foi possível registrar. Revise seus dados e tente novamente.",{status:400})}
  }
 
+ // Meta Cloud API webhook: signed inbound conversations and unsubscribe signals.
+ if(p==="/webhooks/meta"&&req.method==="GET"){
+  const expected=Bun.env.META_VERIFY_TOKEN||"";
+  const challenge=u.searchParams.get("hub.challenge")||"";
+  if(!expected)return new Response("Webhook indisponível",{status:503});
+  const valid=u.searchParams.get("hub.mode")==="subscribe"&&cvxSafeEqual(u.searchParams.get("hub.verify_token")||"",expected)&&challenge.length>0&&challenge.length<500;
+  return valid?new Response(challenge,{headers:{"Content-Type":"text/plain","Cache-Control":"no-store"}}):new Response("Verificação inválida",{status:403});
+ }
+ if(p==="/webhooks/meta"&&req.method==="POST"){
+  const secret=Bun.env.META_APP_SECRET||"",account=Bun.env.META_PHONE_NUMBER_ID||"";
+  if(!secret||!account)return new Response("Integração Meta não configurada",{status:503});
+  const declared=Number(req.headers.get("content-length")||"0");
+  if(declared>262144)return new Response("Payload muito grande",{status:413});
+  const raw=await req.text();
+  if(raw.length>262144)return new Response("Payload muito grande",{status:413});
+  const signed=String(req.headers.get("x-hub-signature-256")||"");
+  const expected="sha256="+createHmac("sha256",secret).update(raw,"utf8").digest("hex");
+  if(!cvxSafeEqual(signed,expected))return new Response("Assinatura inválida",{status:401});
+  let payload;try{payload=JSON.parse(raw)}catch{return new Response("JSON inválido",{status:400})}
+  if(payload.object!=="whatsapp_business_account")return new Response("EVENT_RECEIVED");
+  let added=0,optouts=0;
+  for(const entry of (Array.isArray(payload.entry)?payload.entry:[]).slice(0,30)){
+   for(const change of (Array.isArray(entry.changes)?entry.changes:[]).slice(0,30)){
+    if(change.field!=="messages"||String(change.value?.metadata?.phone_number_id||"")!==account)continue;
+    for(const m of (Array.isArray(change.value?.messages)?change.value.messages:[]).slice(0,100)){
+     const phone=prospectPhone(m.from),body=prospectText(m.text?.body||m.button?.text||"",300);
+     if(phone.length<10||!body)continue;
+     const normalized=body.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[.!?]/g,"").trim().toLowerCase();
+     const isOptout=/^(parar|sair|stop|cancelar|descadastrar|nao quero|remover|pare de enviar)(\b|$)/.test(normalized);
+     const known=prospectDb.query("SELECT id FROM prospect_leads WHERE phone=?").get(phone);
+     if(isOptout){
+      if(known){
+       prospectDb.query("UPDATE prospect_leads SET opt_out=1,consent=0,approved=0,approval_note='',approved_at=NULL,consent_at=NULL,updated_at=? WHERE id=?").run(prospectNow(),known.id);
+       prospectDb.query("UPDATE prospect_outbox SET status='cancelled' WHERE lead_id=? AND status='pending'").run(known.id);
+       prospectAudit("lead.meta_optout",known.id,"Descadastro confirmado por webhook Meta");
+       optouts++;
+      }else{
+       const newLead=prospectImport({name:"Contato WhatsApp",phone,origin:"whatsapp_inbound",notes:"Descadastro solicitado via WhatsApp",consent:false});
+       prospectDb.query("UPDATE prospect_leads SET opt_out=1 WHERE id=?").run(newLead.id);
+       prospectAudit("lead.meta_optout",newLead.id,"Descadastro anterior a cadastro");
+       optouts++;
+      }
+      continue;
+     }
+     const name=prospectText(change.value?.contacts?.find?.(c=>c.wa_id===m.from)?.profile?.name||"Contato WhatsApp",120);
+     const lead=prospectImport({name,phone,origin:"whatsapp_inbound",notes:"Mensagem recebida espontaneamente pelo WhatsApp: "+body,consent:false});
+     prospectAudit("lead.meta_inbound",lead.id,"Lead inbound; não autoriza disparo em massa");
+     if(!lead.updated)added++;
+    }
+   }
+  }
+  return new Response(JSON.stringify({received:true,created:added,optouts}),{headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
+ }
  if(p==="/api/master/me")return cvxAuthenticated(req)?new Response(JSON.stringify({role:"owner",authenticated:true}),{headers:{"Content-Type":"application/json","Cache-Control":"no-store"}}):new Response(JSON.stringify({error:"Não autorizado"}),{status:401,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
  if(p==="/"||p==="/login"&&req.method==="GET"){
   if(cvxAuthenticated(req))return Response.redirect(new URL("/prospect-ia",req.url),302);
