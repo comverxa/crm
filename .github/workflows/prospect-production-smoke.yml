@@ -30,6 +30,7 @@ jobs:
           await probe('Painel privado','/prospect-ia',[401,403,302]);
           await probe('API administrativa privada','/api/master/prospect/leads',[401,403]);
           await probe('API overview privada','/api/master/prospect/overview',[401,403]);
+          await probe('Exportacao CSV protegida','/api/master/prospect/export.csv',[401,403]);
           const bad=new URLSearchParams({email:'qa-nao-existe@example.invalid',password:'invalid'});
           await probe('Senha inválida rejeitada sem falha de configuração','/login',[401,429],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Origin:base},body:bad.toString()});
           await probe('Captação sem consentimento rejeitada','/captar',[400,429],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Origin:base},body:new URLSearchParams({name:'TESTE SEM CONSENTIMENTO',phone:'31000000000'}).toString()});
