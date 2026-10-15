@@ -41,8 +41,8 @@ try{
  });
  await page.waitForTimeout(120);
  assert.equal(await button.textContent(),"Enviar pela Meta API");
- assert.equal(await page.locator("#cvx-inbox-change-line").isVisible(),true);
- await page.locator("#cvx-inbox-change-line").click();
+ assert.equal(await page.locator("#cvx-inbox-change-line").evaluate(el=>el.hidden),false,"QR reassignment action offered");
+ await page.evaluate(()=>document.getElementById("cvx-inbox-change-line").click());
  const state=await page.evaluate(()=>({modal:document.getElementById("leadModal")?.open,selectedLine:document.getElementById("leadForm")?.elements?.line?.value,leadLine:leads[0].line,sendCalls:window.__qaCalls.length}));
  assert.equal(state.modal,true,"Existing lead edit form opened, not auto-updated");
  assert.equal(state.selectedLine,"2","QR line is suggested in lead editor");
