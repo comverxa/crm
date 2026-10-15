@@ -48,7 +48,7 @@ function cvxCaptureAllowed(req){
 async function cvxFallback(req){
  const u=new URL(req.url),p=u.pathname;
  if(p==="/captar"&&Bun.env.PROSPECT_PUBLIC_CAPTURE_ENABLED!=="true")return new Response("Captação desabilitada durante a homologação.",{status:503,headers:{"Cache-Control":"no-store","Content-Type":"text/plain; charset=utf-8"}});
- if(p==="/healthz")return new Response("healthy",{status:200,headers:{"Content-Type":"text/plain","Cache-Control":"no-store"}});
+ if(p==="/healthz"){try{prospectDb.query("SELECT COUNT(*) AS n FROM prospect_leads").get();return new Response("healthy",{status:200,headers:{"Content-Type":"text/plain","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}})}catch{return new Response("database unavailable",{status:503,headers:{"Content-Type":"text/plain","Cache-Control":"no-store"}})}}
 
  if(p==="/captar"&&req.method==="GET")return new Response(cvxCapturePage,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
  if(p==="/captar"&&req.method==="POST"){
