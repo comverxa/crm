@@ -17,8 +17,8 @@ const prospectPhone=(v)=>String(v||"").replace(/\D/g,"").slice(0,15);
 const prospectAudit=(event,id,details)=>prospectDb.query("INSERT INTO prospect_audit(event,entity_id,details,at) VALUES (?,?,?,?)").run(event,id||null,prospectText(details||"",300),prospectNow());
 function prospectRating(item){
  const t=(String(item.notes||"")+" "+String(item.product||"")+" "+String(item.origin||"")).toLowerCase();
- let score=25;
- for(const term of ["cotação","cotacao","proposta","preço","preco","contratar","hoje","urgente","seguro","proteção","protecao","renovar"]){if(t.includes(term))score+=8;}
+ let score=29;
+ for(const term of ["cotação","cotacao","proposta","preço","preco","contratar","hoje","urgente","urgência","seguro","proteção","protecao","renovar"]){if(t.includes(term))score+=8;}
  for(const term of ["sem interesse","não quero","nao quero","apenas pesquisa","depois"]){if(t.includes(term))score-=24;}
  if(item.consent && !item.opt_out)score+=9;
  score=Math.max(0,Math.min(100,score));
