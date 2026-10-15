@@ -9,6 +9,10 @@ function cvxSafeEqual(a,b){
  const aa=Buffer.from(String(a)),bb=Buffer.from(String(b));
  return aa.length===bb.length && timingSafeEqual(aa,bb);
 }
+// Railway's internal request URL can be HTTP even when the browser uses HTTPS.
+// Accept only the configured public HTTPS origin (or an exact internal origin).
+const cvxPublicOrigin=(Bun.env.PROSPECT_PUBLIC_ORIGIN||"https://comverxa-prospect-ia-production.up.railway.app").replace(/\/$/,"");
+const cvxOriginOk=(value,internal)=>!value||value===internal||value===cvxPublicOrigin;
 function cvxAuthConfigured(){return !!(Bun.env.PROSPECT_ADMIN_PASSWORD_SCRYPT&&Bun.env.PROSPECT_SESSION_SECRET&&Bun.env.PROSPECT_ADMIN_EMAIL)}
 function cvxValidPassword(value){
  try{if(!cvxAuthConfigured())return false;
@@ -48,7 +52,7 @@ async function cvxFallback(req){
 
  if(p==="/captar"&&req.method==="GET")return new Response(cvxCapturePage,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
  if(p==="/captar"&&req.method==="POST"){
-  const origin=req.headers.get("origin");if(origin&&origin!==u.origin)return new Response("Origem inválida",{status:403});
+  const origin=req.headers.get("origin");if(!cvxOriginOk(origin,u.origin))return new Response("Origem inválida",{status:403});
   if(!cvxCaptureAllowed(req))return new Response("Limite temporário de solicitações atingido",{status:429});
   try{
    const form=await req.formData();
@@ -119,7 +123,7 @@ async function cvxFallback(req){
   return new Response(cvxLoginPage,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none'; form-action 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"}});
  }
  if(p==="/login"&&req.method==="POST"){
-  const origin=req.headers.get("origin");if(origin&&origin!==u.origin)return new Response("Origem inválida",{status:403});
+  const origin=req.headers.get("origin");if(!cvxOriginOk(origin,u.origin))return new Response("Origem inválida",{status:403});
   if(!cvxAuthConfigured())return new Response("Credenciais administrativas não configuradas",{status:503});
   const clientKey=String(req.headers.get("x-forwarded-for")||req.headers.get("cf-connecting-ip")||"unknown").split(",")[0].slice(0,80);
   if(cvxState.loginAttempts.size>10000)cvxState.loginAttempts.clear();
@@ -141,7 +145,7 @@ async function cvxFallback(req){
   return new Response(null,{status:303,headers:{"Location":"/prospect-ia","Set-Cookie":cookie,"Cache-Control":"no-store"}});
  }
  if(p==="/logout"&&req.method==="POST"){
-  const origin=req.headers.get("origin");if(origin&&origin!==u.origin)return new Response("Origem inválida",{status:403});
+  const origin=req.headers.get("origin");if(!cvxOriginOk(origin,u.origin))return new Response("Origem inválida",{status:403});
   const match=new RegExp("(?:^|;\\s*)"+CVX_OWNER_SESSION_COOKIE+"=([^;]+)").exec(req.headers.get("cookie")||"");
   if(match){const sid=match[1].split(".")[1];if(sid)cvxState.sessions.delete(sid);}
   return new Response(null,{status:303,headers:{"Location":"/login","Set-Cookie":CVX_OWNER_SESSION_COOKIE+"=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0","Cache-Control":"no-store"}});
@@ -211,7 +215,7 @@ Bun.serve=function(cfg){
    if(auth.status!==200)return prospectJson({error:"Acesso reservado ao ADM Master autenticado",login:"/admin"},401);
    if(req.method!=="GET"){
     const origin=req.headers.get("origin");
-    if(origin&&new URL(origin).origin!==u.origin)return prospectJson({error:"Origem não autorizada"},403);
+    if(!cvxOriginOk(origin,u.origin))return prospectJson({error:"Origem não autorizada"},403);
     if(req.headers.get("X-COMVERXA-Prospect")!=="1")return prospectJson({error:"Proteção contra requisição não autorizada"},403);
    }
    if(path==="/prospect-ia"&&req.method==="GET")return new Response(COMVERXA_PROSPECT_PAGE,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Referrer-Policy":"same-origin","Content-Security-Policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"}});
