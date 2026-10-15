@@ -1,0 +1,33 @@
+name: COMVERXA diagnostico publico de producao
+on:
+  push:
+    paths:
+      - .github/workflows/comverxa-live-diagnostic.yml
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Inspecionar respostas publicas sem credenciais
+        run: |
+          node - <<'NODE'
+          const base='https://app.comverxa.com.br';
+          for(const path of ['/','/healthz','/cvx-ui.js','/_cvx']) {
+            try {
+              const response=await fetch(base+path,{redirect:'manual',signal:AbortSignal.timeout(12000)});
+              const body=await response.text();
+              const csp=response.headers.get('content-security-policy')||'';
+              console.log(JSON.stringify({
+                path,status:response.status,type:response.headers.get('content-type'),
+                bytes:Buffer.byteLength(body),
+                contentSecurityPolicy:csp.slice(0,450),
+                markers:{premium:body.includes('comverxa-premium-v2'),
+                         uxScript:body.includes('cvx-ui.js'),vip:body.includes('cvxVip'),
+                         business:body.includes('Plano atual: business'),
+                         title:body.includes('<title>')},
+                scriptTags:(body.match(/<script/gi)||[]).length
+              }));
+            }catch(ex){console.log(JSON.stringify({path,error:String(ex.message).slice(0,160)}));process.exitCode=1;}
+          }
+          NODE
