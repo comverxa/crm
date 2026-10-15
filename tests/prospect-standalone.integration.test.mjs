@@ -65,8 +65,15 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   const scored=await mustJson(await post("/api/master/prospect/score",{},cookie),200);
   assert.equal(scored.updated,2);
 
+  const before=await mustJson(await post("/api/master/prospect/campaigns",{name:"Campanha sem validacao",template_name:"test_approved_template"},cookie),201);
+  assert.equal(before.queued,0,"Public form consent alone must not authorize a marketing send");
+  const captured=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(x=>x.phone==="5531999990001");
+  assert.ok(captured&&!captured.approved);
+  assert.equal((await post("/api/master/prospect/leads/"+captured.id+"/approve",{verification:"fraca"},cookie)).status,400,"Approval must require evidence");
+  const reviewed=await mustJson(await post("/api/master/prospect/leads/"+captured.id+"/approve",{verification:"Verificado pelo responsável em canal oficial com documento de opt-in."},cookie),200);
+  assert.equal(reviewed.ok,true);
   const campaign=await mustJson(await post("/api/master/prospect/campaigns",{name:"Teste de consentimento",template_name:"test_approved_template"},cookie),201);
-  assert.equal(campaign.queued,1,"Only self-authorized lead goes to outgoing campaign");
+  assert.equal(campaign.queued,1,"Only verified opt-in lead can enter outgoing campaign");
   r=await post("/api/master/prospect/campaigns/"+campaign.id+"/send",{},cookie);
   assert.equal(r.status,503,"No Meta credentials => no real send");
   const ai=await post("/api/master/prospect/ai",{context:"Quero seguro do meu veículo ainda hoje, orçamento e assistência"},cookie);
