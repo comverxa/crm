@@ -38,7 +38,8 @@ jobs:
               return {scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,nodes,extra,cardVisibleAtPoint:center?{tag:center.tagName,id:center.id,cls:String(center.className).slice(0,100),text:center.textContent.slice(0,60)}:null,styles};
              });
              console.log('DESKTOP_LAYOUT '+JSON.stringify({status:resp.status(),w,...d}));
-             await page.addStyleTag({content:require('node:fs').readFileSync('backend/desktop-layout.css','utf8')});
+             const publishedCss=await page.locator('#cvx-desktop-layout-hotfix').count();
+             if(publishedCss!==1)throw new Error('CRM production desktop hotfix not published');
              const fixed=await page.evaluate(()=>{
                document.querySelector('#marketing')?.classList.add('hide');
                document.querySelector('#app')?.classList.remove('hide');
