@@ -31,7 +31,7 @@ Foi desenvolvido um módulo independente de captação e qualificação, com int
 - Painel administrativo (após implantação e login independente): `/prospect-ia`
 - Testes automatizados e preparação Docker/Railway: [status verificado](./docs/PROSPECT-IA-STATUS-2026-10-15.md)
 
-**Este módulo ainda NÃO está implantado nem disponível no domínio COMVERXA.** O Railway negou a criação de novo serviço por `Free plan resource provision limit exceeded`. A aplicação anterior foi preservada. Testes de integração aprovados no GitHub Actions não substituem a homologação da plataforma hospedada nem a integração de credenciais Meta/OpenAI. O módulo é restrito a um administrador e **não** oferece ainda isolamento multiempresa ou operação comercial em escala.
+**Situação operacional (15/10/2026): piloto implantado em serviço Railway separado**, com painel em [COMVERXA Prospect IA](https://comverxa-prospect-ia-production.up.railway.app/login) e formulário com consentimento em [Solicitar demonstração](https://comverxa-prospect-ia-production.up.railway.app/captar). Foi configurado acesso exclusivo ao administrador, com senha em hash e sessão protegida, além de exportação CSV autenticada. Testes externos comprovaram abertura das páginas, proteção de rotas, recusa de login incorreto e recusa de formulário sem consentimento. O serviço **não** está integrado automaticamente à base do CRM principal. As credenciais de Meta Cloud API/OpenAI não estão configuradas, portanto não anunciar disparos WhatsApp e IA generativa como operacionais. Seguem pendentes isolamento multiempresa, restore de backup, testes autenticados reais com fornecedor e homologação para comercialização em escala.
 
 ## Prontidão comercial (outubro/2026)
 
