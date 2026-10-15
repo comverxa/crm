@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { scryptSync } from "node:crypto";
+import { scryptSync,createHmac } from "node:crypto";
 import test from "node:test";
 
 test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()=>{
@@ -16,7 +16,7 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
  const env={...process.env,PORT:String(port),PROSPECT_DATA_DIR:dir,
   PROSPECT_ADMIN_EMAIL:"owner@example.invalid",
   PROSPECT_ADMIN_PASSWORD_SCRYPT:salt+":"+passHash,
-  PROSPECT_SESSION_SECRET:"local-test-only-session-secret-please-do-not-deploy"};
+  PROSPECT_SESSION_SECRET:"local-test-only-session-secret-please-do-not-deploy", META_APP_SECRET:"test_meta_app_secret",META_VERIFY_TOKEN:"test_meta_verify_token",META_PHONE_NUMBER_ID:"987654321"};
  const child=spawn("bun",["run",resolve("backend/prospect-standalone.ts")],{env,stdio:["ignore","pipe","pipe"]});
  let output="";
  child.stdout.on("data",x=>{output+=String(x).slice(0,500)});
@@ -89,6 +89,20 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   const campaigns=await mustJson(await fetch(base+"/api/master/prospect/campaigns",{headers:{Cookie:cookie}}),200);
   assert.equal(campaigns.items[0].pending,0,"Opt-out must remove queued sends");
   assert.equal((await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}})).status,200);
+  const handshake=await fetch(base+"/webhooks/meta?hub.mode=subscribe&hub.verify_token=test_meta_verify_token&hub.challenge=ABCD1234");
+  assert.equal(handshake.status,200);
+  assert.equal(await handshake.text(),"ABCD1234");
+  assert.equal((await fetch(base+"/webhooks/meta?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=ABC")).status,403);
+  const metaEvent=(phone,text)=>JSON.stringify({object:"whatsapp_business_account",entry:[{changes:[{field:"messages",value:{metadata:{phone_number_id:"987654321"},contacts:[{wa_id:phone,profile:{name:"Contato de Teste"}}],messages:[{from:phone,type:"text",text:{body:text}}]}}]}]});
+  const signedPost=(raw,valid=true)=>fetch(base+"/webhooks/meta",{method:"POST",headers:{"Content-Type":"application/json","x-hub-signature-256":valid?"sha256="+createHmac("sha256","test_meta_app_secret").update(raw).digest("hex"):"sha256=00"},body:raw});
+  const incoming=metaEvent("5531999990003","Quero cotação de seguro hoje, assistência 24 horas");
+  assert.equal((await signedPost(incoming,false)).status,401,"Forged webhook must be rejected");
+  assert.equal((await signedPost(incoming)).status,200,"Signed inbound event should be accepted");
+  let inbound=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(l=>l.phone==="5531999990003");
+  assert.ok(inbound&&!inbound.consent&&!inbound.approved,"Inbound conversations do not imply consent to mass advertising");
+  assert.equal((await signedPost(metaEvent("5531999990003","SAIR"))).status,200);
+  inbound=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(l=>l.phone==="5531999990003");
+  assert.ok(inbound.opt_out&&!inbound.approved,"STOP must revoke all marketing permission");
   const logout=await fetch(base+"/logout",{method:"POST",headers:{Cookie:cookie},redirect:"manual"});
   assert.equal(logout.status,303,"Logout must succeed");
   assert.equal((await fetch(base+"/prospect-ia",{headers:{Cookie:cookie}})).status,401,"Logged-out cookie must be revoked server-side");
