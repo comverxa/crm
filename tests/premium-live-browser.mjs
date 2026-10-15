@@ -32,4 +32,23 @@ try{
   console.log("PASS | "+size.name+" CRM production rendering | "+JSON.stringify({document:d.doc,viewport:d.vw,label:d.label}));
   await page.close();
  }
+  const billingPage=await browser.newPage({viewport:{width:390,height:844}});
+  await billingPage.route("**/api/me",route=>route.fulfill({status:200,contentType:"application/json",body:'{"email":"qa@example.invalid"}'}));
+  await billingPage.route("**/api/billing",route=>route.fulfill({status:200,contentType:"application/json",body:'{"plan":"business","status":"active","paid_until":253402300799}'}));
+  const billingResponse=await billingPage.goto(base,{waitUntil:"domcontentloaded",timeout:30000});
+  assert.equal(billingResponse.status(),200);
+  await billingPage.evaluate(()=>{
+    const root=document.querySelector("#app")||document.body;
+    const section=document.createElement("section");
+    section.id="cvx-qa-billing";
+    section.innerHTML='<h2>Minha assinatura</h2><h3>Plano atual: business</h3><p>Situação: active</p><form><button type="button">Solicitar contratação</button></form>';
+    root.appendChild(section);
+  });
+  await billingPage.waitForFunction(()=>{
+    const s=document.querySelector("#cvx-qa-billing");
+    return s?.textContent.includes("Plano atual: Empresarial")&&s?.textContent.includes("Situação: Ativo")&&
+      !!document.querySelector("#cvx-lifetime-banner")&&s.querySelector("form")?.hidden;
+  },{timeout:5000});
+  console.log("PASS | Plano Empresarial Vitalicio | traducao, aviso e formulario oculto com API simulada");
+  await billingPage.close();
 }finally{await browser.close()}
