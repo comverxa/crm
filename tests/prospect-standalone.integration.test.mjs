@@ -131,6 +131,24 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal((await signedPost(metaEvent("5531999990003","SAIR"))).status,200);
   inbound=(await mustJson(await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}}),200)).items.find(l=>l.phone==="5531999990003");
   assert.ok(inbound.opt_out&&!inbound.approved,"STOP must revoke all marketing permission");
+
+  // LGPD: owner can export a single lead and erase it only with explicit matching confirmation.
+  const ownerExport=await fetch(base+"/api/master/prospect/leads/"+create.id+"/export",{headers:{Cookie:cookie}});
+  assert.equal(ownerExport.status,200,"Owner export should succeed");
+  assert.match(ownerExport.headers.get("cache-control")||"",/no-store/);
+  const individual=await ownerExport.json();
+  assert.equal(individual.lead.id,create.id);
+  assert.equal(individual.lead.name,"Sem Permissão");
+  assert.equal((await fetch(base+"/api/master/prospect/leads/"+create.id+"/export")).status,401,"Anon export must be blocked");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/erase",{confirmation:"EXCLUIR "+create.id,request_basis:"titular"})).status,401,"Anon erasure must be blocked");
+  assert.equal((await fetch(base+"/api/master/prospect/leads/"+create.id+"/erase",{method:"POST",headers:{"Cookie":cookie,"Content-Type":"application/json"},body:'{"confirmation":"EXCLUIR 1","request_basis":"titular"}'})).status,403,"CSRF without header must fail");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/erase",{confirmation:"EXCLUIR 999",request_basis:"titular"},cookie)).status,400,"Mismatched confirmation must fail");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/erase",{confirmation:"EXCLUIR "+create.id,request_basis:"invalid"},cookie)).status,400,"Invalid justification must fail");
+  const erased=await mustJson(await post("/api/master/prospect/leads/"+create.id+"/erase",{confirmation:"EXCLUIR "+create.id,request_basis:"titular"},cookie),200);
+  assert.equal(erased.erased_id,create.id);
+  assert.equal((await fetch(base+"/api/master/prospect/leads/"+create.id+"/export",{headers:{Cookie:cookie}})).status,404,"Erased contact must be absent");
+  assert.equal((await post("/api/master/prospect/leads/"+create.id+"/erase",{confirmation:"EXCLUIR "+create.id,request_basis:"titular"},cookie)).status,404,"Repeated erasure should not be silent");
+
   const logout=await fetch(base+"/logout",{method:"POST",headers:{Cookie:cookie},redirect:"manual"});
   assert.equal(logout.status,303,"Logout must succeed");
   assert.equal((await fetch(base+"/prospect-ia",{headers:{Cookie:cookie}})).status,401,"Logged-out cookie must be revoked server-side");
