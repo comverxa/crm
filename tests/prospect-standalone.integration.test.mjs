@@ -89,7 +89,10 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   const campaigns=await mustJson(await fetch(base+"/api/master/prospect/campaigns",{headers:{Cookie:cookie}}),200);
   assert.equal(campaigns.items[0].pending,0,"Opt-out must remove queued sends");
   assert.equal((await fetch(base+"/api/master/prospect/leads",{headers:{Cookie:cookie}})).status,200);
-  console.log("PASS: health, capture, owner auth, consent, score, deduplication, campaign, Meta/AI fail-closed, opt-out");
+  const logout=await fetch(base+"/logout",{method:"POST",headers:{Cookie:cookie},redirect:"manual"});
+  assert.equal(logout.status,303,"Logout must succeed");
+  assert.equal((await fetch(base+"/prospect-ia",{headers:{Cookie:cookie}})).status,401,"Logged-out cookie must be revoked server-side");
+  console.log("PASS: health, capture, revocable owner auth, verified opt-in, score, deduplication, campaign, Meta/AI fail-closed, opt-out");
  }finally{
   child.kill("SIGTERM");
   await new Promise(resolve=>setTimeout(resolve,200));
