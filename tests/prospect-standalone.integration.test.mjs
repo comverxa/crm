@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { Database } from "bun:sqlite";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { scryptSync,createHmac } from "node:crypto";
@@ -72,11 +71,9 @@ test("Prospect IA: authenticated Bun runtime and consent-safe campaigns",async()
   assert.equal(backup.subarray(0,15).toString(),"SQLite format 3","Backup must contain SQLite header");
   const backupPath=join(dir,"backup-verified.sqlite");
   writeFileSync(backupPath,backup);
-  const testBackupDb=new Database(backupPath,{readonly:true});
-  try{
-    assert.equal(testBackupDb.query("PRAGMA integrity_check").get().integrity_check,"ok");
-    assert.equal(testBackupDb.query("SELECT COUNT(*) AS n FROM prospect_leads").get().n,1);
-  }finally{testBackupDb.close()}
+  const checkedBackup=spawnSync("bun",["-e",
+    "import {Database} from 'bun:sqlite';const db=new Database(process.argv[1],{readonly:true});if(db.query('PRAGMA integrity_check').get().integrity_check!=='ok'||db.query('SELECT COUNT(*) AS n FROM prospect_leads').get().n!==1)process.exit(7);db.close();",backupPath],{encoding:"utf8"});
+  assert.equal(checkedBackup.status,0,"SQLite restore verification failed: "+checkedBackup.stderr);
 
   const csvResponse=await fetch(base+"/api/master/prospect/export.csv",{headers:{Cookie:cookie}});
   assert.equal(csvResponse.status,200,"CSV export requires authenticated owner");
