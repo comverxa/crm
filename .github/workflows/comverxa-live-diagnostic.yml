@@ -1,4 +1,5 @@
 name: COMVERXA diagnostico publico de producao
+# Validação da correção de sintaxe v8
 on:
   push:
     paths:
