@@ -15,8 +15,8 @@ test("Master authorization before any prospect endpoint",()=>{
  assert.ok(backend.includes('req.headers.get("X-COMVERXA-Prospect")'));
 });
 test("A campaign cannot enqueue unknown-consent contacts",()=>{
- assert.match(backend,/WHERE consent=1 AND opt_out=0 AND consent_evidence<>''/);
- assert.match(backend,/if\(!current\?\.consent\|\|current\.opt_out\|\|!current\.consent_evidence\)/);
+ assert.match(backend,/WHERE consent=1 AND opt_out=0 AND approved=1 AND consent_evidence<>''/);
+ assert.match(backend,/if\(!current\?\.consent\|\|current\.opt_out\|\|!current\.approved\|\|!current\.consent_evidence\)/);
  assert.match(backend,/status=\x27processing\x27/);
  assert.ok(backend.includes("status='cancelled'"));
  assert.ok(backend.includes("lead.optout"));
