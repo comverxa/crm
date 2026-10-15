@@ -19,8 +19,7 @@ jobs:
               const body=await response.text();
               const csp=response.headers.get('content-security-policy')||'';
               if(path==='/' && response.status===200){
-                const match=body.match(/<script id="comverxa-premium-v2-js">([\\s\\S]*?)<\\/script>/);
-                const script=match?.[1]||'';
+                const script=body.split('<script id="comverxa-premium-v2-js">')[1]?.split('</script>')[0]||'';
                 let syntax='missing';
                 if(script){try{new Function(script);syntax='valid'}catch(e){syntax='invalid: '+String(e.message).slice(0,160)}}
                 console.log('BILLING_SCRIPT_SYNTAX='+syntax);
