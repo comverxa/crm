@@ -1,0 +1,38 @@
+name: COMVERXA Prospect IA — smoke real
+on:
+  push:
+    paths:
+      - .github/workflows/prospect-production-smoke.yml
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verificar login, captação e isolamento anônimo
+        run: |
+          node - <<'NODE'
+          const base='https://comverxa-prospect-ia-production.up.railway.app';
+          let fail=0;
+          async function probe(name,path,want,init={}){
+            const r=await fetch(base+path,{redirect:'manual',signal:AbortSignal.timeout(12000),...init});
+            const body=await r.text();
+            const ok=want.includes(r.status);
+            console.log((ok?'PASS':'FAIL')+' '+name+' '+r.status+' bytes='+body.length);
+            if(!ok)fail++;
+            return {r,body};
+          }
+          await probe('Saúde','/healthz',[200]);
+          const login=await probe('Login disponível','/login',[200]);
+          if(!login.body.includes('Entrar no painel'))fail++;
+          const captar=await probe('Captação voluntária ativa','/captar',[200]);
+          if(!captar.body.includes('consent'))fail++;
+          await probe('Painel privado','/prospect-ia',[401,403,302]);
+          await probe('API administrativa privada','/api/master/prospect/leads',[401,403]);
+          await probe('API overview privada','/api/master/prospect/overview',[401,403]);
+          const bad=new URLSearchParams({email:'qa-nao-existe@example.invalid',password:'invalid'});
+          await probe('Senha inválida rejeitada sem falha de configuração','/login',[401,429],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Origin:base},body:bad.toString()});
+          await probe('Captação sem consentimento rejeitada','/captar',[400,429],{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Origin:base},body:new URLSearchParams({name:'TESTE SEM CONSENTIMENTO',phone:'31000000000'}).toString()});
+          console.log('FALHAS='+fail);
+          if(fail)process.exit(1);
+          NODE
