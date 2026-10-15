@@ -70,3 +70,11 @@ Esta é uma entrega técnica verificável em piloto, **não uma certificação d
 - Webhook Meta verifica assinatura antes de qualquer alteração; novos leads inbound não entram automaticamente em listas de marketing.
 - A captura por formulário e o processamento de mensagens precisam de aviso LGPD, política de retenção, direitos dos titulares e teste com ambiente de homologação.
 - A Meta pode exigir revisão do aplicativo, permissões apropriadas e templates aprovados para utilizar os recursos de produção.
+
+## Atualização operacional — 15/10/2026
+
+- O serviço `comverxa-prospect-ia` passou a seguir a branch `main` do repositório `comverxa/crm`, sem pin de commit antigo. Deploy de produção do commit `198791b4` concluído com sucesso no Railway em 15/10/2026; armazenamento persistente `/data` mantido.
+- Foi adicionado ao painel autenticado um botão para **download manual de backup SQLite** do Prospect IA. O servidor usa `VACUUM INTO`, confirma `PRAGMA integrity_check = ok`, gera nome de arquivo local e rejeita downloads sem autenticação ou proteção de requisição. Teste de integração com restauração em banco isolado passou no [GitHub Actions](https://github.com/comverxa/crm/actions/runs/38745416688).
+- O arquivo contém dados pessoais e deve ser armazenado pelo administrador fora do Railway, com proteção e controle de acesso. **Não é backup automático externo**: operação humana de download, retenção, criptografia, frequência e teste de restauração real em produção continuam pendentes.
+- O Prospect IA continua **separado** da autenticação e do banco do CRM principal. Não declarar integração de leads ou disparos Meta/OpenAI em produção sem testes autenticados e credenciais externas verificadas.
+
