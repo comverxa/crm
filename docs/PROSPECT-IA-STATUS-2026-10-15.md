@@ -5,6 +5,8 @@
 - Painel premium administrativo com acesso autenticado em aplicação standalone, cadastro e importação de leads, classificação por regras, deduplicação e observações.
 - Captação própria em \`/captar\` por formulário com manifestação expressa de interesse e aceite de contato pelo WhatsApp para a COMVERXA; não faz scraping de terceiros.
 - Modelo de permissões de contato (opt-in com evidência, opt-out que cancela campanhas pendentes).
+- **Aprovação adicional obrigatória pelo proprietário** para liberar um contato em campanhas: cadastrar ou marcar consentimento no formulário não é suficiente; o operador registra como verificou a autorização e o número. Leads antigos são migrados como não aprovados.
+- **Webhook oficial da Meta** em `/webhooks/meta`: desafio de verificação, validação HMAC `x-hub-signature-256`, recepção de contatos que iniciam conversa, classificação por regras sem opt-in automático e reconhecimento de mensagens de descadastro; exige ambiente Meta válido.
 - Campanha na API Oficial da Meta por templates previamente aprovados. Envio manual em lotes limitados, proteção de concorrência para não duplicar solicitação; sem credenciais externas nenhuma mensagem é transmitida.
 - IA generativa opcional via chave OpenAI no servidor. Sem chave, o sistema mostra uma indisponibilidade explícita e a pontuação por regras permanece.
 - Banco SQLite próprio, caminho \`PROSPECT_DATA_DIR\` ou \`/data\`. Preparação de Docker e Railway para implantação isolada sem substituir o CRM anterior.
@@ -32,7 +34,7 @@ Por esse motivo, NÃO há endereço de serviço publicado para o Prospect IA sta
 - Configurar via gerenciador de secrets: \`PROSPECT_ADMIN_EMAIL\`, \`PROSPECT_ADMIN_PASSWORD_SCRYPT\` (scrypt 16384/8/1 com salt hex de 16 bytes), \`PROSPECT_SESSION_SECRET\`.
 - Para funcionalidades optativas: \`OPENAI_API_KEY\`, \`OPENAI_MODEL\`, \`META_ACCESS_TOKEN\`, \`META_PHONE_NUMBER_ID\`.
 - **Jamais gravar senhas/tokens no repositório**. Usar credenciais distintas das contas do CRM original.
-- Após ativação: testes de login remoto e captura, DNS, HTTPS, 401 sem sessão, troca de senhas, backup e restauração externa, monitoramento, hardening, consentimentos, canais Meta de teste e carga.
+- Após ativação: testes de login remoto, revogação de sessões, aprovação individual e captura, DNS, HTTPS, 401 sem sessão, troca de senhas, backup e restauração externa, monitoramento, hardening, consentimentos, canais Meta de teste e carga.
 
 ## Ainda não implementado / não comercializar como disponível
 
@@ -49,3 +51,12 @@ Por esse motivo, NÃO há endereço de serviço publicado para o Prospect IA sta
 WhatsApp Business Messaging Policy exige opt-in válido, templates aprovados em conversas iniciadas pela empresa e remoção de contatos que optarem por sair. Ver https://business.whatsapp.com/policy/preview?lang=pt_BR. Dados Google Maps Places não podem ser indiscriminadamente exportados/armazenados para listas de prospecção; consultar as condições do provedor.
 
 Esta é uma entrega técnica verificável em piloto, **não uma certificação de prontidão comercial**.
+
+## Segurança adicionada na revisão de 15/10/2026
+
+- Sessões com identificadores aleatórios por acesso e expiração de 8 horas; `/logout` revoga o ID no processo, impedindo reutilização do cookie. Isso é próprio de um piloto de **uma réplica**: múltiplas réplicas exigem armazenamento de sessão compartilhado.
+- Tentativas de login limitadas por cliente na aplicação, além de proteções que devem ser configuradas no provedor de borda (WAF/rate limiting real).
+- Campanhas não recebem leads públicos automaticamente; só contatos com consentimento registrado, sem descadastro e com aprovação administrativa.
+- Webhook Meta verifica assinatura antes de qualquer alteração; novos leads inbound não entram automaticamente em listas de marketing.
+- A captura por formulário e o processamento de mensagens precisam de aviso LGPD, política de retenção, direitos dos titulares e teste com ambiente de homologação.
+- A Meta pode exigir revisão do aplicativo, permissões apropriadas e templates aprovados para utilizar os recursos de produção.
