@@ -13,6 +13,10 @@ const flags={
  assistedQueue:html.includes("__cvxQrAssistedQueueInstalled"),
  batch10Button:html.includes("Enviar próximos 10 (QR)"),
  batch10Logic:html.includes("async function sendBatch("),
+ senderMenu:html.includes("Disparador em massa (WhatsApp QR)"),
+ channelMismatchGuard:html.includes('get("cvx-bgt-channel")?.value!=="qr"'),
+ sessionPhoneDedup:html.includes("attemptedPhones.add(q.phone)"),
+ inFlightQueueLock:html.includes('get("cvx-qa-build").disabled=sending'),
  privacyAndSecurity:UI_contains(html)
 };
 function UI_contains(x){return x.includes("comverxa-premium-v2")&&x.includes("cvx-inbox-channel-patch")}
