@@ -1,0 +1,14 @@
+name: COMVERXA | Inspecionar contrato envio QR
+on:
+  push:
+    paths:
+      - tests/qr-send-contract-diagnostic.mjs
+      - .github/workflows/qr-send-contract-diagnostic.yml
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tests/qr-send-contract-diagnostic.mjs
