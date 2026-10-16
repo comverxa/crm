@@ -227,7 +227,7 @@ const css=[
 "#cvx-qr-assist .cvx-qa-warning{border-left:3px solid #cba043;background:#fffaec;padding:10px;font-size:12px;color:#6a562b}"
 ].join("\n");
 const eligible=l=>{
- const x=l?.consent??l?.opt_in??l?.marketing_consent;
+ const x=l?.optin??l?.consent??l?.opt_in??l?.marketing_consent;
  const yes=x===true||x===1||String(x||"").toLowerCase()==="true"||String(x||"").toLowerCase()==="sim";
  const blocked=x=>x===true||x===1||String(x||"").toLowerCase()==="true";
  const no=blocked(l?.opt_out)||blocked(l?.unsubscribed)||blocked(l?.do_not_contact);
