@@ -15,3 +15,5 @@ const form=formStart>=0&&formEnd>formStart?html.slice(formStart,formEnd+7):"";
 const fields=[...form.matchAll(/<(?:input|select|textarea)\\b[^>]*name=["']([^"']+)["']/gi)].map(m=>m[1]);
 const optinFlags=["consent","opt_in","marketing_consent","consent_evidence","approved","opt_out"].map(k=>({name:k,inLeadForm:fields.includes(k),mentionedInApp:html.includes(k)}));
 console.log("LEAD_FORM_CONTRACT",JSON.stringify({formPresent:form.length>0,namedFieldCount:fields.length,fields:fields.filter(x=>!/password|token|secret/i.test(x)),optinFlags}));
+
+console.log("LEAD_FORM_STRUCTURE",JSON.stringify({markup:form.slice(0,2200),length:form.length}));
