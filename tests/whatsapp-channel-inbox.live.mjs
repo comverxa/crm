@@ -10,6 +10,7 @@ try{
  assert.equal(await page.locator("#cvx-inbox-channel-patch").count(),1,"Channel-aware script absent in real production");
  const productionHtml=await response.text();
  assert.ok(productionHtml.includes("cvx-wa-connection-hub-v1"),"Central de conexão WhatsApp QR/Meta não foi publicada");
+ assert.ok(productionHtml.includes("async function cvxQrStatusAutoRefresh()"),"Consulta automática real do estado QR não publicada");
  await page.locator(".cvx-wa-launch").first().waitFor({state:"attached",timeout:9000});
 
  await page.evaluate(()=>{
