@@ -66,6 +66,7 @@ try{
   window.switchTab=dest=>window.__qaNav.push(dest);
  });
  await page.evaluate(()=>document.getElementById("leadModal")?.close());
+ await page.evaluate(()=>{const app=document.getElementById("app");if(app){app.hidden=false;app.classList.remove("hide","hidden");app.style.setProperty("display","block","important");const nav=app.querySelector("nav.tabs");if(nav)nav.style.setProperty("display","flex","important")}});
  await page.locator(".cvx-wa-launch").first().waitFor({state:"visible",timeout:8000});
  await page.locator(".cvx-wa-launch").first().click();
  await page.waitForFunction(()=>document.getElementById("cvx-wa-hub-summary")?.textContent.includes("2 linhas encontradas"));
@@ -105,6 +106,29 @@ try{
  const auto=await page.evaluate(()=>window.__qrAutomaticStatusCalls);
  assert.deepEqual(auto.map(x=>x.path),["/api/lines","/api/lines/2/qr/status"]);
  assert.ok(auto.every(x=>x.method==="GET"),"Status cannot generate QR or disconnect number");
+
+
+ // Screenshot scenario: connected WhatsApp 2 but zero messages in the CRM's persisted history.
+ await page.evaluate(()=>{
+  selected={id:1,line:2,name:"Lead QA",phone:"00000000000"};
+  leads=[{id:1,line:2,name:"Lead QA",phone:"00000000000"}];
+  lines=[{slot:2,name:"WhatsApp 2 QA",mode:"qr"}];
+  window.__qaInboxDiagCalls=[];
+  window.api=async(path,method="GET")=>{
+   window.__qaInboxDiagCalls.push({path,method});
+   if(path==="/api/lines/2/qr/status")return {connected:true};
+   if(path==="/api/inbox/1/messages")return {items:[]};
+   throw Error("Unexpected request "+path);
+  };
+  document.getElementById("chatHeader").textContent="Lead QA WhatsApp 2";
+ });
+ await page.locator("#cvx-qr-sync-diagnostics").waitFor({state:"visible"});
+ await page.getByRole("button",{name:"Verificar histórico e conexão"}).click();
+ await page.waitForFunction(()=>document.getElementById("cvx-qr-sync-state")?.textContent.includes("0 mensagens gravadas"));
+ assert.match(await page.locator("#cvx-qr-sync-state").innerText(),/Linha QR conectada/);
+ assert.match(await page.locator("#cvx-qr-sync-state").innerText(),/webhook/);
+ assert.deepEqual(await page.evaluate(()=>window.__qaInboxDiagCalls.map(x=>x.path)),["/api/lines/2/qr/status","/api/inbox/1/messages"]);
+ assert.ok((await page.evaluate(()=>window.__qaInboxDiagCalls)).every(x=>x.method==="GET"),"Diagnostics cannot mutate sessions or contacts");
 
  console.log("PASS | Evolution QR / Meta selection, safe editing, read-only connection status, no automatic reassignment or sends");
  await page.close();
