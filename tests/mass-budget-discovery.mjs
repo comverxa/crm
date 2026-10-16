@@ -11,7 +11,7 @@ try{
   const s=[...document.querySelectorAll("script")].filter(x=>!x.src).map(x=>x.textContent||"");
   const idx=s.map((x,i)=>({i,len:x.length,hasCampaign:x.includes("campaignForm"),hasBatch:x.includes("/api/campaigns")})).filter(x=>x.hasCampaign||x.hasBatch);
   const panels=[...document.querySelectorAll("#campaigns input,#campaigns select,#campaigns button,#campaigns textarea")].map(x=>({tag:x.tagName,type:x.type,name:x.name,id:x.id,action:(x.getAttribute("onclick")||"").slice(0,80),text:(x.textContent||"").slice(0,85)}));
-  return {httpSnippet:location.pathname,appExists:!!app,sectionExists:!!sec,sectionMarkup:sec?.outerHTML.slice(0,9000)||null,formExists:!!form,campaignControls:panels,inlineScripts:idx,functions:handlers,checkboxCount:picks.length,globalNames:["leads","campaigns","lines"].map(n=>{try{return {name:n,kind:eval("typeof "+n)}}catch{return {name:n,kind:"unknown"}}})};
+  return {httpSnippet:location.pathname,appExists:!!app,sectionExists:!!sec,sectionMarkup:sec?.outerHTML.slice(0,9000)||null,formExists:!!form,campaignControls:panels,inlineScripts:idx,functions:handlers,checkboxCount:picks.length,topIds:Array.from(document.querySelectorAll('#app [id]')).slice(0,55).map(e=>({tag:e.tagName,id:e.id})),globalNames:["leads","campaigns","lines"].map(n=>{try{return {name:n,kind:eval("typeof "+n)}}catch{return {name:n,kind:"unknown"}}})};
  });
  console.log("CAMPAIGN_DIAGNOSTICS_SAFE\n"+JSON.stringify({status:response.status(),...data},null,2));
 }finally{await browser.close()}
