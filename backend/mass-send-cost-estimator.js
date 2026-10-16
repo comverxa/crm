@@ -240,7 +240,7 @@ const leadLine=l=>Number(l?.line||l?.slot||0);
 const crmLines=()=>{try{return typeof lines!=="undefined"&&Array.isArray(lines)?lines:[]}catch{return []}};
 const crmLeads=()=>{try{return typeof leads!=="undefined"&&Array.isArray(leads)?leads:[]}catch{return []}};
 let queue=[],position=0,sending=false,stopRequested=false;
-const attemptedIds=new Set();
+const attemptedIds=new Set(),attemptedPhones=new Set();
 function linePicker(){
  const sel=get("cvx-qa-line"),old=sel.value;
  sel.replaceChildren();const o=document.createElement("option");o.value="";o.textContent="Selecione uma linha QR";sel.append(o);
@@ -256,13 +256,16 @@ function render(){
   const label=document.createElement("span");label.textContent=(i+1)+". "+q.name;
   const right=document.createElement("span");right.textContent=q.deliveryStatus==="accepted"?"Aceita para envio":q.deliveryStatus==="uncertain"?"Resultado incerto":i<position?"Aberto":i===position?"Próximo":"Aguardando";row.append(label,right);holder.append(row);
  }
- get("cvx-qa-next").disabled=position>=queue.length||queue.length===0;
+ get("cvx-qa-next").disabled=sending||position>=queue.length||queue.length===0;
+ get("cvx-qa-build").disabled=sending;
+ get("cvx-qa-line").disabled=sending;
  get("cvx-qa-send").disabled=sending||!queue.some(q=>q.deliveryStatus==="pending");
  get("cvx-qa-stop").disabled=!sending;
 }
 function msg(s){get("cvx-qa-summary").textContent=s}
 function reset(){if(sending){msg("Envio em andamento. Use Parar próximos envios antes de limpar.");return}queue=[];position=0;render();msg("Fila limpa. Registros existentes preservados; mensagens já aceitas pelo servidor não podem ser desfeitas.")}
 function build(){
+ if(sending){msg("Campanha em andamento. Aguarde a confirmação ou solicite Parar próximos envios.");return}
  queue=[];position=0;
  const sid=Number(get("cvx-qa-line").value);
  const qr=crmLines().find(l=>Number(l.slot)===sid&&l.mode==="qr");
@@ -277,7 +280,7 @@ function build(){
   if(leadLine(l)!==sid){wrongLine++;continue}
   const p=phone(l);if(!/^\d{10,15}$/.test(p)){badPhone++;continue}
   if(used.has(p)){duplicates++;continue}
-  if(attemptedIds.has(leadId(l)))continue;
+  if(attemptedIds.has(leadId(l))||attemptedPhones.has(p)){duplicates++;continue}
   used.add(p);queue.push({id:leadId(l),name:leadName(l),phone:p,deliveryStatus:"pending"});
   if(queue.length>=150)break;
  }
@@ -307,6 +310,7 @@ async function next(){
 
 async function sendBatch(){
  if(sending)return;
+ if(get("cvx-bgt-channel")?.value!=="qr"){msg("Para envio pela Evolution, selecione WhatsApp por QR / Evolution no tipo de conexão antes de confirmar.");return}
  const tasks=queue.filter(q=>q.deliveryStatus==="pending"&&!attemptedIds.has(q.id)).slice(0,10);
  if(tasks.length===0){msg("Não há destinatários pendentes. Mensagens com resultado incerto não serão reenviadas automaticamente.");return}
  const slot=Number(get("cvx-qa-line").value);
@@ -340,6 +344,7 @@ async function sendBatch(){
  try{
   for(const q of tasks){
    if(stopRequested)break;
+   if(Number(get("cvx-qa-line").value)!==slot){stopRequested=true;msg("Linha de envio alterada; campanha interrompida.");break}
    const currentLead=crmLeads().find(l=>leadId(l)===q.id);
    if(!currentLead||!eligible(currentLead)||leadLine(currentLead)!==slot||phone(currentLead)!==q.phone){stopRequested=true;msg("Pausa de segurança: os dados ou a autorização do destinatário foram alterados.");break}
    // Revalidate server opt-in/tenant-scoped lead before every attempted message.
@@ -348,7 +353,7 @@ async function sendBatch(){
    const remote=(snapshot?.items||[]).find(l=>leadId(l)===q.id);
    if(!remote||!eligible(remote)||leadLine(remote)!==slot||phone(remote)!==q.phone){stopRequested=true;msg("Autorização ou linha do contato mudou. Envio interrompido.");break}
    const message=template.replaceAll("{nome}",q.name);
-   attemptedIds.add(q.id);
+   attemptedIds.add(q.id);attemptedPhones.add(q.phone);
    q.deliveryStatus="uncertain";render();
    try{
     await window.api("/api/inbox/"+encodeURIComponent(q.id)+"/send","POST",{type:"text",message,template:""});
