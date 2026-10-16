@@ -1,0 +1,23 @@
+name: COMVERXA - Lote QR na interface real (sem envios)
+on:
+  push:
+    paths:
+      - tests/live-qr-batch-browser.mjs
+      - .github/workflows/live-qr-batch-browser.yml
+  pull_request:
+    paths:
+      - tests/live-qr-batch-browser.mjs
+      - .github/workflows/live-qr-batch-browser.yml
+  workflow_dispatch:
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-save playwright-core@1.56.1
+      - name: Navegador real, cadastros sintéticos, bloqueio HTTP POST
+        run: node tests/live-qr-batch-browser.mjs
