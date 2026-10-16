@@ -1,0 +1,20 @@
+name: COMVERXA - Readiness anonimo QA
+on:
+  push:
+    paths:
+      - backend/production-safe-preflight.js
+      - tests/production-safe-preflight.test.mjs
+      - .github/workflows/production-safe-preflight.yml
+  pull_request:
+    paths:
+      - backend/production-safe-preflight.js
+      - tests/production-safe-preflight.test.mjs
+      - .github/workflows/production-safe-preflight.yml
+jobs:
+  no-write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun tests/production-safe-preflight.test.mjs
