@@ -65,6 +65,7 @@ try{
   };
   window.switchTab=dest=>window.__qaNav.push(dest);
  });
+ await page.evaluate(()=>document.getElementById("leadModal")?.close());
  await page.locator(".cvx-wa-launch").first().waitFor({state:"visible",timeout:8000});
  await page.locator(".cvx-wa-launch").first().click();
  await page.waitForFunction(()=>document.getElementById("cvx-wa-hub-summary")?.textContent.includes("2 linhas encontradas"));
