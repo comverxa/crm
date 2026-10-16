@@ -42,7 +42,7 @@ try{
     assert.equal(r.status,200,await r.clone().text().catch(()=>"<binary>"));
     assert.equal(r.headers.get("content-type"),"application/vnd.sqlite3");
     const bytes=new Uint8Array(await r.arrayBuffer());
-    assert.equal(Buffer.from(bytes.subarray(0,16)).toString("latin1"),"SQLite format 3\\0");
+    assert.equal(Buffer.from(bytes.subarray(0,16)).toString("latin1"),"SQLite format 3\0");
     const dest=join(root,"restored.sqlite");writeFileSync(dest,bytes);
     const restored=new Database(dest,{readonly:true});
     assert.equal(restored.query("SELECT name FROM leads WHERE id=1").get().name,"PROVA TESTE BACKUP");
