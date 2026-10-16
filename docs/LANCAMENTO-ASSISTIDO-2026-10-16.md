@@ -48,3 +48,21 @@ Não excluir, formatar, substituir ou restaurar o volume Railway de produção s
 
 ## Decisão
 **GO** para CRM interno, demonstração e prospecção comercial. **NO-GO** para comercialização SaaS em escala com dados reais de empresas independentes até homologação dos requisitos pendentes. Uma proposta pode ser emitida amanhã, mas entrega operacional ao cliente depende do aceite acima.
+
+## Segurança e publicação — verificação adicional 16/10, 02:22 UTC
+- ADM Master: HSTS max-age=31536000 e X-Content-Type-Options nosniff implantados no Railway sem alterar banco/volume. Implantação concluída com SUCCESS.
+- Homologação pública com cabeçalhos reforçados: https://github.com/comverxa/crm/actions/runs/38840151562 — concluída com sucesso.
+- Continuam pendentes testes de isolamento autenticado entre duas empresas e restauração independente do backup. Não registrar GO de venda SaaS multiempresa em escala por causa dessas evidências não coletadas.
+
+### Habilitar backup no painel do proprietário (ação manual obrigatória)
+1. Abra Railway → projeto de produção do SaaS → serviço conecta-crm-saas → aba Backups.
+2. No volume saas-dados, habilite agenda Daily e crie um backup manual inicial. Não clique em Restore nem formate o volume.
+3. Faça o mesmo para comverxa-prospect-ia-dados e, no projeto do conector, para os volumes Postgres/Redis conforme criticidade.
+4. Confirme no painel o horário e status da cópia. Railway não possui ação disponível nesta integração para criar ou configurar backups de volumes; não afirmar que já estão ativos.
+5. A restauração real deve ser testada num ambiente seguro, sem remover o volume em uso. O restore Railway cria volume substituto para revisão e só toma efeito após o deploy, portanto requer cuidado. Não realizar em produção sem plano e autorização.
+Referência oficial: https://docs.railway.com/volumes/backups
+
+### Informações necessárias do titular para contratos e faturamento
+- Cadastro de fornecedor e natureza jurídica (PF/MEI/PJ), endereço contratual e canal de suporte.
+- Situação do plano Railway e orçamento/faturamento ativo, que não é acessível por esta integração.
+- Aceite jurídico dos modelos de contrato e DPA; o software não pode assinar ou conferir dados fiscais do fornecedor sozinho.
