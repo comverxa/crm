@@ -56,5 +56,28 @@ try{
  assert.equal(await page.locator("#cvx-bgt-people").inputValue(),"0");
  assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 0,00");
 
+ // Fila QR assistida: somente registros com consentimento, nao dispara automaticamente.
+ await page.evaluate(()=>{
+  const a=leads.find(l=>l.id===960001),b=leads.find(l=>l.id===960002);
+  a.consent=1;b.consent=0;
+ });
+ await page.locator("#cvx-bc-select-all").click();
+ await page.locator("#cvx-qa-line").selectOption("2");
+ await page.locator("#cvx-qa-build").click();
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 contatos aptos/);
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 sem autorização registrada/);
+ assert.equal(await page.locator("#cvx-qa-list .cvx-qa-row").count(),1);
+ await page.locator("#cvx-bc-msg").fill("Olá, {nome}! Mensagem de teste.");
+ await page.evaluate(()=>{
+  window.__qaOpenCalls=[];
+  window.openThread=async(id)=>{window.__qaOpenCalls.push(id)};
+ });
+ await page.locator("#cvx-qa-next").click();
+ const opened=await page.evaluate(()=>window.__qaOpenCalls);
+ assert.deepEqual(opened,[960001]);
+ assert.equal(await page.locator("#replyText").inputValue(),"Olá, Contato QA Um! Mensagem de teste.");
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/Nenhum envio foi iniciado/);
+
+
  console.log("PASS: modal/QR/Meta, 50 destinatarios, 0/10/15/21.09 BRL, saldo 3, Escape. Sem uso de contas reais.");
 }finally{await browser.close();}
