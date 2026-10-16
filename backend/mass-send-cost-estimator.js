@@ -125,3 +125,68 @@ function schedule(){if(pending)return;pending=true;requestAnimationFrame(()=>{pe
 function start(){mount();new MutationObserver(schedule).observe(E("app")||document.body,{childList:true,subtree:true})}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
 })();
+
+/* COMVERXA · Selecao local de contatos e linha QR para orcamento; sem envio. */
+(function(){
+"use strict";
+if(window.__cvxBudgetContactsInstalled)return;window.__cvxBudgetContactsInstalled=true;
+const ID="cvx-budget-contacts",el=id=>document.getElementById(id);
+const css="#cvx-budget-contacts{margin:16px 0;padding:16px;background:#f5fafb;border:1px solid #d4e4ea;border-radius:14px;color:#24475c;font:14px/1.5 system-ui,sans-serif}\n#cvx-budget-contacts summary{font-weight:850;cursor:pointer;font-size:16px}\n#cvx-budget-contacts label.cvx-contact-row{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px;border-bottom:1px solid #e2ecf0;cursor:pointer}\n#cvx-budget-contacts .cvx-contact-row input{width:18px;min-height:18px;height:18px;flex:0 0 18px}\n#cvx-budget-contacts input:not([type=checkbox]),#cvx-budget-contacts select,#cvx-budget-contacts textarea{width:100%;box-sizing:border-box;min-height:41px;border:1px solid #b7cfda;border-radius:9px;background:white;padding:9px;font:inherit;color:#19394c}\n#cvx-budget-contacts textarea{min-height:72px;resize:vertical}\n#cvx-budget-contacts button{padding:9px 12px;border:1px solid #a9c6cc;background:#fff;color:#19655c;border-radius:9px;cursor:pointer;font-weight:700}\n#cvx-budget-contacts button:focus-visible,#cvx-budget-contacts input:focus-visible,#cvx-budget-contacts select:focus-visible{outline:3px solid #17ad92}\n#cvx-budget-contacts .cvx-contact-list{background:white;max-height:210px;overflow:auto;border:1px solid #d2e4eb;border-radius:9px;margin:8px 0}\n#cvx-budget-contacts .cvx-contacts-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}\n#cvx-budget-contacts .cvx-contact-stat{font-weight:800;color:#0e7869}\n#cvx-budget-contacts .cvx-contact-note{background:#fff7e3;border-left:3px solid #d6a64b;padding:9px;font-size:12px;margin-top:9px;color:#61512d}\n#cvx-budget-contacts .cvx-contact-preview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#e2f6f0;color:#155949}\n#cvx-budget-contacts .cvx-contact-muted{color:#6b8190;font-size:12px;margin:7px 0}",layout="<summary>Escolher contatos do CRM e linha QR (orçamento)</summary><p class='cvx-contact-muted'>Somente planejamento local. Nenhum contato será modificado e nenhuma mensagem será enviada.</p><label>Linha WhatsApp por QR<select id='cvx-bc-line'><option value=''>Todas as linhas (planejamento)</option></select></label><label>Pesquisar contatos<input id='cvx-bc-search' type='search' placeholder='Nome ou classificação' autocomplete='off'></label><div class='cvx-contacts-actions'><button type='button' id='cvx-bc-refresh'>Atualizar</button><button type='button' id='cvx-bc-select-all'>Selecionar exibidos</button><button type='button' id='cvx-bc-clear'>Limpar</button></div><p class='cvx-contact-muted' id='cvx-bc-status' role='status'></p><div class='cvx-contact-list' id='cvx-bc-list'></div><p id='cvx-bc-count' class='cvx-contact-stat'>0 selecionados</p><p class='cvx-contact-note'>O cadastro no CRM não comprova consentimento para marketing. Confirme a autorização individual e respeite descadastros antes de qualquer envio. Nenhum disparo acontece aqui.</p><label>Mensagem (prévia, não enviada)<textarea id='cvx-bc-msg' maxlength='5000' placeholder='Olá, {nome}! Posso enviar uma proposta?'></textarea></label><p id='cvx-bc-preview' class='cvx-contact-preview'>Digite a mensagem para visualizar.</p>";
+let shown=[],pool=[],selected=new Set();
+const lid=l=>l&&l.id!==undefined&&l.id!==null?String(l.id):"";
+const name=l=>String(l?.name||l?.nome||l?.full_name||"Sem nome").slice(0,85);
+const stage=l=>String(l?.stage||l?.status||l?.temperature||"").slice(0,35);
+const slot=l=>Number(l?.line||l?.slot||0);
+const crmLeads=()=>{try{return typeof leads!=="undefined"&&Array.isArray(leads)?leads:[]}catch{return []}};
+const crmLines=()=>{try{return typeof lines!=="undefined"&&Array.isArray(lines)?lines:[]}catch{return []}};
+function preview(){
+const msg=el("cvx-bc-msg").value,first=pool.find(l=>selected.has(lid(l)));
+el("cvx-bc-preview").textContent=msg?msg.replaceAll("{nome}",first?name(first):"Cliente"):"Digite a mensagem para visualizar.";
+}
+function syncCount(){
+const current=new Set(pool.map(lid));for(const id of selected)if(!current.has(id))selected.delete(id);
+el("cvx-bc-count").textContent=selected.size.toLocaleString("pt-BR")+" destinatários selecionados";
+if(selected.size){const n=el("cvx-bgt-people");n.value=String(selected.size);n.dispatchEvent(new Event("input",{bubbles:true}))}
+preview();
+}
+function render(){
+const list=el("cvx-bc-list");if(!list)return;list.replaceChildren();
+pool=crmLeads().filter(l=>lid(l));const currentSlot=el("cvx-bc-line").value;
+const lineSelect=el("cvx-bc-line");lineSelect.replaceChildren();
+function option(value,caption){const o=document.createElement("option");o.value=value;o.textContent=caption;lineSelect.append(o)}
+option("","Todas as linhas (planejamento)");
+const qr=crmLines().filter(l=>l?.mode==="qr");
+qr.forEach(l=>option(String(l.slot),"WhatsApp "+l.slot+" · "+String(l.name||"QR").slice(0,60)));
+if([...lineSelect.options].some(o=>o.value===currentSlot))lineSelect.value=currentSlot;
+const q=el("cvx-bc-search").value.trim().toLowerCase(),s=Number(lineSelect.value);
+const found=pool.filter(l=>(!s||!slot(l)||slot(l)===s)&&(!q||(name(l)+" "+stage(l)).toLowerCase().includes(q)));
+shown=found.slice(0,150);
+for(const lead of shown){
+const row=document.createElement("label");row.className="cvx-contact-row";
+const input=document.createElement("input");input.type="checkbox";input.checked=selected.has(lid(lead));input.setAttribute("aria-label","Selecionar "+name(lead));
+const title=document.createElement("span");title.textContent=name(lead);
+const info=document.createElement("small");info.textContent=" · "+(stage(lead)||"sem classificação");info.style.color="#68808e";title.append(info);
+row.append(input,title);input.addEventListener("change",()=>{if(input.checked)selected.add(lid(lead));else selected.delete(lid(lead));syncCount()});
+list.append(row);
+}
+if(!shown.length){const p=document.createElement("p");p.style.padding="12px";p.textContent="Nenhum contato disponível nesta sessão; utilize a quantidade manual acima.";list.append(p)}
+el("cvx-bc-status").textContent=found.length+" encontrados · "+shown.length+" exibidos por vez. "+qr.length+" linhas QR cadastradas. Somente prévia.";
+syncCount();
+}
+function install(){
+if(el(ID))return true;
+const help=el("cvx-bgt-help");if(!help)return false;
+const style=document.createElement("style");style.textContent=css;style.id=ID+"-css";document.head.append(style);
+const details=document.createElement("details");details.id=ID;details.innerHTML=layout;help.before(details);
+el("cvx-bc-refresh").addEventListener("click",render);
+el("cvx-bc-line").addEventListener("change",render);
+el("cvx-bc-search").addEventListener("input",render);
+el("cvx-bc-select-all").addEventListener("click",()=>{shown.forEach(l=>selected.add(lid(l)));render()});
+el("cvx-bc-clear").addEventListener("click",()=>{selected.clear();render();const n=el("cvx-bgt-people");n.value="0";n.dispatchEvent(new Event("input",{bubbles:true}))});
+el("cvx-bc-msg").addEventListener("input",preview);
+details.addEventListener("toggle",()=>{if(details.open)render()});
+return true;
+}
+function start(){if(install())return;const mo=new MutationObserver(()=>{if(install())mo.disconnect()});mo.observe(document.body,{childList:true,subtree:true})}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+})();
