@@ -202,7 +202,7 @@ const html=[
 '<h3>Fila assistida de mensagens QR</h3>',
 '<p>Prepare contatos autorizados e abra cada conversa no CRM. <strong>O envio só acontece quando você clicar em Enviar na Caixa de entrada.</strong></p>',
 '<label>WhatsApp QR usado na preparação<select id="cvx-qa-line"></select></label>',
-'<div class="cvx-qa-btns"><button id="cvx-qa-build" type="button">Validar contatos selecionados</button><button id="cvx-qa-next" type="button" disabled>Preparar próximo atendimento</button><button id="cvx-qa-reset" type="button">Limpar fila</button></div>',
+'<div class="cvx-qa-btns"><button id="cvx-qa-build" type="button">Validar contatos selecionados</button><button id="cvx-qa-next" type="button" disabled>Preparar próximo atendimento</button><button id="cvx-qa-send" type="button" disabled>Enviar próximos 10 (QR)</button><button id="cvx-qa-stop" type="button" disabled>Parar próximos envios</button><button id="cvx-qa-reset" type="button">Limpar fila</button></div>',
 '<div id="cvx-qa-summary" role="status" aria-live="polite">Selecione contatos acima, confirme o consentimento registrado e valide a fila.</div>',
 '<div class="cvx-qa-list" id="cvx-qa-list"></div>',
 '<p class="cvx-qa-warning">A marcação de consentimento no cadastro deve corresponder a uma autorização real e comprovável. Contatos sem essa marcação, com pedido de descadastro, telefone inválido ou linha diferente não entram. Abrir uma conversa não significa mensagem enviada ou entregue.</p>'
@@ -234,7 +234,8 @@ const leadName=l=>String(l?.name||l?.nome||"Contato").slice(0,90);
 const leadLine=l=>Number(l?.line||l?.slot||0);
 const crmLines=()=>{try{return typeof lines!=="undefined"&&Array.isArray(lines)?lines:[]}catch{return []}};
 const crmLeads=()=>{try{return typeof leads!=="undefined"&&Array.isArray(leads)?leads:[]}catch{return []}};
-let queue=[],position=0;
+let queue=[],position=0,sending=false,stopRequested=false;
+const attemptedIds=new Set();
 function linePicker(){
  const sel=get("cvx-qa-line"),old=sel.value;
  sel.replaceChildren();const o=document.createElement("option");o.value="";o.textContent="Selecione uma linha QR";sel.append(o);
@@ -248,12 +249,14 @@ function render(){
  for(let i=0;i<Math.min(queue.length,150);i++){
   const q=queue[i],row=document.createElement("div");row.className="cvx-qa-row";
   const label=document.createElement("span");label.textContent=(i+1)+". "+q.name;
-  const right=document.createElement("span");right.textContent=i<position?"Aberto":i===position?"Próximo":"Aguardando";row.append(label,right);holder.append(row);
+  const right=document.createElement("span");right.textContent=q.deliveryStatus==="accepted"?"Aceita para envio":q.deliveryStatus==="uncertain"?"Resultado incerto":i<position?"Aberto":i===position?"Próximo":"Aguardando";row.append(label,right);holder.append(row);
  }
  get("cvx-qa-next").disabled=position>=queue.length||queue.length===0;
+ get("cvx-qa-send").disabled=sending||!queue.some(q=>q.deliveryStatus==="pending");
+ get("cvx-qa-stop").disabled=!sending;
 }
 function msg(s){get("cvx-qa-summary").textContent=s}
-function reset(){queue=[];position=0;render();msg("Fila limpa. Nenhum contato ou mensagem do CRM foi alterado.")}
+function reset(){if(sending){msg("Envio em andamento. Use Parar próximos envios antes de limpar.");return}queue=[];position=0;render();msg("Fila limpa. Registros existentes preservados; mensagens já aceitas pelo servidor não podem ser desfeitas.")}
 function build(){
  queue=[];position=0;
  const sid=Number(get("cvx-qa-line").value);
@@ -269,7 +272,8 @@ function build(){
   if(leadLine(l)!==sid){wrongLine++;continue}
   const p=phone(l);if(!/^\d{10,15}$/.test(p)){badPhone++;continue}
   if(used.has(p)){duplicates++;continue}
-  used.add(p);queue.push({id:leadId(l),name:leadName(l),phone:p});
+  if(attemptedIds.has(leadId(l)))continue;
+  used.add(p);queue.push({id:leadId(l),name:leadName(l),phone:p,deliveryStatus:"pending"});
   if(queue.length>=150)break;
  }
  render();
@@ -295,6 +299,72 @@ async function next(){
   msg("Mensagem de "+q.name+" preparada no atendimento. Confira e clique no botão de envio do CRM. Nenhum envio foi iniciado pela fila. "+(queue.length-position)+" restantes.");
  }catch(e){msg("Não foi possível preparar esta conversa. Nada foi enviado pela fila.");}
 }
+
+async function sendBatch(){
+ if(sending)return;
+ const tasks=queue.filter(q=>q.deliveryStatus==="pending"&&!attemptedIds.has(q.id)).slice(0,10);
+ if(tasks.length===0){msg("Não há destinatários pendentes. Mensagens com resultado incerto não serão reenviadas automaticamente.");return}
+ const slot=Number(get("cvx-qa-line").value);
+ const line=crmLines().find(l=>Number(l.slot)===slot&&l.mode==="qr");
+ const template=get("cvx-bc-msg")?.value?.trim()||"";
+ if(!line||!template||template.length>4000){msg("Selecione a linha QR e informe uma mensagem com até 4.000 caracteres.");return}
+ if(typeof window.api!=="function"){msg("É necessário entrar na sua conta para usar a API autenticada do CRM.");return}
+ let current;
+ try{
+  const [session,remoteLines,remoteLeads]=await Promise.all([
+   window.api("/api/me"),window.api("/api/lines"),window.api("/api/leads")
+  ]);
+  if(!session?.user||!["trial","active"].includes(String(session?.company?.status||""))){msg("A sessão ou assinatura da empresa precisa estar ativa.");return}
+  const serverLine=(remoteLines?.items||[]).find(l=>Number(l.slot)===slot&&l.mode==="qr");
+  if(!serverLine){msg("A linha QR não está disponível nesta conta. Atualize as conexões.");return}
+  if(!Array.isArray(remoteLeads?.items)){msg("Não foi possível verificar os destinatários no servidor. Nenhuma mensagem enviada.");return}
+  current=new Map(remoteLeads.items.map(l=>[leadId(l),l]));
+  for(const q of tasks){
+   const l=current.get(q.id);
+   if(!l||!eligible(l)||leadLine(l)!==slot||phone(l)!==q.phone){
+    msg("A lista foi alterada ou algum contato perdeu autorização. Revalide a campanha; nada foi enviado.");return;
+   }
+  }
+ }catch(error){msg("Não foi possível validar a sessão e os destinatários. Nenhuma mensagem foi enviada.");return}
+ const estimated=get("cvx-bgt-rtotal")?.textContent||"Não calculado";
+ const confirmText="ENVIAR "+tasks.length;
+ const confirmation=window.prompt("COMVERXA — ENVIO REAL POR QR\n\n"+tasks.length+" mensagens para contatos com consentimento registrado, pela linha "+slot+".\nOrçamento exibido: "+estimated+".\n\nVocê confirma que tem autorização para contato e aceita os riscos operacionais do WhatsApp por QR? Digite "+confirmText+" para iniciar. Sem confirmação nada será enviado.");
+ if(confirmation!==confirmText){msg("Envio cancelado. Nenhuma mensagem foi disparada.");return}
+ sending=true;stopRequested=false;render();
+ let accepted=0,failed=0;
+ try{
+  for(const q of tasks){
+   if(stopRequested)break;
+   const currentLead=crmLeads().find(l=>leadId(l)===q.id);
+   if(!currentLead||!eligible(currentLead)||leadLine(currentLead)!==slot||phone(currentLead)!==q.phone){stopRequested=true;msg("Pausa de segurança: os dados ou a autorização do destinatário foram alterados.");break}
+   // Revalidate server opt-in/tenant-scoped lead before every attempted message.
+   let snapshot;
+   try{snapshot=await window.api("/api/leads")}catch{stopRequested=true;msg("Consulta de autorização falhou; envios futuros interrompidos.");break}
+   const remote=(snapshot?.items||[]).find(l=>leadId(l)===q.id);
+   if(!remote||!eligible(remote)||leadLine(remote)!==slot||phone(remote)!==q.phone){stopRequested=true;msg("Autorização ou linha do contato mudou. Envio interrompido.");break}
+   const message=template.replaceAll("{nome}",q.name);
+   attemptedIds.add(q.id);
+   q.deliveryStatus="uncertain";render();
+   try{
+    await window.api("/api/inbox/"+encodeURIComponent(q.id)+"/send","POST",{type:"text",message,template:""});
+    q.deliveryStatus="accepted";accepted++;render();
+    msg("Servidor confirmou "+accepted+" solicitações; não significa entrega no WhatsApp. "+(tasks.length-accepted)+" solicitações ainda não confirmadas neste lote.");
+   }catch{
+    failed++;stopRequested=true;render();
+    msg("O servidor não confirmou o envio. Resultado incerto: por segurança, a campanha foi interrompida. Verifique a conversa antes de tentar novamente.");
+    break;
+   }
+   if(!stopRequested&&tasks.indexOf(q)<tasks.length-1){
+    await new Promise(resolve=>setTimeout(resolve,2200));
+   }
+  }
+ }finally{
+  sending=false;render();
+  if(!failed&&!stopRequested)msg("Lote concluído: "+accepted+" mensagens aceitas pelo servidor para processamento; entrega e leitura precisam ser conferidas nas conversas. Não houve débito de saldo pelo simulador.");
+  if(stopRequested&&!failed)msg("Envio interrompido pelo operador ou por validação de segurança. "+accepted+" solicitações foram aceitas pelo servidor. Confira as conversas antes de continuar.");
+ }
+}
+
 function start(){
  if(get(ID))return;
  const parent=get("cvx-budget-contacts"),after=get("cvx-bc-preview");
@@ -306,6 +376,8 @@ function start(){
  get("cvx-qa-build").addEventListener("click",build);
  get("cvx-qa-next").addEventListener("click",next);
  get("cvx-qa-reset").addEventListener("click",reset);
+ get("cvx-qa-send").addEventListener("click",sendBatch);
+ get("cvx-qa-stop").addEventListener("click",()=>{stopRequested=true;msg("Pausa solicitada. A mensagem atualmente em trânsito pode ser concluída; não serão iniciados novos destinatários.")});
  linePicker();render();return true;
 }
 function boot(){if(start())return;const observer=new MutationObserver(()=>{if(start())observer.disconnect()});observer.observe(document.body,{childList:true,subtree:true})}
