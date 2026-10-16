@@ -230,13 +230,13 @@ const phone=l=>String(l?.phone||l?.telefone||l?.whatsapp||"").replace(/\D/g,"");
 const leadId=l=>l?.id===undefined||l?.id===null?"":String(l.id);
 const leadName=l=>String(l?.name||l?.nome||"Contato").slice(0,90);
 const leadLine=l=>Number(l?.line||l?.slot||0);
-const lines=()=>{try{return typeof window.lines!=="undefined"&&Array.isArray(window.lines)?window.lines:typeof globalThis.lines!=="undefined"&&Array.isArray(globalThis.lines)?globalThis.lines:[]}catch{return []}};
-const leads=()=>{try{return typeof window.leads!=="undefined"&&Array.isArray(window.leads)?window.leads:typeof globalThis.leads!=="undefined"&&Array.isArray(globalThis.leads)?globalThis.leads:[]}catch{return []}};
+const crmLines=()=>{try{return typeof lines!=="undefined"&&Array.isArray(lines)?lines:[]}catch{return []}};
+const crmLeads=()=>{try{return typeof leads!=="undefined"&&Array.isArray(leads)?leads:[]}catch{return []}};
 let queue=[],position=0;
 function linePicker(){
  const sel=get("cvx-qa-line"),old=sel.value;
  sel.replaceChildren();const o=document.createElement("option");o.value="";o.textContent="Selecione uma linha QR";sel.append(o);
- for(const l of lines().filter(x=>x?.mode==="qr")){
+ for(const l of crmLines().filter(x=>x?.mode==="qr")){
   const item=document.createElement("option");item.value=String(l.slot);item.textContent="WhatsApp "+l.slot+" · "+String(l.name||"QR").slice(0,55);sel.append(item);
  }
  if([...sel.options].some(x=>x.value===old))sel.value=old;
@@ -255,12 +255,12 @@ function reset(){queue=[];position=0;render();msg("Fila limpa. Nenhum contato ou
 function build(){
  queue=[];position=0;
  const sid=Number(get("cvx-qa-line").value);
- const qr=lines().find(l=>Number(l.slot)===sid&&l.mode==="qr");
+ const qr=crmLines().find(l=>Number(l.slot)===sid&&l.mode==="qr");
  if(!qr){render();msg("Selecione uma linha configurada em modo QR antes de preparar.");return}
  const fields=Array.from(document.querySelectorAll("#cvx-bc-list input[type=checkbox]:checked"));
  const ids=new Set(fields.map(i=>i.closest("label")?.querySelector("input")?.getAttribute("data-lead-id")||i.value).filter(Boolean));
  // Browser leads are scoped to the signed-in CRM. Never infer consent from a selected checkbox.
- const used=new Set(),raw=leads();let noConsent=0,badPhone=0,wrongLine=0,duplicates=0;
+ const used=new Set(),raw=crmLeads();let noConsent=0,badPhone=0,wrongLine=0,duplicates=0;
  for(const l of raw){
   if(!ids.has(leadId(l)))continue;
   if(!eligible(l)){noConsent++;continue}
@@ -275,7 +275,7 @@ function build(){
 }
 async function next(){
  if(position>=queue.length)return;
- const q=queue[position],raw=leads().find(l=>leadId(l)===q.id),sid=Number(get("cvx-qa-line").value);
+ const q=queue[position],raw=crmLeads().find(l=>leadId(l)===q.id),sid=Number(get("cvx-qa-line").value);
  if(!raw||!eligible(raw)||leadLine(raw)!==sid||phone(raw)!==q.phone){msg("Cadastro ou autorização mudou. Revalide a fila antes de continuar.");reset();return}
  const body=get("cvx-bc-msg")?.value?.trim()||"";
  if(!body){msg("Digite a mensagem na prévia antes de abrir o atendimento.");return}
