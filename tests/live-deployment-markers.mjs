@@ -16,6 +16,7 @@ const flags={
  senderMenu:html.includes("Disparador em massa (WhatsApp QR)"),
  channelMismatchGuard:html.includes('get("cvx-bgt-channel")?.value!=="qr"'),
  sessionPhoneDedup:html.includes("attemptedPhones.add(q.phone)"),
+ productionOptinField:html.includes("const x=l?.optin??l?.consent??l?.opt_in??l?.marketing_consent;"),
  inFlightQueueLock:html.includes('get("cvx-qa-build").disabled=sending'),
  privacyAndSecurity:UI_contains(html)
 };
