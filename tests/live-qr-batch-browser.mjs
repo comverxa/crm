@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import {chromium} from "playwright-core";
 const target="https://app.comverxa.com.br/";
-.test(code),"Modulo nao deve fazer chamadas diretas ao fornecedor: utilizar apenas API autenticada existente.");
 const browser=await chromium.launch({headless:true,executablePath:"/usr/bin/google-chrome",args:["--no-sandbox"]});
 try{
  const page=await browser.newPage({viewport:{width:1365,height:830}});
