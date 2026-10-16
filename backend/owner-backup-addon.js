@@ -24,7 +24,7 @@ function ownerBackupResponse(message,status){
   return new Response(message,{status,headers:{...backupNoCache,"Content-Type":"text/plain; charset=utf-8"}});
 }
 function matchToken(request){
-  const raw=(request.headers.get("cookie")||"").match(/(?:^|;\\s*)__Host-cvx-backup=([a-f0-9]{48})(?:;|$)/)?.[1];
+  const raw=(request.headers.get("cookie")||"").match(/(?:^|;\s*)__Host-cvx-backup=([a-f0-9]{48})(?:;|$)/)?.[1];
   const sent=request.headers.get("x-cvx-backup-token")||"";
   return !!raw && /^[a-f0-9]{48}$/.test(sent) &&
     timingSafeEqual(Buffer.from(raw,"hex"),Buffer.from(sent,"hex"));
@@ -77,7 +77,7 @@ Bun.serve=function cvxBackupServe(cfg) {
     if(!integrity||Object.values(integrity)[0]!=="ok")throw Error("integrity check");
     output.close();output=undefined;
     const data=readFileSync(snapshot);
-    if(data.subarray(0,16).toString("latin1")!=="SQLite format 3\\0")throw Error("invalid sqlite header");
+    if(data.subarray(0,16).toString("latin1")!=="SQLite format 3\0")throw Error("invalid sqlite header");
     const name="COMVERXA-"+kind+"-"+new Date().toISOString().slice(0,10)+".sqlite";
     return new Response(data,{status:200,headers:{...backupNoCache,
       "Content-Type":"application/vnd.sqlite3","Content-Disposition":'attachment; filename="'+name+'"',
