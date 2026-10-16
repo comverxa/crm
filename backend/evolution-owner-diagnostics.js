@@ -6,7 +6,7 @@
 const cvxDiagPreviousServe=Bun.serve;
 const cvxDiagNoStore={"Cache-Control":"no-store, private","X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY"};
 const cvxDiagJson=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{...cvxDiagNoStore,"Content-Type":"application/json; charset=utf-8"}});
-const cvxDiagSafeName=value=>String(value||"").replace(/[<>\\u0000-\\u001f]/g,"").slice(0,70);
+const cvxDiagSafeName=value=>String(value||"").split("").filter(ch=>ch.charCodeAt(0)>=32&&ch!=="<"&&ch!==">").join("").slice(0,70);
 const cvxDiagState=x=>{
  const val=String(x?.connectionStatus?.state||x?.connectionStatus||x?.instance?.state||
    x?.instance?.connectionStatus?.state||x?.status||x?.state||"unknown").toLowerCase();
