@@ -238,10 +238,67 @@ if(typeof existingRenderLines==="function"){
  };
 }
 
+
+/* Inbox QR diagnostics: only authenticated GET, no webhook reconfiguration,
+   QR generation, contact mutation or sending messages. */
+const CVX_SYNC_CARD="cvx-qr-sync-diagnostics";
+let cvxSyncBusy=false;
+let cvxSyncLastSelected=null;
+function cvxSyncSelected(){
+ const {thread,line,slot}=current();
+ return {thread,line,slot,isQr:line?.mode==="qr"};
+}
+function cvxSyncCard(){
+ const parent=byId("inbox"),messages=byId("chatMessages");
+ if(!parent||!messages)return null;
+ let root=byId(CVX_SYNC_CARD);
+ if(!root){
+  root=document.createElement("section");root.id=CVX_SYNC_CARD;
+  root.style.cssText="margin:12px 0;padding:13px 15px;border:1px solid #c9e0e6;border-radius:12px;background:#f0f8fa;color:#1c4254;font:13px/1.45 system-ui,sans-serif";
+  const head=document.createElement("div");head.style.cssText="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px";
+  const title=document.createElement("strong");title.textContent="Diagnóstico da sincronização WhatsApp QR";
+  const button=document.createElement("button");button.type="button";button.id="cvx-qr-sync-check";button.textContent="Verificar histórico e conexão";button.className="secondary";
+  button.addEventListener("click",()=>{void cvxSyncInspect()});
+  const status=document.createElement("div");status.id="cvx-qr-sync-state";status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.style.cssText="margin-top:8px;color:#365d6c";
+  head.append(title,button);root.append(head,status);messages.after(root);
+ }
+ const state=cvxSyncSelected();
+ root.hidden=!state.isQr||!state.thread;
+ if(!root.hidden&&state.thread.id!==cvxSyncLastSelected){
+  cvxSyncLastSelected=state.thread.id;
+  byId("cvx-qr-sync-state").textContent="Esta tela mostra apenas mensagens gravadas no CRM. Conexão QR não garante sincronização. Use Verificar histórico e conexão para conferir.";
+ }
+ return root;
+}
+async function cvxSyncInspect(){
+ const card=cvxSyncCard(),state=cvxSyncSelected();
+ if(cvxSyncBusy||!card||card.hidden||!state.thread||!state.isQr)return;
+ if(typeof window.api!=="function"){byId("cvx-qr-sync-state").textContent="Entre no CRM para consultar o histórico.";return}
+ const btn=byId("cvx-qr-sync-check"),text=byId("cvx-qr-sync-state");
+ cvxSyncBusy=true;btn.disabled=true;text.textContent="Consultando a linha e as mensagens gravadas, sem enviar nada...";
+ const id=String(state.thread.id),slot=String(state.slot);
+ try{
+  const [connection,history]=await Promise.all([
+   window.api("/api/lines/"+encodeURIComponent(slot)+"/qr/status"),
+   window.api("/api/inbox/"+encodeURIComponent(id)+"/messages")
+  ]);
+  const now=cvxSyncSelected();if(!now.thread||String(now.thread.id)!==id||String(now.slot)!==slot)return;
+  if(!history||!Array.isArray(history.items))throw Error("Histórico não foi retornado no formato esperado");
+  const count=history.items.length;
+  if(connection?.connected!==true)text.textContent="Conexão QR não confirmada. Abra WhatsApp sem API e consulte o status da linha. Nenhum contato foi alterado.";
+  else if(count>0)text.textContent="Linha QR conectada; "+count+" mensagem(ns) encontrada(s) no histórico deste contato. Use Atualizar mensagens se a tela estiver desatualizada.";
+  else text.textContent="Linha QR conectada, mas o CRM retornou 0 mensagens gravadas para esta conversa. É necessário verificar no servidor se o webhook recebe eventos de mensagem e associa o remetente ao lead/linha corretos. Não gere novo QR.";
+ }catch(error){
+  text.textContent="Não foi possível confirmar o histórico pelo CRM. A consulta falhou ou o servidor não retornou dados válidos; não conclua que mensagens foram perdidas.";
+ }finally{cvxSyncBusy=false;btn.disabled=false}
+}
+function cvxSyncOnThread(){cvxSyncCard()}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",cvxSyncOnThread,{once:true});else cvxSyncOnThread();
+
 const oldOpen=window.openThread;
-if(typeof oldOpen==="function")window.openThread=async function(...args){const r=await oldOpen.apply(this,args);sync();return r};
+if(typeof oldOpen==="function")window.openThread=async function(...args){const r=await oldOpen.apply(this,args);sync();cvxSyncOnThread();return r};
 const oldRender=window.renderInbox;
-if(typeof oldRender==="function")window.renderInbox=async function(...args){const r=await oldRender.apply(this,args);sync();return r};
+if(typeof oldRender==="function")window.renderInbox=async function(...args){const r=await oldRender.apply(this,args);sync();cvxSyncOnThread();return r};
 const oldSend=window.sendReply;
 if(typeof oldSend==="function")window.sendReply=async function(type){
  const {thread,line}=current();
@@ -252,5 +309,5 @@ if(typeof oldSend==="function")window.sendReply=async function(type){
  return oldSend.call(this,type);
 };
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",sync,{once:true});else sync();
-new MutationObserver(()=>sync()).observe(byId("chatHeader")||document.body,{childList:true,subtree:false});
+new MutationObserver(()=>{sync();cvxSyncOnThread()}).observe(byId("chatHeader")||document.body,{childList:true,subtree:false});
 })();
