@@ -18,4 +18,4 @@ const flags={
 function UI_contains(x){return x.includes("comverxa-premium-v2")&&x.includes("cvx-inbox-channel-patch")}
 for(const [name,value] of Object.entries(flags))console.log("MARKER "+name+" "+(value?"PRESENT":"ABSENT"));
 console.log("READ_ONLY: arquivo HTML público, sem sessão, mensagens, números ou credenciais.");
-if(!flags.whatsappQrCorrection||!flags.massBudgetEstimator||!flags.assistedQueue||!flags.privacyAndSecurity)process.exitCode=1;
+if(!Object.values(flags).every(Boolean))process.exitCode=1;
