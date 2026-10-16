@@ -1,0 +1,26 @@
+name: COMVERXA - Porta de liberacao comercial
+on:
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: "Exigir homologação comercial integral (falha até evidências P0)"
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - tests/commercial-release-gate.mjs
+      - .github/workflows/commercial-release-gate.yml
+jobs:
+  public-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar serviços e proteção pública sem alterar dados
+        run: node tests/commercial-release-gate.mjs
+      - name: Veredicto rigoroso (só manual e explicitamente solicitado)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.strict }}
+        run: node tests/commercial-release-gate.mjs --strict
