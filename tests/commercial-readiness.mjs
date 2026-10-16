@@ -35,6 +35,27 @@ if(publicPage.status===200){
  ["Preço não informado como valor fixo",/sob consulta/i]
  ])log(expression.test(html)?"PASS":"FAIL","Conteúdo comercial: "+item);
 }
+// Verificações de lançamento assistido: somente leitura, nunca testar envio com clientes reais.
+const crmPage=await get(base+"/");
+if(crmPage.status===200){
+ const crmHtml=await crmPage.text();
+ for(const [name,needle] of [
+  ["CRM premium publicado",'id="comverxa-premium-v2"'],
+  ["Orçamento QR publicado","cvx-disparo-orcamento"],
+  ["Fila assistida com consentimento","__cvxQrAssistedQueueInstalled"],
+  ["WhatsApp por canal autenticado","/api/inbox/"]
+ ]) log(crmHtml.includes(needle)?"PASS":"FAIL","Produção: "+name);
+}else log("FAIL","Página CRM indisponível para verificação",crmPage.status);
+for(const [name,path] of [
+ ["Portal de clientes","acesso.html"],
+ ["Termos públicos","termos.html"],
+ ["Política pública","privacidade.html"]
+])await expect("Lançamento: "+name,marketing+path,[200]);
+for(const [name,path] of [
+ ["Contatos CRM protegidos","/api/leads"],
+ ["Caixa de entrada protegida","/api/inbox"],
+ ["Canais WhatsApp protegidos","/api/lines"]
+])await expect("Autenticação: "+name,base+path,[401,403,404]);
 const csp=health?.headers.get("content-security-policy");
 if(!csp)log("WARN","Healthcheck não divulga Content-Security-Policy (confirmar nos documentos HTML)");
 const app=await get(base+"/admin");
