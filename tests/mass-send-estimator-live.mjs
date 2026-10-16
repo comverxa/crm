@@ -122,7 +122,9 @@ try{
  await page.locator("#cvx-qa-next").click();
  const opened=await page.evaluate(()=>window.__qaOpenCalls);
  assert.deepEqual(opened,[960001]);
- assert.match(await page.locator("#replyText").inputValue(),/Olá, Contato QA Um! Mensagem de teste\\.\\nVer proposta: https:\\/\\/exemplo\\.com\\.br\\/proposta/);
+ const prepared=await page.locator("#replyText").inputValue();
+ assert.ok(prepared.startsWith("Olá, Contato QA Um! Mensagem de teste."));
+ assert.ok(prepared.includes("Ver proposta: https://exemplo.com.br/proposta"));
  assert.match(await page.locator("#cvx-qa-summary").innerText(),/sem envio/);
  await page.locator("#cvx-qa-next").click();
  assert.deepEqual(await page.evaluate(()=>window.__qaOpenCalls),[960001,960002],"Lead sem opt-in pode preparar atendimento individual");
