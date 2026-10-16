@@ -7,6 +7,8 @@ const checks=[
  ["CRM online",base+"/healthz",[200],"health"],
  ["Página inicial acessível",base+"/",[200]],
  ["Backup ADM exige login",base+"/admin/backup",[401]],
+ ["Diagnóstico WhatsApp ADM exige login",base+"/admin/whatsapp-health",[401]],
+ ["Estado da Evolution exige ADM",base+"/api/master/whatsapp-health",[401]],
  ["Área master publicada",base+"/admin",[200]],
  ["Informações master exigem login",base+"/api/master/me",[401,403]]
 ];
