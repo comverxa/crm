@@ -17,6 +17,9 @@ const flags={
  channelMismatchGuard:html.includes('get("cvx-bgt-channel")?.value!=="qr"'),
  sessionPhoneDedup:html.includes("attemptedPhones.add(q.phone)"),
  productionOptinField:html.includes("const x=l?.optin??l?.consent??l?.opt_in??l?.marketing_consent;"),
+ consentReviewButton:html.includes("Revisar autorização de "),
+ consentReviewEditor:html.includes("window.editLead(Number(lid(lead)))"),
+ consentSafety:html.includes("window.__cvxQrConsentEligible=eligible"),
  inFlightQueueLock:html.includes('get("cvx-qa-build").disabled=sending'),
  privacyAndSecurity:UI_contains(html)
 };
