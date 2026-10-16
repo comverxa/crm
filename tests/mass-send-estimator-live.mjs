@@ -29,5 +29,32 @@ try{
  await page.keyboard.press("Escape");
  assert.equal(await page.locator("#cvx-bgt-rpeople").count(),1);
  assert.equal(await page.locator(".cvx-bgt-back").isHidden(),true);
+ // Contatos ficticios apenas no navegador sem autenticacao, nunca no backend.
+ await page.evaluate(()=>{
+  if(!Array.isArray(leads)||!Array.isArray(lines))throw new Error("CRM session arrays unavailable");
+  leads.push({id:960001,name:"Contato QA Um",stage:"novo",line:2});
+  leads.push({id:960002,name:"Contato QA Dois",stage:"proposta",line:2});
+  lines.push({slot:2,name:"Linha QA QR",mode:"qr"});
+ });
+ await page.locator("#app .cvx-bgt-launch").first().click();
+ await page.locator("#cvx-budget-contacts").waitFor({state:"attached",timeout:8000});
+ await page.locator("#cvx-budget-contacts > summary").click();
+ await page.locator("#cvx-bc-line").selectOption("2");
+ assert.equal(await page.locator("#cvx-bc-list .cvx-contact-row").count(),2);
+ await page.locator("#cvx-bc-list input[type='checkbox']").first().check();
+ assert.equal(await page.locator("#cvx-bgt-people").inputValue(),"1");
+ await page.locator("#cvx-bc-list input[type='checkbox']").nth(1).check();
+ assert.equal(await page.locator("#cvx-bgt-people").inputValue(),"2");
+ await page.locator("#cvx-bgt-channel").selectOption("qr");
+ await page.locator("#cvx-bgt-rate").fill("0,50");
+ await page.locator("#cvx-bgt-fixed").fill("0");
+ await page.locator("#cvx-bgt-balance").fill("0");
+ assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 1,00");
+ await page.locator("#cvx-bc-msg").fill("Olá, {nome}!");
+ assert.equal(await page.locator("#cvx-bc-preview").innerText(),"Olá, Contato QA Um!");
+ await page.locator("#cvx-bc-clear").click();
+ assert.equal(await page.locator("#cvx-bgt-people").inputValue(),"0");
+ assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 0,00");
+
  console.log("PASS: modal/QR/Meta, 50 destinatarios, 0/10/15/21.09 BRL, saldo 3, Escape. Sem uso de contas reais.");
 }finally{await browser.close();}
