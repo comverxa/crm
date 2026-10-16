@@ -11,6 +11,9 @@ try{
  const productionHtml=await response.text();
  assert.ok(productionHtml.includes("cvx-wa-connection-hub-v1"),"Central de conexão WhatsApp QR/Meta não foi publicada");
  assert.ok(productionHtml.includes("async function cvxQrStatusAutoRefresh()"),"Consulta automática real do estado QR não publicada");
+ assert.ok(productionHtml.includes("cvx-qr-sync-diagnostics"),"Diagnóstico de recebimento não publicado na página do CRM");
+ assert.ok(productionHtml.includes("cvxQrPollEveryMs=20000"),"Atualização periódica do histórico QR não publicada");
+
  await page.locator(".cvx-wa-launch").first().waitFor({state:"attached",timeout:9000});
 
  await page.evaluate(()=>{
