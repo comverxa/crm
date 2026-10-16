@@ -45,6 +45,11 @@ try{
  assert.equal(await page.locator("#cvx-bgt-kind-label").isVisible(),true);
  assert.equal(await page.locator("#cvx-bgt-rate").inputValue(),"0,3217");
  assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 21,09");
+ await page.locator("#cvx-cmp-example").click();
+ assert.equal(await page.locator("#cvx-bgt-channel").inputValue(),"business");
+ assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 18,31","Screenshot reference total should match illustrated paid business broadcast");
+ assert.equal(await page.locator("#cvx-cmp-need").innerText(),"R$ 17,77");
+ await page.locator("#cvx-bgt-tax").fill("0");
  await page.keyboard.press("Escape");
  assert.equal(await page.locator("#cvx-bgt-rpeople").count(),1);
  assert.equal(await page.locator(".cvx-bgt-back").isHidden(),true);
@@ -155,6 +160,10 @@ try{
  await page.locator("#cvx-qa-send").click();
  assert.match(await page.locator("#cvx-qa-summary").innerText(),/selecione WhatsApp por QR/);
  assert.equal(await page.evaluate(()=>window.__qaSendRequests.length),0,"Mode mismatch cannot send");
+ await page.locator("#cvx-bgt-channel").selectOption("business");
+ await page.locator("#cvx-qa-send").click();
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/selecione WhatsApp por QR/);
+ assert.equal(await page.evaluate(()=>window.__qaSendRequests.length),0,"Native WhatsApp app planning must never send through QR API");
  await page.locator("#cvx-bgt-channel").selectOption("qr");
  await page.locator("#cvx-qa-send").click();
  await page.waitForFunction(()=>window.__qaSendRequests?.length===1,{timeout:12000});
