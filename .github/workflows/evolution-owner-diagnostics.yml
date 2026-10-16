@@ -1,0 +1,22 @@
+name: COMVERXA - Diagnostico seguro WhatsApp QA
+on:
+  push:
+    paths:
+      - backend/evolution-owner-diagnostics.js
+      - tests/evolution-owner-diagnostics.test.mjs
+      - .github/workflows/evolution-owner-diagnostics.yml
+  pull_request:
+    paths:
+      - backend/evolution-owner-diagnostics.js
+      - tests/evolution-owner-diagnostics.test.mjs
+      - .github/workflows/evolution-owner-diagnostics.yml
+  workflow_dispatch:
+jobs:
+  safe-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Testar diagnósticos sem tokens e sem disparos
+        run: bun tests/evolution-owner-diagnostics.test.mjs
