@@ -8,6 +8,10 @@ try{
  const response=await page.goto("https://app.comverxa.com.br/",{waitUntil:"domcontentloaded",timeout:30000});
  assert.equal(response.status(),200,"CRM real must load");
  assert.equal(await page.locator("#cvx-inbox-channel-patch").count(),1,"Channel-aware script absent in real production");
+ const productionHtml=await response.text();
+ assert.ok(productionHtml.includes("cvx-wa-connection-hub-v1"),"Central de conexão WhatsApp QR/Meta não foi publicada");
+ await page.locator(".cvx-wa-launch").first().waitFor({state:"attached",timeout:9000});
+
  await page.evaluate(()=>{
    document.querySelector("#marketing")?.classList.add("hide");
    document.querySelector("#app")?.classList.remove("hide");
