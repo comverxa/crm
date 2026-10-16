@@ -138,7 +138,7 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 "use strict";
 if(window.__cvxBudgetContactsInstalled)return;window.__cvxBudgetContactsInstalled=true;
 const ID="cvx-budget-contacts",el=id=>document.getElementById(id);
-const css="#cvx-budget-contacts{margin:16px 0;padding:16px;background:#f5fafb;border:1px solid #d4e4ea;border-radius:14px;color:#24475c;font:14px/1.5 system-ui,sans-serif}\n#cvx-budget-contacts summary{font-weight:850;cursor:pointer;font-size:16px}\n#cvx-budget-contacts label.cvx-contact-row{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px;border-bottom:1px solid #e2ecf0;cursor:pointer}\n#cvx-budget-contacts .cvx-contact-row input{width:18px;min-height:18px;height:18px;flex:0 0 18px}\n#cvx-budget-contacts input:not([type=checkbox]),#cvx-budget-contacts select,#cvx-budget-contacts textarea{width:100%;box-sizing:border-box;min-height:41px;border:1px solid #b7cfda;border-radius:9px;background:white;padding:9px;font:inherit;color:#19394c}\n#cvx-budget-contacts textarea{min-height:72px;resize:vertical}\n#cvx-budget-contacts button{padding:9px 12px;border:1px solid #a9c6cc;background:#fff;color:#19655c;border-radius:9px;cursor:pointer;font-weight:700}\n#cvx-budget-contacts button:focus-visible,#cvx-budget-contacts input:focus-visible,#cvx-budget-contacts select:focus-visible{outline:3px solid #17ad92}\n#cvx-budget-contacts .cvx-contact-list{background:white;max-height:210px;overflow:auto;border:1px solid #d2e4eb;border-radius:9px;margin:8px 0}\n#cvx-budget-contacts .cvx-contacts-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}\n#cvx-budget-contacts .cvx-contact-stat{font-weight:800;color:#0e7869}\n#cvx-budget-contacts .cvx-contact-note{background:#fff7e3;border-left:3px solid #d6a64b;padding:9px;font-size:12px;margin-top:9px;color:#61512d}\n#cvx-budget-contacts .cvx-contact-preview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#e2f6f0;color:#155949}\n#cvx-budget-contacts .cvx-contact-muted{color:#6b8190;font-size:12px;margin:7px 0}\n#cvx-budget-contacts .cvx-contact-entry{display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2ecf0;flex-wrap:wrap}\n#cvx-budget-contacts .cvx-contact-entry .cvx-contact-row{flex:1 1 210px;border-bottom:0}\n#cvx-budget-contacts .cvx-review-optin{font-size:12px;min-height:34px;margin:4px 6px 4px 0}",layout="<summary>Escolher contatos do CRM e linha QR (orçamento)</summary><p class='cvx-contact-muted'>Seleção e orçamento não enviam mensagens. O comando de lote QR exige confirmação explícita e somente aceita contatos autorizados.</p><label>Linha WhatsApp por QR<select id='cvx-bc-line'><option value=''>Todas as linhas (planejamento)</option></select></label><label>Pesquisar contatos<input id='cvx-bc-search' type='search' placeholder='Nome ou classificação' autocomplete='off'></label><div class='cvx-contacts-actions'><button type='button' id='cvx-bc-refresh'>Atualizar</button><button type='button' id='cvx-bc-select-all'>Selecionar exibidos</button><button type='button' id='cvx-bc-clear'>Limpar</button></div><p class='cvx-contact-muted' id='cvx-bc-status' role='status'></p><div class='cvx-contact-list' id='cvx-bc-list'></div><p id='cvx-bc-count' class='cvx-contact-stat'>0 selecionados</p><p class='cvx-contact-note'>O cadastro no CRM não comprova consentimento para marketing. Confirme a autorização individual e respeite descadastros antes de qualquer envio. Nenhum disparo acontece aqui.</p><label>Mensagem da campanha (prévia)<textarea id='cvx-bc-msg' maxlength='5000' placeholder='Olá, {nome}! Posso enviar uma proposta?'></textarea></label><p id='cvx-bc-preview' class='cvx-contact-preview'>Digite a mensagem para visualizar.</p>";
+const css="#cvx-budget-contacts{margin:16px 0;padding:16px;background:#f5fafb;border:1px solid #d4e4ea;border-radius:14px;color:#24475c;font:14px/1.5 system-ui,sans-serif}\n#cvx-budget-contacts summary{font-weight:850;cursor:pointer;font-size:16px}\n#cvx-budget-contacts label.cvx-contact-row{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px;border-bottom:1px solid #e2ecf0;cursor:pointer}\n#cvx-budget-contacts .cvx-contact-row input{width:18px;min-height:18px;height:18px;flex:0 0 18px}\n#cvx-budget-contacts input:not([type=checkbox]),#cvx-budget-contacts select,#cvx-budget-contacts textarea{width:100%;box-sizing:border-box;min-height:41px;border:1px solid #b7cfda;border-radius:9px;background:white;padding:9px;font:inherit;color:#19394c}\n#cvx-budget-contacts textarea{min-height:72px;resize:vertical}\n#cvx-budget-contacts button{padding:9px 12px;border:1px solid #a9c6cc;background:#fff;color:#19655c;border-radius:9px;cursor:pointer;font-weight:700}\n#cvx-budget-contacts button:focus-visible,#cvx-budget-contacts input:focus-visible,#cvx-budget-contacts select:focus-visible{outline:3px solid #17ad92}\n#cvx-budget-contacts .cvx-contact-list{background:white;max-height:210px;overflow:auto;border:1px solid #d2e4eb;border-radius:9px;margin:8px 0}\n#cvx-budget-contacts .cvx-contacts-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}\n#cvx-budget-contacts .cvx-contact-stat{font-weight:800;color:#0e7869}\n#cvx-budget-contacts .cvx-contact-note{background:#fff7e3;border-left:3px solid #d6a64b;padding:9px;font-size:12px;margin-top:9px;color:#61512d}\n#cvx-budget-contacts .cvx-contact-preview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#e2f6f0;color:#155949}\n#cvx-budget-contacts .cvx-contact-muted{color:#6b8190;font-size:12px;margin:7px 0}\n#cvx-budget-contacts .cvx-contact-entry{display:flex;align-items:center;gap:8px;border-bottom:1px solid #e2ecf0;flex-wrap:wrap}\n#cvx-budget-contacts .cvx-contact-entry .cvx-contact-row{flex:1 1 210px;border-bottom:0}\n#cvx-budget-contacts .cvx-review-optin{font-size:12px;min-height:34px;margin:4px 6px 4px 0}",layout="<summary>Escolher contatos do CRM e linha QR</summary><p class='cvx-contact-muted'>Selecione qualquer contato para orçamento ou preparação de atendimento individual. Campanhas automáticas exigem autorização para mensagens pelo WhatsApp; não é necessário marcar consentimento para preparar uma conversa.</p><label>Linha WhatsApp por QR<select id='cvx-bc-line'><option value=''>Todas as linhas (planejamento)</option></select></label><label>Pesquisar contatos<input id='cvx-bc-search' type='search' placeholder='Nome ou classificação' autocomplete='off'></label><div class='cvx-contacts-actions'><button type='button' id='cvx-bc-refresh'>Atualizar</button><button type='button' id='cvx-bc-select-all'>Selecionar exibidos</button><button type='button' id='cvx-bc-clear'>Limpar</button></div><p class='cvx-contact-muted' id='cvx-bc-status' role='status'></p><div class='cvx-contact-list' id='cvx-bc-list'></div><p id='cvx-bc-count' class='cvx-contact-stat'>0 selecionados</p><p class='cvx-contact-note'>Seleção, simulação e preparação manual não exigem a caixa de consentimento. Para envios comerciais em lote, só entram contatos com autorização registrada. Pedidos de descadastro sempre são respeitados.</p><label>Mensagem da campanha (prévia)<textarea id='cvx-bc-msg' maxlength='5000' placeholder='Olá, {nome}! Posso enviar uma proposta?'></textarea></label><p id='cvx-bc-preview' class='cvx-contact-preview'>Digite a mensagem para visualizar.</p>";
 let shown=[],pool=[],selected=new Set();
 window.__cvxBudgetSelectionIds=()=>Array.from(selected);
 const lid=l=>l&&l.id!==undefined&&l.id!==null?String(l.id):"";
@@ -220,13 +220,13 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 if(window.__cvxQrAssistedQueueInstalled)return;window.__cvxQrAssistedQueueInstalled=true;
 const ID="cvx-qr-assist",get=id=>document.getElementById(id);
 const html=[
-'<h3>Fila assistida de mensagens QR</h3>',
-'<p>Valide contatos e escolha entre preparar atendimento individual ou solicitar envio de até 10 contatos autorizados. O lote só é executado após confirmação explícita e revalidação da sessão.</p>',
+'<h3>Atendimento individual e campanhas QR</h3>',
+'<p>Você pode preparar atendimentos individuais sem o campo de consentimento. O botão Enviar próximos 10 (QR) continua restrito a destinatários autorizados, com confirmação e revalidação.</p>',
 '<label>WhatsApp QR usado na preparação<select id="cvx-qa-line"></select></label>',
 '<div class="cvx-qa-btns"><button id="cvx-qa-build" type="button">Validar contatos selecionados</button><button id="cvx-qa-next" type="button" disabled>Preparar próximo atendimento</button><button id="cvx-qa-send" type="button" disabled>Enviar próximos 10 (QR)</button><button id="cvx-qa-stop" type="button" disabled>Parar próximos envios</button><button id="cvx-qa-reset" type="button">Limpar fila</button></div>',
-'<div id="cvx-qa-summary" role="status" aria-live="polite">Selecione contatos acima, confirme o consentimento registrado e valide a fila.</div><button id="cvx-qa-review" type="button" hidden>Revisar autorizações</button>',
+'<div id="cvx-qa-summary" role="status" aria-live="polite">Selecione contatos para preparar atendimentos. O sistema separa aqueles aptos para campanhas.</div><button id="cvx-qa-review" type="button" hidden>Revisar autorizações</button>',
 '<div class="cvx-qa-list" id="cvx-qa-list"></div>',
-'<p class="cvx-qa-warning">A marcação de consentimento no cadastro deve corresponder a uma autorização real e comprovável. Contatos sem essa marcação, com pedido de descadastro, telefone inválido ou linha diferente não entram. Abrir uma conversa não significa mensagem enviada ou entregue.</p>'
+'<p class="cvx-qa-warning">Preparar o atendimento apenas abre a conversa e preenche a mensagem, sem enviar. Para iniciar campanhas de marketing em lote, é necessária permissão válida para contato no WhatsApp. Pedidos de descadastro, linhas incorretas e números inválidos continuam bloqueados.</p>'
 ].join("");
 const css=[
 "#cvx-qr-assist{border:1px solid #d5e6e9;border-radius:13px;background:#fff;margin-top:15px;padding:15px;color:#1c4657;line-height:1.5}",
@@ -243,10 +243,10 @@ const css=[
 "#cvx-qr-assist .cvx-qa-warning{border-left:3px solid #cba043;background:#fffaec;padding:10px;font-size:12px;color:#6a562b}"
 ].join("\n");
 const explicitOptin=x=>x===true||x===1||(typeof x==="string"&&["true","1","sim","yes"].includes(x.trim().toLowerCase()));
+const optedOut=l=>explicitOptin(l?.opt_out)||explicitOptin(l?.unsubscribed)||explicitOptin(l?.do_not_contact);
 const eligible=l=>{
  const x=l?.optin??l?.consent??l?.opt_in??l?.marketing_consent;
- const no=explicitOptin(l?.opt_out)||explicitOptin(l?.unsubscribed)||explicitOptin(l?.do_not_contact);
- return explicitOptin(x)&&!no;
+ return explicitOptin(x)&&!optedOut(l);
 };
 window.__cvxQrConsentEligible=eligible;
 window.__cvxQrOptinTrue=explicitOptin;
@@ -271,12 +271,12 @@ function render(){
  for(let i=0;i<Math.min(queue.length,150);i++){
   const q=queue[i],row=document.createElement("div");row.className="cvx-qa-row";
   const label=document.createElement("span");label.textContent=(i+1)+". "+q.name;
-  const right=document.createElement("span");right.textContent=q.deliveryStatus==="accepted"?"Aceita para envio":q.deliveryStatus==="uncertain"?"Resultado incerto":i<position?"Aberto":i===position?"Próximo":"Aguardando";row.append(label,right);holder.append(row);
+  const right=document.createElement("span");right.textContent=q.deliveryStatus==="accepted"?"Aceita para envio":q.deliveryStatus==="uncertain"?"Resultado incerto":i<position?"Preparado":!q.canBatch?"Atendimento manual":i===position?"Próximo":"Apto para lote";row.append(label,right);holder.append(row);
  }
  get("cvx-qa-next").disabled=sending||position>=queue.length||queue.length===0;
  get("cvx-qa-build").disabled=sending;
  get("cvx-qa-line").disabled=sending;
- get("cvx-qa-send").disabled=sending||!queue.some(q=>q.deliveryStatus==="pending");
+ get("cvx-qa-send").disabled=sending||!queue.some(q=>q.canBatch&&q.deliveryStatus==="pending"&&!attemptedIds.has(q.id));
  get("cvx-qa-stop").disabled=!sending;
 }
 function msg(s){get("cvx-qa-summary").textContent=s}
@@ -290,26 +290,28 @@ function build(){
  const fields=Array.from(document.querySelectorAll("#cvx-bc-list input[type=checkbox]:checked"));
  const ids=new Set(typeof window.__cvxBudgetSelectionIds==="function"?window.__cvxBudgetSelectionIds():fields.map(i=>i.value).filter(Boolean));
  // Browser leads are scoped to the signed-in CRM. Never infer consent from a selected checkbox.
- const used=new Set(),raw=crmLeads();let noConsent=0,badPhone=0,wrongLine=0,duplicates=0;
+ const used=new Set(),raw=crmLeads();let noConsent=0,optouts=0,badPhone=0,wrongLine=0,duplicates=0;
  for(const l of raw){
   if(!ids.has(leadId(l)))continue;
-  if(!eligible(l)){noConsent++;continue}
+  if(optedOut(l)){optouts++;continue}
   if(leadLine(l)!==sid){wrongLine++;continue}
   const p=phone(l);if(!/^\d{10,15}$/.test(p)){badPhone++;continue}
   if(used.has(p)){duplicates++;continue}
   if(attemptedIds.has(leadId(l))||attemptedPhones.has(p)){duplicates++;continue}
-  used.add(p);queue.push({id:leadId(l),name:leadName(l),phone:p,deliveryStatus:"pending"});
+  const canBatch=eligible(l);
+  if(!canBatch)noConsent++;
+  used.add(p);queue.push({id:leadId(l),name:leadName(l),phone:p,canBatch,deliveryStatus:"pending"});
   if(queue.length>=150)break;
  }
  render();
  const review=get("cvx-qa-review");review.hidden=noConsent===0;review.textContent="Revisar autorização de "+noConsent+" contato(s)";
  const budget=get("cvx-bgt-people");if(budget){budget.value=String(queue.length);budget.dispatchEvent(new Event("input",{bubbles:true}))}
- msg(queue.length+" contatos aptos. Excluídos: "+noConsent+" sem autorização registrada, "+badPhone+" com telefone inválido, "+wrongLine+" fora da linha e "+duplicates+" duplicados. "+(noConsent?"Clique em Revisar autorização, confira o aceite real de cada destinatário, salve o cadastro e valide a fila novamente. ":"")+"Nenhum envio ocorreu nesta validação.");
+ msg(queue.length+" contatos para atendimento manual, "+queue.filter(q=>q.canBatch).length+" aptos para lote QR. "+noConsent+" sem autorização para campanha podem ser preparados individualmente, sem envio automático. Excluídos: "+optouts+" descadastrados, "+badPhone+" telefone(s) inválido(s), "+wrongLine+" fora da linha e "+duplicates+" duplicados. Nenhum envio ocorreu nesta validação.");
 }
 async function next(){
  if(position>=queue.length)return;
  const q=queue[position],raw=crmLeads().find(l=>leadId(l)===q.id),sid=Number(get("cvx-qa-line").value);
- if(!raw||!eligible(raw)||leadLine(raw)!==sid||phone(raw)!==q.phone){msg("Cadastro ou autorização mudou. Revalide a fila antes de continuar.");reset();return}
+ if(!raw||optedOut(raw)||leadLine(raw)!==sid||phone(raw)!==q.phone){msg("Cadastro ou descadastro mudou. Revalide a fila antes de continuar.");reset();return}
  const body=get("cvx-bc-msg")?.value?.trim()||"";
  if(!body){msg("Digite a mensagem na prévia antes de abrir o atendimento.");return}
  const formatted=body.replaceAll("{nome}",q.name);
@@ -322,14 +324,14 @@ async function next(){
   if(!input){msg("Conversa aberta, mas o campo de mensagem não foi encontrado. Não houve envio.");return}
   input.value=formatted;input.dispatchEvent(new Event("input",{bubbles:true}));
   position++;render();
-  msg("Mensagem de "+q.name+" preparada no atendimento. Confira e clique no botão de envio do CRM. Nenhum envio foi iniciado pela fila. "+(queue.length-position)+" restantes.");
+  msg("Mensagem de "+q.name+" preparada no atendimento, sem envio. "+(!eligible(raw)?"Sem autorização de WhatsApp registrada: use apenas para responder a uma solicitação existente; não envie publicidade não solicitada. ":"")+"Confira a conversa antes de decidir se deve responder. "+(queue.length-position)+" restantes.");
  }catch(e){msg("Não foi possível preparar esta conversa. Nada foi enviado pela fila.");}
 }
 
 async function sendBatch(){
  if(sending)return;
  if(get("cvx-bgt-channel")?.value!=="qr"){msg("Para envio pela Evolution, selecione WhatsApp por QR / Evolution no tipo de conexão antes de confirmar.");return}
- const tasks=queue.filter(q=>q.deliveryStatus==="pending"&&!attemptedIds.has(q.id)).slice(0,10);
+ const tasks=queue.filter(q=>q.canBatch&&q.deliveryStatus==="pending"&&!attemptedIds.has(q.id)).slice(0,10);
  if(tasks.length===0){msg("Não há destinatários pendentes. Mensagens com resultado incerto não serão reenviadas automaticamente.");return}
  const slot=Number(get("cvx-qa-line").value);
  const line=crmLines().find(l=>Number(l.slot)===slot&&l.mode==="qr");

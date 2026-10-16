@@ -73,9 +73,11 @@ try{
  await page.locator("#cvx-bc-select-all").click();
  await page.locator("#cvx-qa-line").selectOption("2");
  await page.locator("#cvx-qa-build").click();
- assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 contatos aptos/);
- assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 sem autorização registrada/);
- assert.equal(await page.locator("#cvx-qa-list .cvx-qa-row").count(),1);
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/2 contatos para atendimento manual/);
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 aptos para lote QR/);
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 sem autorização para campanha podem ser preparados individualmente/);
+ assert.equal(await page.locator("#cvx-qa-list .cvx-qa-row").count(),2);
+ assert.match(await page.locator("#cvx-qa-list").innerText(),/Atendimento manual/);
  assert.equal(await page.locator("#cvx-qa-review").isVisible(),true,"Unapproved leads should have an actionable review control");
  assert.equal(await page.locator('[data-review-lead-id="960002"]').count(),1,"Show review beside the blocked lead");
  assert.equal(await page.evaluate(()=>window.__cvxQrOptinTrue("0")),false,"Textual zero must not count as consent");
@@ -101,7 +103,11 @@ try{
  const opened=await page.evaluate(()=>window.__qaOpenCalls);
  assert.deepEqual(opened,[960001]);
  assert.equal(await page.locator("#replyText").inputValue(),"Olá, Contato QA Um! Mensagem de teste.");
- assert.match(await page.locator("#cvx-qa-summary").innerText(),/Nenhum envio foi iniciado/);
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/sem envio/);
+ await page.locator("#cvx-qa-next").click();
+ assert.deepEqual(await page.evaluate(()=>window.__qaOpenCalls),[960001,960002],"Lead sem opt-in pode preparar atendimento individual");
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/Sem autorização de WhatsApp registrada/,"Não autorizar publicidade ao preparar conversa");
+ assert.equal(await page.locator("#cvx-qa-send").isDisabled(),false,"Somente lead com opt-in continua elegível para lote");
 
  // Uma campanha real so pode ser iniciada com opt-in verificado no app e
  // confirmacao expressa. TODAS as chamadas abaixo sao mocks locais do Chrome.
@@ -121,7 +127,7 @@ try{
   window.prompt=text=>{window.__qaPrompts.push(text);return "ENVIAR 2"};
  });
  await page.locator("#cvx-qa-build").click();
- assert.match(await page.locator("#cvx-qa-summary").innerText(),/2 contatos aptos/);
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/2 aptos para lote QR/);
  // A budget set to Meta must never trigger a QR campaign.
  await page.locator("#cvx-bgt-channel").selectOption("meta");
  await page.locator("#cvx-qa-send").click();
