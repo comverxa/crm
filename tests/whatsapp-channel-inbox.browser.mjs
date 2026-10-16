@@ -48,6 +48,41 @@ try{
  assert.equal(state.selectedLine,"2","QR line is suggested in lead editor");
  assert.equal(state.leadLine,1,"No lead data changed automatically");
  assert.equal(state.sendCalls,1,"No new message sent on editor open");
- console.log("PASS | Evolution QR / Meta selection, safe editing, no automatic reassignment or sends");
+
+ // Connection center is a read-only view over this company's authenticated API.
+ // All network results below are synthetic — do not pair numbers or send messages.
+ await page.evaluate(()=>{
+  window.__qaConnectionCalls=[];window.__qaNav=[];
+  window.api=async(path,method="GET")=>{
+   window.__qaConnectionCalls.push({path,method});
+   if(method!=="GET")throw Error("Connection center attempted to write data");
+   if(path==="/api/lines")return {qrGatewayReady:true,webhookConfigured:false,items:[
+    {slot:1,name:"Meta oficial QA",mode:"api",configured:true,meta_phone_id:"QA123"},
+    {slot:2,name:"Evolution QR QA",mode:"qr"}
+   ]};
+   if(path==="/api/lines/2/qr/status")return {connected:true,message:"Conectado"};
+   throw Error("Unexpected read-only route "+path);
+  };
+  window.switchTab=dest=>window.__qaNav.push(dest);
+ });
+ await page.evaluate(()=>document.getElementById("leadModal")?.close());
+ await page.locator(".cvx-wa-launch").first().waitFor({state:"visible",timeout:8000});
+ await page.locator(".cvx-wa-launch").first().click();
+ await page.waitForFunction(()=>document.getElementById("cvx-wa-hub-summary")?.textContent.includes("2 linhas encontradas"));
+ assert.match(await page.locator("#cvx-wa-hub-summary").innerText(),/1 QR conectada/);
+ assert.match(await page.locator("#cvx-wa-hub-lines").innerText(),/Meta configurada · webhook pendente/);
+ assert.equal(await page.locator("#cvx-wa-hub-lines .cvx-wa-line").count(),2);
+ assert.ok(!(await page.locator("#cvx-wa-hub-lines").innerText()).includes("QA123"),"Phone Number ID must not appear in status summary");
+ assert.deepEqual(await page.evaluate(()=>window.__qaConnectionCalls.map(x=>x.path)),["/api/lines","/api/lines/2/qr/status"]);
+ await page.locator("#cvx-wa-hub-lines .cvx-wa-line").first().getByRole("button",{name:"Abrir configuração Meta"}).click();
+ assert.deepEqual(await page.evaluate(()=>window.__qaNav),["lines"]);
+ assert.equal(await page.locator("#cvx-wa-connection-hub-v1").isHidden(),true);
+ await page.locator(".cvx-wa-launch").first().click();
+ await page.waitForFunction(()=>document.getElementById("cvx-wa-hub-lines")?.querySelectorAll(".cvx-wa-line").length===2);
+ await page.locator("#cvx-wa-hub-lines .cvx-wa-line").nth(1).getByRole("button",{name:"Abrir conexão QR"}).click();
+ assert.deepEqual(await page.evaluate(()=>window.__qaNav),["lines","waweb"]);
+ assert.equal((await page.evaluate(()=>window.__qaConnectionCalls)).every(x=>x.method==="GET"),true);
+
+ console.log("PASS | Evolution QR / Meta selection, safe editing, read-only connection status, no automatic reassignment or sends");
  await page.close();
 }finally{await browser.close()}
