@@ -61,10 +61,11 @@ if(!csp)log("WARN","Healthcheck não divulga Content-Security-Policy (confirmar 
 const app=await get(base+"/admin");
 if(app.status===200){
  const headers=app.headers;
- for(const [name,key] of [["X-Content-Type-Options","x-content-type-options"],["Proteção de enquadramento","x-frame-options"],["Sem cache em ADM","cache-control"]]){
-  log(headers.has(key)?"PASS":"WARN","Cabeçalho de segurança: "+name);
+ for(const [name,key] of [["X-Content-Type-Options","x-content-type-options"],["Proteção de enquadramento","x-frame-options"],["Sem cache em ADM","cache-control"],["HSTS","strict-transport-security"]]){
+  log(headers.has(key)?"PASS":"FAIL","Cabeçalho de segurança: "+name);
  }
- if(!headers.get("strict-transport-security"))log("WARN","HSTS ausente na resposta do ADM Master — rever no proxy/dominio");
+ if(!String(headers.get("strict-transport-security")||"").includes("max-age=31536000"))log("FAIL","HSTS deve cobrir pelo menos um ano no ADM Master.");
+ if(headers.get("x-content-type-options")!=="nosniff")log("FAIL","ADM Master deve enviar nosniff.");
 }
 console.log(JSON.stringify({summary:{checksFailed:failures,warnings,mode:"PUBLIC_READ_ONLY",authenticatedTenantIsolation:"NOT_TESTED",recoveryBackupRestore:"NOT_TESTED",productionPayments:"NOT_TESTED"}},null,2));
 if(failures)process.exit(1);
