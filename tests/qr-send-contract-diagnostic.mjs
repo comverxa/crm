@@ -8,3 +8,10 @@ for(const needle of ["async function sendReply","function sendReply","async func
   .replace(/(?:Bearer\s+)[A-Za-z0-9_.-]+/g,"Bearer [REDACTED]");
  console.log("CONTRACT",needle,JSON.stringify(snippet));
 }
+
+const formStart=html.search(/<form[^>]*id=["']leadForm["']/i);
+const formEnd=formStart>=0?html.indexOf("</form>",formStart):-1;
+const form=formStart>=0&&formEnd>formStart?html.slice(formStart,formEnd+7):"";
+const fields=[...form.matchAll(/<(?:input|select|textarea)\\b[^>]*name=["']([^"']+)["']/gi)].map(m=>m[1]);
+const optinFlags=["consent","opt_in","marketing_consent","consent_evidence","approved","opt_out"].map(k=>({name:k,inLeadForm:fields.includes(k),mentionedInApp:html.includes(k)}));
+console.log("LEAD_FORM_CONTRACT",JSON.stringify({formPresent:form.length>0,namedFieldCount:fields.length,fields:fields.filter(x=>!/password|token|secret/i.test(x)),optinFlags}));
