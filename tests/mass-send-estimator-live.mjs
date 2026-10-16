@@ -107,7 +107,16 @@ try{
  });
  await page.locator("#cvx-qa-build").click();
  assert.match(await page.locator("#cvx-qa-summary").innerText(),/2 contatos aptos/);
+ // A budget set to Meta must never trigger a QR campaign.
+ await page.locator("#cvx-bgt-channel").selectOption("meta");
  await page.locator("#cvx-qa-send").click();
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/selecione WhatsApp por QR/);
+ assert.equal(await page.evaluate(()=>window.__qaSendRequests.length),0,"Mode mismatch cannot send");
+ await page.locator("#cvx-bgt-channel").selectOption("qr");
+ await page.locator("#cvx-qa-send").click();
+ await page.waitForFunction(()=>window.__qaSendRequests?.length===1,{timeout:12000});
+ assert.equal(await page.locator("#cvx-qa-build").isDisabled(),true,"Cannot rebuild queue while sending");
+ assert.equal(await page.locator("#cvx-qa-line").isDisabled(),true,"Cannot change QR line while sending");
  await page.waitForFunction(()=>window.__qaSendRequests?.length===2,{timeout:20000});
  const result=await page.evaluate(()=>({posts:window.__qaSendRequests,prompts:window.__qaPrompts}));
  assert.equal(result.posts.length,2);
