@@ -12,7 +12,7 @@ try{
  assert.equal(res.status(),200);
  let html=await res.text();
  assert.match(html,/cvx-disparo-orcamento/,"Script nao incluido na resposta real do CRM.");
- await page.evaluate(()=>{document.getElementById("app")?.remove();const app=document.createElement("div");app.id="app";app.innerHTML='<nav class="tabs"></nav><section class="screen" id="campaigns"><h2>Campanhas</h2><div class="actions"></div></section>';document.body.appendChild(app);});
+ await page.evaluate(()=>{const app=document.getElementById("app")||document.createElement("div");app.id="app";app.hidden=false;app.style.display="block";app.innerHTML='<nav class="tabs"></nav><section class="screen" id="campaigns"><h2>Campanhas</h2><div class="actions"></div></section>';if(!app.isConnected)document.body.appendChild(app);});
  await page.waitForSelector("#app .cvx-bgt-launch",{timeout:9000});
  await page.locator("#app .cvx-bgt-launch").first().click();
  assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 0,00");
