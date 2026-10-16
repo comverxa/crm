@@ -76,6 +76,21 @@ try{
  assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 contatos aptos/);
  assert.match(await page.locator("#cvx-qa-summary").innerText(),/1 sem autorização registrada/);
  assert.equal(await page.locator("#cvx-qa-list .cvx-qa-row").count(),1);
+ assert.equal(await page.locator("#cvx-qa-review").isVisible(),true,"Unapproved leads should have an actionable review control");
+ assert.equal(await page.locator('[data-review-lead-id="960002"]').count(),1,"Show review beside the blocked lead");
+ assert.equal(await page.evaluate(()=>window.__cvxQrOptinTrue("0")),false,"Textual zero must not count as consent");
+ await page.locator("#cvx-qa-review").click();
+ assert.equal(await page.locator("#cvx-budget-contacts").evaluate(n=>n.open),true);
+ await page.evaluate(()=>{
+  window.__qaReview=[];
+  window.editLead=(id)=>window.__qaReview.push({action:"edit",id});
+  window.switchTab=(tab)=>window.__qaReview.push({action:"tab",tab});
+ });
+ await page.locator('[data-review-lead-id="960002"]').click();
+ assert.deepEqual(await page.evaluate(()=>window.__qaReview),[{action:"tab",tab:"leads"},{action:"edit",id:960002}]);
+ assert.equal(await page.locator(".cvx-bgt-back").isHidden(),true,"Review closes campaign without sending");
+ await page.locator("#app .cvx-bgt-launch").first().click();
+ assert.equal(await page.locator("#cvx-bc-count").innerText(),"2 destinatários selecionados","Selection should survive editor navigation");
  await page.locator("#cvx-bc-msg").fill("Olá, {nome}! Mensagem de teste.");
  await page.evaluate(()=>{
   window.__qaOpenCalls=[];
