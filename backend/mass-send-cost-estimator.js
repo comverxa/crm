@@ -10,7 +10,8 @@ const get=id=>num(E(id).value),round=n=>Math.round((n+Number.EPSILON)*100)/100;
 const rows=[
 '<div class="cvx-bgt-back" hidden><div class="cvx-bgt-box" role="dialog" aria-modal="true" aria-labelledby="cvx-bgt-title">',
 '<header><div><small>COMVERXA · PLANEJAMENTO</small><h2 id="cvx-bgt-title">Disparador em massa · WhatsApp</h2></div><button type="button" data-close aria-label="Fechar">×</button></header>',
-'<p>Selecione contatos com consentimento, confira a linha WhatsApp QR e o orçamento antes do envio. O envio em lote exige validação da conta e confirmação explícita; a simulação de custos não debita saldo.</p>',
+'<p>Monte a campanha com público, prévia e orçamento inspirado nas transmissões comerciais do WhatsApp Business. QR/Evolution e pagamentos da Meta são recursos diferentes; nenhuma cobrança acontece aqui.</p>',
+"<section class=\"cvx-cmp-grid\" id=\"cvx-broadcast-composer\" aria-label=\"Preparar campanha\">\n<div class=\"cvx-cmp-left\">\n<div class=\"cvx-cmp-label\">Público <span id=\"cvx-cmp-count\">0 selecionados</span></div>\n<p class=\"cvx-cmp-muted\">Escolha os contatos no seletor abaixo. Não é necessário consentimento para simular ou preparar atendimento.</p>\n<label>Mensagem<textarea id=\"cvx-cmp-message\" maxlength=\"4000\" rows=\"4\" placeholder=\"Olá, {nome}! Temos uma novidade para você.\"></textarea></label>\n<p class=\"cvx-cmp-muted\">Use {nome} para personalizar. O envio QR em lote só ocorre após confirmação e validação do destinatário.</p>\n<div class=\"cvx-cmp-unavailable\"><b>Anexo opcional</b><span>Não disponível neste fluxo QR de texto. Fotos e documentos exigem integração de mídia homologada.</span></div>\n<div class=\"cvx-cmp-linkbox\"><b>Botão opcional / link de ação</b><small>No QR o link será acrescentado como texto, não será um botão interativo.</small><div class=\"cvx-cmp-linkrow\"><input id=\"cvx-cmp-link-label\" maxlength=\"65\" placeholder=\"Ex.: Ver proposta\" aria-label=\"Texto do link\"><input id=\"cvx-cmp-link-url\" placeholder=\"https://exemplo.com.br\" aria-label=\"URL https do link de ação\"></div></div>\n</div>\n<aside class=\"cvx-cmp-right\">\n<div class=\"cvx-cmp-label\">Prévia do WhatsApp</div><div class=\"cvx-cmp-bubble\" id=\"cvx-cmp-preview\">Sua mensagem aparecerá aqui.</div>\n<div class=\"cvx-cmp-label cvx-cmp-summary-head\">Resumo da campanha</div>\n<div class=\"cvx-cmp-line\"><span>Público selecionado</span><b id=\"cvx-cmp-recipients\">0</b></div>\n<div class=\"cvx-cmp-line\"><span>Mensagens planejadas</span><b id=\"cvx-cmp-planned\">0</b></div>\n<div class=\"cvx-cmp-line\"><span>Custo variável estimado</span><b id=\"cvx-cmp-cost\">R$ 0,00</b></div>\n<div class=\"cvx-cmp-line\"><span>Despesa fixa + encargos</span><b id=\"cvx-cmp-charges\">R$ 0,00</b></div>\n<div class=\"cvx-cmp-line cvx-cmp-grand\"><span>Total estimado</span><b id=\"cvx-cmp-total\">R$ 0,00</b></div>\n<div class=\"cvx-cmp-line\"><span>Saldo informado</span><b id=\"cvx-cmp-balance\">R$ 0,00</b></div>\n<div class=\"cvx-cmp-line cvx-cmp-need\"><span>Saldo adicional estimado</span><b id=\"cvx-cmp-need\">R$ 0,00</b></div>\n<button id=\"cvx-cmp-plan-topup\" type=\"button\" class=\"cvx-cmp-topup\">Planejar recarga</button>\n<div id=\"cvx-cmp-topup-panel\" hidden><strong>Planejamento, sem pagamento</strong><p class=\"cvx-cmp-muted\">Não acessamos o saldo do WhatsApp Business ou processamos cartão/Pix. Para adicionar fundos reais às transmissões comerciais da Meta, use os pagamentos do próprio WhatsApp Business.</p><label>Valor a simular (R$)<input id=\"cvx-cmp-topup-amount\" type=\"text\" inputmode=\"decimal\" placeholder=\"18,31\"></label><button type=\"button\" id=\"cvx-cmp-topup-simulate\">Simular saldo informado</button><small>Cartão · Pix · Boleto · Mercado Pago: não integrados ao COMVERXA.</small><p id=\"cvx-cmp-topup-status\" role=\"status\"></p><a href=\"https://faq.whatsapp.com/1800502557189664/?locale=pt_BR\" target=\"_blank\" rel=\"noopener noreferrer\">Como adicionar fundos no WhatsApp Business</a></div>\n<small class=\"cvx-cmp-footnote\">Custos editáveis; não são cotação, faturamento ou saldo real da Meta. No QR, a tarifa oficial por mensagem não se aplica.</small>\n</aside>\n</section>",
 '<div class="cvx-bgt-inputs">',
 '<label>Tipo de conexão<select id="cvx-bgt-channel"><option value="qr">WhatsApp por QR / Evolution — sem API oficial</option><option value="meta">API oficial da Meta</option></select></label>',
 '<label id="cvx-bgt-kind-label" hidden>Categoria oficial<select id="cvx-bgt-kind"><option value="marketing">Marketing</option><option value="utility">Utilidade</option><option value="authentication">Autenticação</option><option value="service">Serviço</option></select></label>',
@@ -66,6 +67,7 @@ const css=[
 '#'+ID+' #cvx-bgt-msg{color:#047661;text-align:right}',
 '#app .cvx-bgt-launch{border:1px solid #087f70!important;background:#087f70!important;color:white!important;border-radius:10px;min-height:42px;padding:10px 13px;font-weight:750;cursor:pointer}',
 '@media(max-width:650px){#'+ID+' .cvx-bgt-back{padding:6px;align-items:start}#'+ID+' .cvx-bgt-box{max-height:99vh;border-radius:14px}#'+ID+' .cvx-bgt-inputs{grid-template-columns:minmax(0,1fr)}}'
+"#cvx-disparo-orcamento .cvx-bgt-box{width:min(1120px,100%)}\n#cvx-disparo-orcamento .cvx-cmp-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.9fr);gap:16px;margin:18px 0}\n#cvx-disparo-orcamento .cvx-cmp-left,#cvx-disparo-orcamento .cvx-cmp-right{background:#161c22;color:#eef4f4;border:1px solid #30424b;border-radius:16px;padding:18px;min-width:0}\n#cvx-disparo-orcamento .cvx-cmp-label{font-size:15px;font-weight:800;color:#fff;display:flex;justify-content:space-between;gap:12px;margin-bottom:13px}\n#cvx-disparo-orcamento .cvx-cmp-muted,#cvx-disparo-orcamento .cvx-cmp-footnote{color:#bac9cd;font-size:12px;line-height:1.6}\n#cvx-disparo-orcamento .cvx-cmp-left label,#cvx-disparo-orcamento .cvx-cmp-right label{color:#e4ecef}\n#cvx-disparo-orcamento .cvx-cmp-left textarea,#cvx-disparo-orcamento .cvx-cmp-left input,#cvx-disparo-orcamento .cvx-cmp-right input{background:#272f35;border-color:#49575f;color:#fff}\n#cvx-disparo-orcamento #cvx-cmp-message{width:100%;min-height:105px;resize:vertical;font:14px/1.5 system-ui,sans-serif}\n#cvx-disparo-orcamento .cvx-cmp-unavailable,#cvx-disparo-orcamento .cvx-cmp-linkbox{border:1px dashed #465961;border-radius:10px;padding:12px;margin:12px 0;display:flex;flex-direction:column;gap:7px}\n#cvx-disparo-orcamento .cvx-cmp-unavailable span,#cvx-disparo-orcamento .cvx-cmp-linkbox small{font-size:12px;color:#b3c0c7}\n#cvx-disparo-orcamento .cvx-cmp-linkrow{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}\n#cvx-disparo-orcamento .cvx-cmp-bubble{white-space:pre-wrap;overflow-wrap:anywhere;min-height:88px;padding:13px;border-radius:12px 12px 3px 12px;background:#087b65;color:white;font-size:13px}\n#cvx-disparo-orcamento .cvx-cmp-summary-head{margin-top:20px}\n#cvx-disparo-orcamento .cvx-cmp-line{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #35434b;padding:9px 0;font-size:12px}\n#cvx-disparo-orcamento .cvx-cmp-line b{font-variant-numeric:tabular-nums;font-weight:800;white-space:nowrap}\n#cvx-disparo-orcamento .cvx-cmp-grand{font-size:16px;color:#fff}\n#cvx-disparo-orcamento .cvx-cmp-need{color:#87e6b9}\n#cvx-disparo-orcamento .cvx-cmp-topup{margin:12px 0;width:100%;background:#117b69;color:white;border-color:#117b69}\n#cvx-disparo-orcamento #cvx-cmp-topup-panel[hidden]{display:none}\n#cvx-disparo-orcamento #cvx-cmp-topup-panel{padding:13px;border:1px solid #425a5a;border-radius:12px;display:grid;gap:8px}\n#cvx-disparo-orcamento #cvx-cmp-topup-panel a{color:#81dbbf;text-decoration:underline}\n#cvx-disparo-orcamento #cvx-cmp-topup-panel small{color:#bac9cd}\n@media(max-width:760px){#cvx-disparo-orcamento .cvx-cmp-grid{grid-template-columns:minmax(0,1fr)}#cvx-disparo-orcamento .cvx-cmp-linkrow{grid-template-columns:minmax(0,1fr)}}",
 ].join("\n");
 const rates={marketing:"0,3217",utility:"0,0350",authentication:"0,0350",service:"0,0350"};
 let previousFocus,summary;
@@ -78,6 +80,7 @@ function calc(){
  const variable=round(delivered*rate),extra=round(fixed+(variable+fixed)*tax),total=round(variable+extra),need=round(Math.max(0,total-balance));
  summary={channel:E("cvx-bgt-channel").value,category:E("cvx-bgt-kind").value,people,planned,delivered,rate,variable,extra,total,balance,need};
  [["rpeople",people.toLocaleString("pt-BR")],["rplanned",planned.toLocaleString("pt-BR")],["rdelivered",delivered.toLocaleString("pt-BR")],["rvariable",money(variable)],["rextra",money(extra)],["rtotal",money(total)],["rbalance",money(balance)],["rneed",money(need)]].forEach(([id,v])=>E("cvx-bgt-"+id).textContent=v);
+ window.__cvxBroadcastRefresh?.();
 }
 function channelChange(){
  const meta=E("cvx-bgt-channel").value==="meta";
@@ -87,6 +90,38 @@ function channelChange(){
  E("cvx-bgt-help").textContent=meta?"API oficial: referência de marketing Brasil (out/2026) R$ 0,3217, editável. Outras categorias usam valores ilustrativos; confirme preços, país, tributos e condições na Meta.":"WhatsApp via QR: sem tarifa de mensagem da API oficial da Meta. Informe os custos operacionais reais. O orçamento é uma simulação; somente o botão Enviar próximos 10 (QR), após validação e confirmação, solicita envios.";
  calc();
 }
+const safeLink=v=>{try{const u=new URL(String(v||"").trim());return u.protocol==="https:"&&Boolean(u.hostname)&&!u.username&&!u.password;}catch{return false}};
+function messageFor(name){
+ const base=String(E("cvx-bc-msg")?.value||E("cvx-cmp-message")?.value||"").trim().replaceAll("{nome}",name||"Cliente");
+ const url=String(E("cvx-cmp-link-url")?.value||"").trim();
+ if(!url)return base;
+ if(!safeLink(url))throw Error("Informe um link HTTPS válido para o botão opcional.");
+ const label=String(E("cvx-cmp-link-label")?.value||"Saiba mais").trim().slice(0,65);
+ return base+"\n"+label+": "+url;
+}
+window.__cvxBroadcastMessage=messageFor;
+window.__cvxBroadcastLinkValid=()=>!E("cvx-cmp-link-url")?.value.trim()||safeLink(E("cvx-cmp-link-url").value);
+function updateComposer(){
+ if(!E("cvx-broadcast-composer"))return;
+ const selected=window.__cvxBudgetSelectionIds?.()?.length||0;
+ const count=String(selected)+" selecionados";
+ E("cvx-cmp-count").textContent=count;
+ E("cvx-cmp-recipients").textContent=count;
+ const msg=E("cvx-bc-msg")?.value||E("cvx-cmp-message")?.value||"";
+ if(document.activeElement!==E("cvx-cmp-message")&&E("cvx-cmp-message").value!==msg)E("cvx-cmp-message").value=msg;
+ const link=String(E("cvx-cmp-link-url").value||"").trim();
+ const valid=!link||safeLink(link);
+ E("cvx-cmp-link-url").setAttribute("aria-invalid",String(!valid));
+ let draft="";
+ try{draft=messageFor("Cliente")||"Sua mensagem aparecerá aqui."}catch{draft=(msg||"Sua mensagem aparecerá aqui.")+"\n⚠ Link inválido: use HTTPS";}
+ E("cvx-cmp-preview").textContent=draft;
+ if(summary){
+  for(const [id,value] of Object.entries({planned:summary.planned,cost:money(summary.variable),charges:money(summary.extra),total:money(summary.total),balance:money(summary.balance),need:money(summary.need)})){
+   E("cvx-cmp-"+id).textContent=id==="planned"?value.toLocaleString("pt-BR"):value;
+  }
+ }
+}
+window.__cvxBroadcastRefresh=updateComposer;
 function close(){E(ID).querySelector(".cvx-bgt-back").hidden=true;previousFocus?.focus?.();}
 window.__cvxCloseMassSender=close;
 function open(){previousFocus=document.activeElement;E(ID).querySelector(".cvx-bgt-back").hidden=false;const selected=E("cvx-budget-contacts");if(selected){selected.open=true;selected.dispatchEvent(new Event("toggle"));}E("cvx-bgt-people").focus();calc();}
@@ -100,6 +135,10 @@ function init(){
  el.querySelectorAll("input,select").forEach(e=>e.addEventListener("input",calc));
  E("cvx-bgt-channel").addEventListener("change",channelChange);
  E("cvx-bgt-kind").addEventListener("change",()=>{E("cvx-bgt-rate").value=rates[E("cvx-bgt-kind").value];calc()});
+ E("cvx-cmp-message").addEventListener("input",()=>{const target=E("cvx-bc-msg");if(target){target.value=E("cvx-cmp-message").value;target.dispatchEvent(new Event("input",{bubbles:true}))}updateComposer()});
+ for(const id of ["cvx-cmp-link-label","cvx-cmp-link-url"])E(id).addEventListener("input",updateComposer);
+ E("cvx-cmp-plan-topup").addEventListener("click",()=>{const panel=E("cvx-cmp-topup-panel");panel.hidden=!panel.hidden;if(!panel.hidden){E("cvx-cmp-topup-amount").value=String(summary?.need?.toFixed(2)||"0.00").replace(".",",");E("cvx-cmp-topup-amount").focus()}});
+ E("cvx-cmp-topup-simulate").addEventListener("click",()=>{const amount=num(E("cvx-cmp-topup-amount").value);if(!(amount>0)||amount>1000000){E("cvx-cmp-topup-status").textContent="Digite um valor positivo de até R$ 1.000.000,00.";return}const actual=num(E("cvx-bgt-balance").value);E("cvx-bgt-balance").value=String(round(actual+amount)).replace(".",",");calc();E("cvx-cmp-topup-status").textContent="Saldo simulado atualizado. Não houve pagamento nem crédito real.";});
  E("cvx-bgt-copy").addEventListener("click",async()=>{
   if(!summary)return;
   const s=summary;
@@ -150,6 +189,7 @@ const crmLines=()=>{try{return typeof lines!=="undefined"&&Array.isArray(lines)?
 function preview(){
 const msg=el("cvx-bc-msg").value,first=pool.find(l=>selected.has(lid(l)));
 el("cvx-bc-preview").textContent=msg?msg.replaceAll("{nome}",first?name(first):"Cliente"):"Digite a mensagem para visualizar.";
+window.__cvxBroadcastRefresh?.();
 }
 function syncCount(){
 const current=new Set(pool.map(lid));for(const id of selected)if(!current.has(id))selected.delete(id);
@@ -314,7 +354,8 @@ async function next(){
  if(!raw||optedOut(raw)||leadLine(raw)!==sid||phone(raw)!==q.phone){msg("Cadastro ou descadastro mudou. Revalide a fila antes de continuar.");reset();return}
  const body=get("cvx-bc-msg")?.value?.trim()||"";
  if(!body){msg("Digite a mensagem na prévia antes de abrir o atendimento.");return}
- const formatted=body.replaceAll("{nome}",q.name);
+ let formatted;
+ try{formatted=typeof window.__cvxBroadcastMessage==="function"?window.__cvxBroadcastMessage(q.name):body.replaceAll("{nome}",q.name)}catch(err){msg(err.message||"Link inválido");return}
  try{
   if(typeof window.openThread!=="function"){msg("Não foi possível abrir a conversa automaticamente nesta tela. Use a Caixa de entrada do CRM para continuar.");return}
   const tab=Array.from(document.querySelectorAll("#tabs button,nav.tabs button")).find(x=>(x.getAttribute("onclick")||"").includes("inbox")||x.getAttribute("data-tab")==="inbox");
@@ -336,6 +377,7 @@ async function sendBatch(){
  const slot=Number(get("cvx-qa-line").value);
  const line=crmLines().find(l=>Number(l.slot)===slot&&l.mode==="qr");
  const template=get("cvx-bc-msg")?.value?.trim()||"";
+ if(typeof window.__cvxBroadcastLinkValid==="function"&&!window.__cvxBroadcastLinkValid()){msg("Informe um link HTTPS válido antes de enviar.");return}
  if(!line||!template||template.length>4000){msg("Selecione a linha QR e informe uma mensagem com até 4.000 caracteres.");return}
  if(typeof window.api!=="function"){msg("É necessário entrar na sua conta para usar a API autenticada do CRM.");return}
  let current;
@@ -372,7 +414,9 @@ async function sendBatch(){
    try{snapshot=await window.api("/api/leads")}catch{stopRequested=true;msg("Consulta de autorização falhou; envios futuros interrompidos.");break}
    const remote=(snapshot?.items||[]).find(l=>leadId(l)===q.id);
    if(!remote||!eligible(remote)||leadLine(remote)!==slot||phone(remote)!==q.phone){stopRequested=true;msg("Autorização ou linha do contato mudou. Envio interrompido.");break}
-   const message=template.replaceAll("{nome}",q.name);
+   let message;
+   try{message=typeof window.__cvxBroadcastMessage==="function"?window.__cvxBroadcastMessage(q.name):template.replaceAll("{nome}",q.name)}catch{stopRequested=true;msg("Link opcional inválido; campanha interrompida.");break}
+   if(message.length>4000){stopRequested=true;msg("Mensagem mais link ultrapassam 4.000 caracteres; campanha interrompida.");break}
    attemptedIds.add(q.id);attemptedPhones.add(q.phone);
    q.deliveryStatus="uncertain";render();
    try{
