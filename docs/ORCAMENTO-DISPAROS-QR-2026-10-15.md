@@ -23,3 +23,13 @@
 3. Mantenha **WhatsApp por QR / Evolution**, informe custo próprio por mensagem entregue (se houver), despesas fixas, encargos e saldo disponível informado.
 4. Confira total estimado e valor adicional e, se necessário, copie o orçamento.
 5. Esta tela não possui ação de enviar campanha. Para atendimento atual continue usando a Caixa de entrada e a linha QR conectada.
+
+
+## Estado verificado em 16/10/2026 — fila assistida e lote experimental
+- **Implantado em produção:** orçamentos com QR (tarifa padrão Meta de R$ 0,00), seleção de leads, filtros por linha, prévia de texto e fila assistida para contatos com consentimento registrado. O código da fila foi publicado no Railway às 02:02:52 UTC, preservando /data.
+- **Fila assistida:** rejeita contatos sem consentimento, número inválido, fora da linha QR e duplicações; oferece Preparar próximo atendimento, que abre a conversa e preenche a mensagem para revisão e clique humano em Enviar. Pode depender da conversa já existir na Caixa de entrada.
+- **Teste de navegador:** https://github.com/comverxa/crm/actions/runs/38838426575 aprovou a presença da fila no HTML de produção e testes sintéticos, sem envio real.
+- **Código experimental no GitHub, NÃO implantado:** botão Enviar próximos 10 (QR), confirmação textual explícita, validação de sessão/linha/consentimento e tentativa sequencial pela rota autenticada de envio. Teste da API simulada aprovado: https://github.com/comverxa/crm/actions/runs/38838876472. Nenhum destinatário de produção recebeu mensagem durante estes testes.
+- A primeira tentativa de implantar o lote excedeu o limite de tamanho da variável no Railway; tentativa de versão compactada foi bloqueada pela ferramenta de implantação. **Não afirmar que envio em lote esteja disponível em produção.**
+- **Estado atual:** serviços conecta-crm-saas e comverxa-prospect-ia online; último deploy estável do SaaS 12ce9f8a-f7d9-46f9-9b62-f5577dffde42; sem patch pendente.
+- **Pendente antes de anunciar disparo em massa real:** autorização persistente por destinatário (opt-in/opt-out), isolamento entre empresas, controle de duplicidade, falhas e desconexão, validação de conectores QR e teste de ponta a ponta com números próprios/autorizados. A integração QR é não oficial, com risco de bloqueios ou restrições do WhatsApp.
