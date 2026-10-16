@@ -68,7 +68,7 @@ try{
  // Fila QR assistida: somente registros com consentimento, nao dispara automaticamente.
  await page.evaluate(()=>{
   const a=leads.find(l=>l.id===960001),b=leads.find(l=>l.id===960002);
-  a.consent=1;b.consent=0;
+  a.optin=1;b.optin=0;delete a.consent;delete b.consent;
  });
  await page.locator("#cvx-bc-select-all").click();
  await page.locator("#cvx-qa-line").selectOption("2");
@@ -91,7 +91,7 @@ try{
  // Uma campanha real so pode ser iniciada com opt-in verificado no app e
  // confirmacao expressa. TODAS as chamadas abaixo sao mocks locais do Chrome.
  await page.evaluate(()=>{
-  const second=leads.find(l=>l.id===960002);second.consent=1;
+  const second=leads.find(l=>l.id===960002);second.optin=1;
   window.__qaSendRequests=[];window.__qaPrompts=[];
   window.api=async(path,method,payload)=>{
    if(path==="/api/me")return {user:{id:1},company:{status:"active"}};
