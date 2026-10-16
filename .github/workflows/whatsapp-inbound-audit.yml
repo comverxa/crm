@@ -1,0 +1,17 @@
+name: COMVERXA - Entrada WhatsApp QR auditoria
+on:
+  push:
+    paths:
+      - backend/whatsapp-inbound-readonly-audit.js
+      - tests/whatsapp-inbound-readonly-audit.test.mjs
+      - .github/workflows/whatsapp-inbound-audit.yml
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Testar contador de webhook sem PII
+        run: bun tests/whatsapp-inbound-readonly-audit.test.mjs
