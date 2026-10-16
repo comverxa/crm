@@ -202,6 +202,42 @@ function bootHub(){
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bootHub,{once:true});else bootHub();
 
+/* QR autostatus: after the existing settings screen renders, use only its
+   authenticated GET status endpoint. Never request a new QR or disconnect. */
+async function cvxQrStatusAutoRefresh(){
+ const cards=[...document.querySelectorAll('[id^="qr-status-"]')]
+  .filter(node=>{
+   const qr=node.closest(".qrBox");
+   return qr&&!qr.classList.contains("hide");
+  });
+ if(!cards.length||typeof window.api!=="function")return;
+ await Promise.all(cards.map(async node=>{
+  const slot=node.id.replace(/^qr-status-/,"");
+  if(!/^[1-9]\d{0,2}$/.test(slot))return;
+  node.textContent="Consultando o estado real da conexão...";
+  try{
+   const answer=await window.api("/api/lines/"+slot+"/qr/status");
+   if(!node.isConnected)return;
+   if(answer?.connected===true){
+    node.textContent="Conectado · WhatsApp pronto para testar na Caixa de entrada";
+    document.getElementById("qr-img-"+slot)?.classList.add("hide");
+   }else{
+    node.textContent="Sem conexão confirmada · toque em Gerar / atualizar QR para conectar o celular.";
+   }
+  }catch{
+   if(node.isConnected)node.textContent="Status não disponível. Toque em Ver status para tentar novamente.";
+  }
+ }));
+}
+const existingRenderLines=window.renderLines;
+if(typeof existingRenderLines==="function"){
+ window.renderLines=async function(...args){
+  const result=await existingRenderLines.apply(this,args);
+  await cvxQrStatusAutoRefresh();
+  return result;
+ };
+}
+
 const oldOpen=window.openThread;
 if(typeof oldOpen==="function")window.openThread=async function(...args){const r=await oldOpen.apply(this,args);sync();return r};
 const oldRender=window.renderInbox;

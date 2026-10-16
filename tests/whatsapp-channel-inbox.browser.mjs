@@ -83,6 +83,29 @@ try{
  assert.deepEqual(await page.evaluate(()=>window.__qaNav),["lines","waweb"]);
  assert.equal((await page.evaluate(()=>window.__qaConnectionCalls)).every(x=>x.method==="GET"),true);
 
+
+ // The settings screen should query line 2's real status instead of just saying "Aguardando conexão".
+ await page.evaluate(async()=>{
+  window.__qrAutomaticStatusCalls=[];
+  window.me={company:{limits:{lines:3}}};
+  window.tab="lines";
+  window.api=async(path,method="GET")=>{
+   window.__qrAutomaticStatusCalls.push({path,method});
+   if(path==="/api/lines")return {qrGatewayReady:true,webhookConfigured:false,items:[
+    {slot:1,name:"Linha sem integração QA",phone:"",mode:"app",meta_phone_id:"",configured:false},
+    {slot:2,name:"WhatsApp 2 QA",phone:"",mode:"qr",meta_phone_id:"",configured:false},
+    {slot:3,name:"Meta QA",phone:"",mode:"api",meta_phone_id:"QA123",configured:true}
+   ]};
+   if(path==="/api/lines/2/qr/status")return {connected:true};
+   throw Error("Unexpected route "+path);
+  };
+  await window.renderLines();
+ });
+ assert.match(await page.locator("#qr-status-2").innerText(),/Conectado · WhatsApp pronto/);
+ const auto=await page.evaluate(()=>window.__qrAutomaticStatusCalls);
+ assert.deepEqual(auto.map(x=>x.path),["/api/lines","/api/lines/2/qr/status"]);
+ assert.ok(auto.every(x=>x.method==="GET"),"Status cannot generate QR or disconnect number");
+
  console.log("PASS | Evolution QR / Meta selection, safe editing, read-only connection status, no automatic reassignment or sends");
  await page.close();
 }finally{await browser.close()}
