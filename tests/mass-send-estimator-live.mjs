@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {chromium} from "playwright-core";
 const target="https://app.comverxa.com.br/";
 const code=readFileSync("backend/mass-send-cost-estimator.js","utf8");
-assert.ok(!/fetch\(|sendText\(|\.submit\(/.test(code),"Estimador nao deve realizar envios nem chamadas HTTP.");
+assert.ok(!/\bfetch\(|sendText\(|\.submit\(/.test(code),"Modulo nao deve fazer chamadas diretas ao fornecedor: utilizar apenas API autenticada existente.");
 new Function(code); // syntax check
 const browser=await chromium.launch({headless:true,executablePath:"/usr/bin/google-chrome",args:["--no-sandbox"]});
 try{
@@ -81,6 +81,37 @@ try{
  assert.deepEqual(opened,[960001]);
  assert.equal(await page.locator("#replyText").inputValue(),"Olá, Contato QA Um! Mensagem de teste.");
  assert.match(await page.locator("#cvx-qa-summary").innerText(),/Nenhum envio foi iniciado/);
+
+ // Uma campanha real so pode ser iniciada com opt-in verificado no app e
+ // confirmacao expressa. TODAS as chamadas abaixo sao mocks locais do Chrome.
+ await page.evaluate(()=>{
+  const second=leads.find(l=>l.id===960002);second.consent=1;
+  window.__qaSendRequests=[];window.__qaPrompts=[];
+  window.api=async(path,method,payload)=>{
+   if(path==="/api/me")return {user:{id:1},company:{status:"active"}};
+   if(path==="/api/lines")return {items:lines};
+   if(path==="/api/leads")return {items:leads};
+   if(path.endsWith("/send")){
+    window.__qaSendRequests.push({path,body:payload.message});
+    return {ok:true};
+   }
+   throw Error("Mock route prohibited");
+  };
+  window.prompt=text=>{window.__qaPrompts.push(text);return "ENVIAR 2"};
+ });
+ await page.locator("#cvx-qa-build").click();
+ assert.match(await page.locator("#cvx-qa-summary").innerText(),/2 contatos aptos/);
+ await page.locator("#cvx-qa-send").click();
+ await page.waitForFunction(()=>window.__qaSendRequests?.length===2,{timeout:20000});
+ const result=await page.evaluate(()=>({posts:window.__qaSendRequests,prompts:window.__qaPrompts}));
+ assert.equal(result.posts.length,2);
+ assert.deepEqual(result.posts.map(x=>x.path),["/api/inbox/960001/send","/api/inbox/960002/send"]);
+ assert.match(result.posts[0].body,/Contato QA Um/);
+ assert.equal(result.prompts.length,1);
+ await page.locator("#cvx-qa-send").waitFor({state:"visible"});
+ await page.waitForFunction(()=>document.querySelector("#cvx-qa-send")?.disabled===true);
+ console.log("PASS | QR consented mini-batch 2 mocks; 0 HTTP writes to real CRM.");
+
 
 
  console.log("PASS: modal/QR/Meta, 50 destinatarios, 0/10/15/21.09 BRL, saldo 3, Escape. Sem uso de contas reais.");
