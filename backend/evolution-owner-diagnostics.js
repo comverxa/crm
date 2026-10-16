@@ -38,7 +38,7 @@ Bun.serve=function cvxDiagServe(config){
   try{
    target=new URL(addr);
    if(!["http:","https:"].includes(target.protocol))throw Error("protocol");
-   target.pathname=target.pathname.replace(/\\/$/,"")+"/instance/fetchInstances";
+   target.pathname=target.pathname.replace(/\/$/,"")+"/instance/fetchInstances";
    target.search="";target.hash="";
   }catch{return cvxDiagJson({error:"Endereço Evolution inválido"},503)}
   try{
