@@ -5,9 +5,9 @@ const dbFile="/tmp/cvx-inbox-audit-fixture-"+process.pid+".sqlite";
 Bun.env.CVX_INBOX_AUDIT_DB=dbFile;
 const db=new Database(dbFile,{create:true});
 db.exec("CREATE TABLE messages(id INTEGER PRIMARY KEY,company_id INTEGER,lead_id INTEGER,direction TEXT,body TEXT)");
-db.exec("CREATE TABLE leads(id INTEGER)");
+db.exec("CREATE TABLE leads(id INTEGER,company_id INTEGER,line INTEGER)");
 db.exec("CREATE TABLE companies(id INTEGER)");
-db.query("INSERT INTO leads(id) VALUES(1)").run();
+db.query("INSERT INTO leads(id,company_id,line) VALUES(1,1,2)").run();
 const original=console.info, lines=[];
 console.info=(...args)=>{lines.push(args.map(String).join(" "))};
 await import("../backend/whatsapp-inbound-readonly-audit.js");
@@ -35,6 +35,12 @@ try{
  assert.deepEqual(audits.map(x=>x.persistedDelta),[1,0]);
  assert.ok(audits.every(x=>x.databaseStatus==="ok"&&x.observedTableTypes===1));
  assert.equal(db.query("SELECT COUNT(*) AS n FROM messages").get().n,1);
+ const {cvxInboxPreflight}=await import("../backend/whatsapp-inbound-readonly-audit.js");
+ const snap=cvxInboxPreflight();
+ assert.deepEqual(snap.db.byLine,[{slot:2,direction:"in",count:1}]);
+ assert.deepEqual(snap.db.leadCounts,[{slot:2,n:1}]);
+ assert.equal(snap.db.unlinked,0);
+
  const all=lines.join("\n");
  for(const privateValue of ["PRIVATE-CUSTOMER-MESSAGE","PRIVATE-PHONE","PRIVATE-KEY","fixture-secret"]){
   assert.equal(all.includes(privateValue),false,"Audit must never log contact or payload");
