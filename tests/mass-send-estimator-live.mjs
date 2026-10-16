@@ -15,6 +15,8 @@ try{
  let html=await res.text();
  assert.match(html,/cvx-disparo-orcamento/,"Script nao incluido na resposta real do CRM.");
  assert.match(html,/__cvxQrAssistedQueueInstalled/,"Fila assistida QR nao incluida no HTML publicado do CRM.");
+ assert.match(html,/Disparador em massa \\(WhatsApp QR\\)/,"Botão de disparo ainda não incluído no HTML de produção.");
+ assert.match(html,/async function sendBatch\\(/,"Lote QR autenticado ainda não publicado.");
  await page.evaluate(()=>{const app=document.getElementById("app")||document.createElement("div");app.id="app";app.hidden=false;app.classList.remove("hide","hidden");app.style.setProperty("display","block","important");app.style.setProperty("visibility","visible","important");app.innerHTML='<nav class="tabs"></nav><section class="screen" id="campaigns"><h2>Campanhas</h2><div class="actions"></div></section>';if(!app.isConnected)document.body.appendChild(app);app.querySelector("nav.tabs").style.setProperty("display","flex","important");});
  await page.waitForSelector("#app .cvx-bgt-launch",{timeout:9000});
  const launch=page.locator("#app .cvx-bgt-launch").first();
