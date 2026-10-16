@@ -15,9 +15,13 @@ try{
  let html=await res.text();
  assert.match(html,/cvx-disparo-orcamento/,"Script nao incluido na resposta real do CRM.");
  assert.match(html,/__cvxQrAssistedQueueInstalled/,"Fila assistida QR nao incluida no HTML publicado do CRM.");
+ assert.ok(html.includes("Disparador em massa (WhatsApp QR)"),"Botão de disparo ainda não incluído no HTML de produção.");
+ assert.ok(html.includes("async function sendBatch("),"Lote QR autenticado ainda não publicado.");
  await page.evaluate(()=>{const app=document.getElementById("app")||document.createElement("div");app.id="app";app.hidden=false;app.classList.remove("hide","hidden");app.style.setProperty("display","block","important");app.style.setProperty("visibility","visible","important");app.innerHTML='<nav class="tabs"></nav><section class="screen" id="campaigns"><h2>Campanhas</h2><div class="actions"></div></section>';if(!app.isConnected)document.body.appendChild(app);app.querySelector("nav.tabs").style.setProperty("display","flex","important");});
  await page.waitForSelector("#app .cvx-bgt-launch",{timeout:9000});
- await page.locator("#app .cvx-bgt-launch").first().click();
+ const launch=page.locator("#app .cvx-bgt-launch").first();
+ assert.match(await launch.textContent(),/Disparador em massa/,"Botão visível no menu");
+ await launch.click();
  assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 0,00");
  await page.locator("#cvx-bgt-rate").fill("0,20");
  assert.equal(await page.locator("#cvx-bgt-rtotal").innerText(),"R$ 10,00");
@@ -41,7 +45,9 @@ try{
  });
  await page.locator("#app .cvx-bgt-launch").first().click();
  await page.locator("#cvx-budget-contacts").waitFor({state:"attached",timeout:8000});
- await page.locator("#cvx-budget-contacts > summary").click();
+ const details=page.locator("#cvx-budget-contacts");
+ if(!(await details.evaluate(node=>node.open)))await page.locator("#cvx-budget-contacts > summary").click();
+ assert.equal(await details.evaluate(node=>node.open),true,"Seletor de leads do disparador deve abrir diretamente");
  await page.locator("#cvx-bc-line").selectOption("2");
  assert.equal(await page.locator("#cvx-bc-list .cvx-contact-row").count(),2);
  await page.locator("#cvx-bc-list input[type='checkbox']").first().check();

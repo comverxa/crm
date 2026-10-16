@@ -1,4 +1,4 @@
-/* COMVERXA — Simulador de orçamento de disparos; 100% local e sem envio. */
+/* COMVERXA — Disparador QR com envio assistido de lotes pequenos e simulador de orçamento. A API real só é chamada após consentimento e confirmação expressa. */
 (function(){
 "use strict";
 if(window.__cvxEstimateInstalled)return;
@@ -9,8 +9,8 @@ const num=s=>{let t=String(s??"").trim();t=t.includes(",")?t.replace(/\./g,"").r
 const get=id=>num(E(id).value),round=n=>Math.round((n+Number.EPSILON)*100)/100;
 const rows=[
 '<div class="cvx-bgt-back" hidden><div class="cvx-bgt-box" role="dialog" aria-modal="true" aria-labelledby="cvx-bgt-title">',
-'<header><div><small>COMVERXA · PLANEJAMENTO</small><h2 id="cvx-bgt-title">Orçamento de disparos</h2></div><button type="button" data-close aria-label="Fechar">×</button></header>',
-'<p>Simule o custo <strong>antes</strong> de usar sua campanha. Esta tela não envia mensagens, não altera leads e não movimenta dinheiro.</p>',
+'<header><div><small>COMVERXA · PLANEJAMENTO</small><h2 id="cvx-bgt-title">Disparador em massa · WhatsApp</h2></div><button type="button" data-close aria-label="Fechar">×</button></header>',
+'<p>Selecione contatos com consentimento, confira a linha WhatsApp QR e o orçamento antes do envio. O envio em lote exige validação da conta e confirmação explícita; a simulação de custos não debita saldo.</p>',
 '<div class="cvx-bgt-inputs">',
 '<label>Tipo de conexão<select id="cvx-bgt-channel"><option value="qr">WhatsApp por QR / Evolution — sem API oficial</option><option value="meta">API oficial da Meta</option></select></label>',
 '<label id="cvx-bgt-kind-label" hidden>Categoria oficial<select id="cvx-bgt-kind"><option value="marketing">Marketing</option><option value="utility">Utilidade</option><option value="authentication">Autenticação</option><option value="service">Serviço</option></select></label>',
@@ -88,7 +88,7 @@ function channelChange(){
  calc();
 }
 function close(){E(ID).querySelector(".cvx-bgt-back").hidden=true;previousFocus?.focus?.();}
-function open(){previousFocus=document.activeElement;E(ID).querySelector(".cvx-bgt-back").hidden=false;E("cvx-bgt-people").focus();calc();}
+function open(){previousFocus=document.activeElement;E(ID).querySelector(".cvx-bgt-back").hidden=false;const selected=E("cvx-budget-contacts");if(selected){selected.open=true;selected.dispatchEvent(new Event("toggle"));}E("cvx-bgt-people").focus();calc();}
 function init(){
  if(E(ID))return;
  const el=document.createElement("div");el.id=ID;el.innerHTML=rows;
@@ -114,10 +114,16 @@ function mount(){
  const campaign=app.querySelector("#campaigns")||[...app.querySelectorAll("section.screen")].find(s=>/campanhas|disparos/i.test(s.querySelector("h2")?.textContent||""));
  if(!nav&&!campaign)return;
  init();
- for(const target of [nav,campaign?.querySelector(".actions")||campaign?.querySelector("h2")?.parentElement]){
+ for(const [target,label] of [
+  [nav,"Disparador em massa (WhatsApp QR)"],
+  [campaign?.querySelector(".actions")||campaign?.querySelector("h2")?.parentElement,"Abrir disparador em massa"]
+ ]){
   if(!target||target.querySelector(".cvx-bgt-launch"))continue;
-  const btn=document.createElement("button");btn.type="button";btn.className="cvx-bgt-launch";btn.textContent="Simular custo de disparos";
-  btn.addEventListener("click",open);target.appendChild(btn);
+  const btn=document.createElement("button");btn.type="button";btn.className="cvx-bgt-launch";
+  btn.textContent=label;btn.setAttribute("aria-haspopup","dialog");
+  btn.title="Selecione contatos, calcule o custo e valide uma campanha WhatsApp QR";
+  btn.addEventListener("click",open);
+  target.prepend(btn);
  }
 }
 let pending=false;
@@ -131,7 +137,7 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 "use strict";
 if(window.__cvxBudgetContactsInstalled)return;window.__cvxBudgetContactsInstalled=true;
 const ID="cvx-budget-contacts",el=id=>document.getElementById(id);
-const css="#cvx-budget-contacts{margin:16px 0;padding:16px;background:#f5fafb;border:1px solid #d4e4ea;border-radius:14px;color:#24475c;font:14px/1.5 system-ui,sans-serif}\n#cvx-budget-contacts summary{font-weight:850;cursor:pointer;font-size:16px}\n#cvx-budget-contacts label.cvx-contact-row{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px;border-bottom:1px solid #e2ecf0;cursor:pointer}\n#cvx-budget-contacts .cvx-contact-row input{width:18px;min-height:18px;height:18px;flex:0 0 18px}\n#cvx-budget-contacts input:not([type=checkbox]),#cvx-budget-contacts select,#cvx-budget-contacts textarea{width:100%;box-sizing:border-box;min-height:41px;border:1px solid #b7cfda;border-radius:9px;background:white;padding:9px;font:inherit;color:#19394c}\n#cvx-budget-contacts textarea{min-height:72px;resize:vertical}\n#cvx-budget-contacts button{padding:9px 12px;border:1px solid #a9c6cc;background:#fff;color:#19655c;border-radius:9px;cursor:pointer;font-weight:700}\n#cvx-budget-contacts button:focus-visible,#cvx-budget-contacts input:focus-visible,#cvx-budget-contacts select:focus-visible{outline:3px solid #17ad92}\n#cvx-budget-contacts .cvx-contact-list{background:white;max-height:210px;overflow:auto;border:1px solid #d2e4eb;border-radius:9px;margin:8px 0}\n#cvx-budget-contacts .cvx-contacts-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}\n#cvx-budget-contacts .cvx-contact-stat{font-weight:800;color:#0e7869}\n#cvx-budget-contacts .cvx-contact-note{background:#fff7e3;border-left:3px solid #d6a64b;padding:9px;font-size:12px;margin-top:9px;color:#61512d}\n#cvx-budget-contacts .cvx-contact-preview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#e2f6f0;color:#155949}\n#cvx-budget-contacts .cvx-contact-muted{color:#6b8190;font-size:12px;margin:7px 0}",layout="<summary>Escolher contatos do CRM e linha QR (orçamento)</summary><p class='cvx-contact-muted'>Somente planejamento local. Nenhum contato será modificado e nenhuma mensagem será enviada.</p><label>Linha WhatsApp por QR<select id='cvx-bc-line'><option value=''>Todas as linhas (planejamento)</option></select></label><label>Pesquisar contatos<input id='cvx-bc-search' type='search' placeholder='Nome ou classificação' autocomplete='off'></label><div class='cvx-contacts-actions'><button type='button' id='cvx-bc-refresh'>Atualizar</button><button type='button' id='cvx-bc-select-all'>Selecionar exibidos</button><button type='button' id='cvx-bc-clear'>Limpar</button></div><p class='cvx-contact-muted' id='cvx-bc-status' role='status'></p><div class='cvx-contact-list' id='cvx-bc-list'></div><p id='cvx-bc-count' class='cvx-contact-stat'>0 selecionados</p><p class='cvx-contact-note'>O cadastro no CRM não comprova consentimento para marketing. Confirme a autorização individual e respeite descadastros antes de qualquer envio. Nenhum disparo acontece aqui.</p><label>Mensagem (prévia, não enviada)<textarea id='cvx-bc-msg' maxlength='5000' placeholder='Olá, {nome}! Posso enviar uma proposta?'></textarea></label><p id='cvx-bc-preview' class='cvx-contact-preview'>Digite a mensagem para visualizar.</p>";
+const css="#cvx-budget-contacts{margin:16px 0;padding:16px;background:#f5fafb;border:1px solid #d4e4ea;border-radius:14px;color:#24475c;font:14px/1.5 system-ui,sans-serif}\n#cvx-budget-contacts summary{font-weight:850;cursor:pointer;font-size:16px}\n#cvx-budget-contacts label.cvx-contact-row{display:flex;flex-direction:row;align-items:center;gap:8px;padding:9px;border-bottom:1px solid #e2ecf0;cursor:pointer}\n#cvx-budget-contacts .cvx-contact-row input{width:18px;min-height:18px;height:18px;flex:0 0 18px}\n#cvx-budget-contacts input:not([type=checkbox]),#cvx-budget-contacts select,#cvx-budget-contacts textarea{width:100%;box-sizing:border-box;min-height:41px;border:1px solid #b7cfda;border-radius:9px;background:white;padding:9px;font:inherit;color:#19394c}\n#cvx-budget-contacts textarea{min-height:72px;resize:vertical}\n#cvx-budget-contacts button{padding:9px 12px;border:1px solid #a9c6cc;background:#fff;color:#19655c;border-radius:9px;cursor:pointer;font-weight:700}\n#cvx-budget-contacts button:focus-visible,#cvx-budget-contacts input:focus-visible,#cvx-budget-contacts select:focus-visible{outline:3px solid #17ad92}\n#cvx-budget-contacts .cvx-contact-list{background:white;max-height:210px;overflow:auto;border:1px solid #d2e4eb;border-radius:9px;margin:8px 0}\n#cvx-budget-contacts .cvx-contacts-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}\n#cvx-budget-contacts .cvx-contact-stat{font-weight:800;color:#0e7869}\n#cvx-budget-contacts .cvx-contact-note{background:#fff7e3;border-left:3px solid #d6a64b;padding:9px;font-size:12px;margin-top:9px;color:#61512d}\n#cvx-budget-contacts .cvx-contact-preview{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;border-radius:9px;background:#e2f6f0;color:#155949}\n#cvx-budget-contacts .cvx-contact-muted{color:#6b8190;font-size:12px;margin:7px 0}",layout="<summary>Escolher contatos do CRM e linha QR (orçamento)</summary><p class='cvx-contact-muted'>Seleção e orçamento não enviam mensagens. O comando de lote QR exige confirmação explícita e somente aceita contatos autorizados.</p><label>Linha WhatsApp por QR<select id='cvx-bc-line'><option value=''>Todas as linhas (planejamento)</option></select></label><label>Pesquisar contatos<input id='cvx-bc-search' type='search' placeholder='Nome ou classificação' autocomplete='off'></label><div class='cvx-contacts-actions'><button type='button' id='cvx-bc-refresh'>Atualizar</button><button type='button' id='cvx-bc-select-all'>Selecionar exibidos</button><button type='button' id='cvx-bc-clear'>Limpar</button></div><p class='cvx-contact-muted' id='cvx-bc-status' role='status'></p><div class='cvx-contact-list' id='cvx-bc-list'></div><p id='cvx-bc-count' class='cvx-contact-stat'>0 selecionados</p><p class='cvx-contact-note'>O cadastro no CRM não comprova consentimento para marketing. Confirme a autorização individual e respeite descadastros antes de qualquer envio. Nenhum disparo acontece aqui.</p><label>Mensagem da campanha (prévia)<textarea id='cvx-bc-msg' maxlength='5000' placeholder='Olá, {nome}! Posso enviar uma proposta?'></textarea></label><p id='cvx-bc-preview' class='cvx-contact-preview'>Digite a mensagem para visualizar.</p>";
 let shown=[],pool=[],selected=new Set();
 window.__cvxBudgetSelectionIds=()=>Array.from(selected);
 const lid=l=>l&&l.id!==undefined&&l.id!==null?String(l.id):"";
@@ -192,15 +198,14 @@ function start(){if(install())return;const mo=new MutationObserver(()=>{if(insta
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
 })();
 
-/* COMVERXA — fila assistida QR para contatos com consentimento registrado.
-   Nao envia mensagens automaticamente, nao grava dados e nao usa API externa. */
+/* COMVERXA — fila assistida QR e mini-lotes com validação da API autenticada; sem envios espontâneos. */
 (function(){
 "use strict";
 if(window.__cvxQrAssistedQueueInstalled)return;window.__cvxQrAssistedQueueInstalled=true;
 const ID="cvx-qr-assist",get=id=>document.getElementById(id);
 const html=[
 '<h3>Fila assistida de mensagens QR</h3>',
-'<p>Prepare contatos autorizados e abra cada conversa no CRM. <strong>O envio só acontece quando você clicar em Enviar na Caixa de entrada.</strong></p>',
+'<p>Valide contatos e escolha entre preparar atendimento individual ou solicitar envio de até 10 contatos autorizados. O lote só é executado após confirmação explícita e revalidação da sessão.</p>',
 '<label>WhatsApp QR usado na preparação<select id="cvx-qa-line"></select></label>',
 '<div class="cvx-qa-btns"><button id="cvx-qa-build" type="button">Validar contatos selecionados</button><button id="cvx-qa-next" type="button" disabled>Preparar próximo atendimento</button><button id="cvx-qa-send" type="button" disabled>Enviar próximos 10 (QR)</button><button id="cvx-qa-stop" type="button" disabled>Parar próximos envios</button><button id="cvx-qa-reset" type="button">Limpar fila</button></div>',
 '<div id="cvx-qa-summary" role="status" aria-live="polite">Selecione contatos acima, confirme o consentimento registrado e valide a fila.</div>',
