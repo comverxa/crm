@@ -163,7 +163,7 @@ const found=pool.filter(l=>(!s||!slot(l)||slot(l)===s)&&(!q||(name(l)+" "+stage(
 shown=found.slice(0,150);
 for(const lead of shown){
 const row=document.createElement("label");row.className="cvx-contact-row";
-const input=document.createElement("input");input.type="checkbox";input.checked=selected.has(lid(lead));input.setAttribute("aria-label","Selecionar "+name(lead));
+const input=document.createElement("input");input.type="checkbox";input.value=lid(lead);input.dataset.leadId=lid(lead);input.checked=selected.has(lid(lead));input.setAttribute("aria-label","Selecionar "+name(lead));
 const title=document.createElement("span");title.textContent=name(lead);
 const info=document.createElement("small");info.textContent=" · "+(stage(lead)||"sem classificação");info.style.color="#68808e";title.append(info);
 row.append(input,title);input.addEventListener("change",()=>{if(input.checked)selected.add(lid(lead));else selected.delete(lid(lead));syncCount()});
@@ -189,4 +189,121 @@ return true;
 }
 function start(){if(install())return;const mo=new MutationObserver(()=>{if(install())mo.disconnect()});mo.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+})();
+
+/* COMVERXA — fila assistida QR para contatos com consentimento registrado.
+   Nao envia mensagens automaticamente, nao grava dados e nao usa API externa. */
+(function(){
+"use strict";
+if(window.__cvxQrAssistedQueueInstalled)return;window.__cvxQrAssistedQueueInstalled=true;
+const ID="cvx-qr-assist",get=id=>document.getElementById(id);
+const html=[
+'<h3>Fila assistida de mensagens QR</h3>',
+'<p>Prepare contatos autorizados e abra cada conversa no CRM. <strong>O envio só acontece quando você clicar em Enviar na Caixa de entrada.</strong></p>',
+'<label>WhatsApp QR usado na preparação<select id="cvx-qa-line"></select></label>',
+'<div class="cvx-qa-btns"><button id="cvx-qa-build" type="button">Validar contatos selecionados</button><button id="cvx-qa-next" type="button" disabled>Preparar próximo atendimento</button><button id="cvx-qa-reset" type="button">Limpar fila</button></div>',
+'<div id="cvx-qa-summary" role="status" aria-live="polite">Selecione contatos acima, confirme o consentimento registrado e valide a fila.</div>',
+'<div class="cvx-qa-list" id="cvx-qa-list"></div>',
+'<p class="cvx-qa-warning">A marcação de consentimento no cadastro deve corresponder a uma autorização real e comprovável. Contatos sem essa marcação, com pedido de descadastro, telefone inválido ou linha diferente não entram. Abrir uma conversa não significa mensagem enviada ou entregue.</p>'
+].join("");
+const css=[
+"#cvx-qr-assist{border:1px solid #d5e6e9;border-radius:13px;background:#fff;margin-top:15px;padding:15px;color:#1c4657;line-height:1.5}",
+"#cvx-qr-assist h3{font:800 18px/1.3 system-ui,sans-serif;margin:0 0 8px;color:#0b7064}",
+"#cvx-qr-assist p{font-size:13px}",
+"#cvx-qr-assist label{display:block;font-size:13px;font-weight:750;margin:12px 0}",
+"#cvx-qr-assist select{width:100%;min-height:42px;padding:8px;border:1px solid #b5d0d9;border-radius:10px;background:white;color:#23485b}",
+"#cvx-qr-assist .cvx-qa-btns{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}",
+"#cvx-qr-assist button{font:750 13px system-ui,sans-serif;min-height:40px;padding:9px 11px;border:1px solid #99c4c3;border-radius:9px;background:#edf8f6;color:#116659;cursor:pointer}",
+"#cvx-qr-assist button:disabled{opacity:.45;cursor:default}",
+"#cvx-qr-assist button:focus-visible{outline:3px solid #15a992;outline-offset:2px}",
+"#cvx-qr-assist .cvx-qa-list{max-height:170px;overflow:auto;border:1px solid #e3edf0;border-radius:9px;margin:10px 0}",
+"#cvx-qr-assist .cvx-qa-row{padding:8px 11px;border-bottom:1px solid #e8edef;font-size:13px;display:flex;justify-content:space-between;gap:9px}",
+"#cvx-qr-assist .cvx-qa-warning{border-left:3px solid #cba043;background:#fffaec;padding:10px;font-size:12px;color:#6a562b}"
+].join("\n");
+const eligible=l=>{
+ const x=l?.consent??l?.opt_in??l?.marketing_consent;
+ const yes=x===true||x===1||String(x||"").toLowerCase()==="true"||String(x||"").toLowerCase()==="sim";
+ const no=l?.opt_out===true||l?.opt_out===1||l?.unsubscribed===true||l?.unsubscribed===1||l?.do_not_contact===true||l?.do_not_contact===1;
+ return yes&&!no;
+};
+const phone=l=>String(l?.phone||l?.telefone||l?.whatsapp||"").replace(/\D/g,"");
+const leadId=l=>l?.id===undefined||l?.id===null?"":String(l.id);
+const leadName=l=>String(l?.name||l?.nome||"Contato").slice(0,90);
+const leadLine=l=>Number(l?.line||l?.slot||0);
+const lines=()=>{try{return typeof window.lines!=="undefined"&&Array.isArray(window.lines)?window.lines:typeof globalThis.lines!=="undefined"&&Array.isArray(globalThis.lines)?globalThis.lines:[]}catch{return []}};
+const leads=()=>{try{return typeof window.leads!=="undefined"&&Array.isArray(window.leads)?window.leads:typeof globalThis.leads!=="undefined"&&Array.isArray(globalThis.leads)?globalThis.leads:[]}catch{return []}};
+let queue=[],position=0;
+function linePicker(){
+ const sel=get("cvx-qa-line"),old=sel.value;
+ sel.replaceChildren();const o=document.createElement("option");o.value="";o.textContent="Selecione uma linha QR";sel.append(o);
+ for(const l of lines().filter(x=>x?.mode==="qr")){
+  const item=document.createElement("option");item.value=String(l.slot);item.textContent="WhatsApp "+l.slot+" · "+String(l.name||"QR").slice(0,55);sel.append(item);
+ }
+ if([...sel.options].some(x=>x.value===old))sel.value=old;
+}
+function render(){
+ const holder=get("cvx-qa-list");holder.replaceChildren();
+ for(let i=0;i<Math.min(queue.length,150);i++){
+  const q=queue[i],row=document.createElement("div");row.className="cvx-qa-row";
+  const label=document.createElement("span");label.textContent=(i+1)+". "+q.name;
+  const right=document.createElement("span");right.textContent=i<position?"Aberto":i===position?"Próximo":"Aguardando";row.append(label,right);holder.append(row);
+ }
+ get("cvx-qa-next").disabled=position>=queue.length||queue.length===0;
+}
+function msg(s){get("cvx-qa-summary").textContent=s}
+function reset(){queue=[];position=0;render();msg("Fila limpa. Nenhum contato ou mensagem do CRM foi alterado.")}
+function build(){
+ queue=[];position=0;
+ const sid=Number(get("cvx-qa-line").value);
+ const qr=lines().find(l=>Number(l.slot)===sid&&l.mode==="qr");
+ if(!qr){render();msg("Selecione uma linha configurada em modo QR antes de preparar.");return}
+ const fields=Array.from(document.querySelectorAll("#cvx-bc-list input[type=checkbox]:checked"));
+ const ids=new Set(fields.map(i=>i.closest("label")?.querySelector("input")?.getAttribute("data-lead-id")||i.value).filter(Boolean));
+ // Browser leads are scoped to the signed-in CRM. Never infer consent from a selected checkbox.
+ const used=new Set(),raw=leads();let noConsent=0,badPhone=0,wrongLine=0,duplicates=0;
+ for(const l of raw){
+  if(!ids.has(leadId(l)))continue;
+  if(!eligible(l)){noConsent++;continue}
+  if(leadLine(l)!==sid){wrongLine++;continue}
+  const p=phone(l);if(!/^\d{10,15}$/.test(p)){badPhone++;continue}
+  if(used.has(p)){duplicates++;continue}
+  used.add(p);queue.push({id:leadId(l),name:leadName(l),phone:p});
+  if(queue.length>=150)break;
+ }
+ render();
+ msg(queue.length+" contatos aptos. Excluídos: "+noConsent+" sem autorização registrada, "+badPhone+" com telefone inválido, "+wrongLine+" fora da linha e "+duplicates+" duplicados. Este resultado é uma validação local de preparação, não uma autorização final para enviar.");
+}
+async function next(){
+ if(position>=queue.length)return;
+ const q=queue[position],raw=leads().find(l=>leadId(l)===q.id),sid=Number(get("cvx-qa-line").value);
+ if(!raw||!eligible(raw)||leadLine(raw)!==sid||phone(raw)!==q.phone){msg("Cadastro ou autorização mudou. Revalide a fila antes de continuar.");reset();return}
+ const body=get("cvx-bc-msg")?.value?.trim()||"";
+ if(!body){msg("Digite a mensagem na prévia antes de abrir o atendimento.");return}
+ const formatted=body.replaceAll("{nome}",q.name);
+ try{
+  if(typeof window.openThread!=="function"){msg("Não foi possível abrir a conversa automaticamente nesta tela. Use a Caixa de entrada do CRM para continuar.");return}
+  const tab=Array.from(document.querySelectorAll("#tabs button,nav.tabs button")).find(x=>(x.getAttribute("onclick")||"").includes("inbox")||x.getAttribute("data-tab")==="inbox");
+  if(tab)tab.click();
+  await window.openThread(Number(q.id));
+  const input=get("replyText");
+  if(!input){msg("Conversa aberta, mas o campo de mensagem não foi encontrado. Não houve envio.");return}
+  input.value=formatted;input.dispatchEvent(new Event("input",{bubbles:true}));
+  position++;render();
+  msg("Mensagem de "+q.name+" preparada no atendimento. Confira e clique no botão de envio do CRM. Nenhum envio foi iniciado pela fila. "+(queue.length-position)+" restantes.");
+ }catch(e){msg("Não foi possível preparar esta conversa. Nada foi enviado pela fila.");}
+}
+function start(){
+ if(get(ID))return;
+ const parent=get("cvx-budget-contacts"),after=get("cvx-bc-preview");
+ if(!parent||!after)return false;
+ const styles=document.createElement("style");styles.id=ID+"-css";styles.textContent=css;document.head.append(styles);
+ const box=document.createElement("section");box.id=ID;box.innerHTML=html;after.after(box);
+ get("cvx-qa-line").addEventListener("focus",linePicker);
+ get("cvx-qa-build").addEventListener("click",build);
+ get("cvx-qa-next").addEventListener("click",next);
+ get("cvx-qa-reset").addEventListener("click",reset);
+ linePicker();render();return true;
+}
+function boot(){if(start())return;const observer=new MutationObserver(()=>{if(start())observer.disconnect()});observer.observe(document.body,{childList:true,subtree:true})}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
 })();
