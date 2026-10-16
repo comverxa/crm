@@ -1,0 +1,22 @@
+name: COMVERXA - Backup ADM Master QA
+on:
+  push:
+    paths:
+      - backend/owner-backup-addon.js
+      - tests/owner-backup.test.mjs
+      - .github/workflows/owner-backup-qa.yml
+  pull_request:
+    paths:
+      - backend/owner-backup-addon.js
+      - tests/owner-backup.test.mjs
+      - .github/workflows/owner-backup-qa.yml
+  workflow_dispatch:
+jobs:
+  security-and-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Testar acesso privado, CSRF, integridade e restauração isolada
+        run: bun tests/owner-backup.test.mjs
