@@ -293,6 +293,22 @@ async function cvxSyncInspect(){
  }finally{cvxSyncBusy=false;btn.disabled=false}
 }
 function cvxSyncOnThread(){cvxSyncCard()}
+let cvxQrPollBusy=false;
+const cvxQrPollEveryMs=20000;
+async function cvxQrPollVisibleConversation(){
+ if(cvxQrPollBusy||document.visibilityState!=="visible")return;
+ const inbox=byId("inbox");
+ if(!inbox||inbox.classList.contains("hide")||!inbox.getClientRects().length)return;
+ const state=cvxSyncSelected();
+ if(!state.isQr||!state.thread||typeof window.loadMessages!=="function")return;
+ cvxQrPollBusy=true;
+ try{
+  // The CRM already uses GET /api/inbox/:id/messages in loadMessages.
+  // Polls only a visible QR conversation; no writes, no QR refresh and no sending.
+  await window.loadMessages();
+ }catch{}finally{cvxQrPollBusy=false}
+}
+window.setInterval(()=>{void cvxQrPollVisibleConversation()},cvxQrPollEveryMs);
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",cvxSyncOnThread,{once:true});else cvxSyncOnThread();
 
 const oldOpen=window.openThread;
