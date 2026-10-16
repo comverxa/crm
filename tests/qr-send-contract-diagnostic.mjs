@@ -17,3 +17,9 @@ const optinFlags=["consent","opt_in","marketing_consent","consent_evidence","app
 console.log("LEAD_FORM_CONTRACT",JSON.stringify({formPresent:form.length>0,namedFieldCount:fields.length,fields:fields.filter(x=>!/password|token|secret/i.test(x)),optinFlags}));
 
 console.log("LEAD_FORM_STRUCTURE",JSON.stringify({markup:form.slice(0,2200),length:form.length}));
+
+for (const needle of ["async function renderLines","function renderLines","function saveLine","async function saveLine","function connectQr","function qrConnect","function connectLine","function loadMessages","/api/lines/","saveLine(event,","qrGatewayReady","webhookConfigured","/api/inbox","lineSelect","mode==='api'"]){
+ const pos=html.indexOf(needle);
+ const snippet=pos<0?"not found":html.slice(pos,Math.min(html.length,pos+4400));
+ console.log("CONNECT_CONTRACT",needle,JSON.stringify(snippet.replace(/\\b(?:\\+?\\d{11,15})\\b/g,"[REDACTED_PHONE]")));
+}
