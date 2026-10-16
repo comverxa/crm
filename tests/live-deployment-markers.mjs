@@ -20,6 +20,9 @@ const flags={
  consentReviewButton:html.includes("Revisar autorização de "),
  consentReviewEditor:html.includes("window.editLead(Number(lid(lead)))"),
  consentSafety:html.includes("window.__cvxQrConsentEligible=eligible"),
+ manualPrepWithoutOptin:html.includes("contatos para atendimento manual"),
+ bulkOptinStillProtected:html.includes('queue.filter(q=>q.canBatch&&q.deliveryStatus==="pending"'),
+ optoutsStillProtected:html.includes("if(optedOut(l)){optouts++;continue}"),
  inFlightQueueLock:html.includes('get("cvx-qa-build").disabled=sending'),
  privacyAndSecurity:UI_contains(html)
 };
