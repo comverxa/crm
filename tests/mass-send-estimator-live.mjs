@@ -8,6 +8,8 @@ new Function(code); // syntax check
 const browser=await chromium.launch({headless:true,executablePath:"/usr/bin/google-chrome",args:["--no-sandbox"]});
 try{
  const page=await browser.newPage({viewport:{width:1365,height:830}});
+ // Validate the candidate module before updating production. It will supersede the deployed read-only widget for this synthetic browser session.
+ await page.addInitScript({content:code});
  const res=await page.goto(target,{waitUntil:"domcontentloaded",timeout:25000});
  assert.equal(res.status(),200);
  let html=await res.text();
