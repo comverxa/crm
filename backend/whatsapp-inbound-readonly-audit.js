@@ -30,7 +30,33 @@ function cvxInboxAuditCounts(){
     };
    }
   }
-  return {status:"ok",counts,columns,messageTotal:["messages","inbox_messages","whatsapp_messages","wa_messages"].reduce((sum,n)=>sum+(counts[n]||0),0)};
+
+  // Only counts by channel and direction. No phone, contact, message or tenant IDs leave SQLite.
+  const byLine=[];
+  const leadCounts=[];
+  let unlinked=null;
+  if(existing.has("leads")){
+   const leadCols=db.query('PRAGMA table_info("leads")').all().map(r=>String(r.name||""));
+   if(leadCols.includes("line")){
+    for(const row of db.query('SELECT line AS slot,COUNT(*) AS n FROM leads GROUP BY line').all()){
+     const slot=Number(row.slot);leadCounts.push({slot:Number.isInteger(slot)&&slot>=1&&slot<=3?slot:"other",n:Number(row.n)});
+    }
+    if(existing.has("messages")&&columns.messages?.hasLead&&columns.messages?.hasTenant){
+     try{
+      const rows=db.query('SELECT l.line AS slot,m.direction AS kind,COUNT(*) AS n FROM messages m LEFT JOIN leads l ON l.id=m.lead_id AND l.company_id=m.company_id GROUP BY l.line,m.direction').all();
+      for(const row of rows){
+       const slot=Number(row.slot),kind=String(row.kind||"").toLowerCase();
+       byLine.push({slot:Number.isInteger(slot)&&slot>=1&&slot<=3?slot:"unlinked",
+        direction:kind==="in"||kind==="out"?kind:"other",count:Number(row.n)});
+      }
+      unlinked=byLine.filter(x=>x.slot==="unlinked").reduce((a,x)=>a+x.count,0);
+     }catch{unlinked=null}
+    }
+   }
+  }
+  return {status:"ok",counts,columns,byLine,leadCounts,unlinked,
+    messageTotal:["messages","inbox_messages","whatsapp_messages","wa_messages"].reduce((sum,n)=>sum+(counts[n]||0),0)};
+
  }catch(e){
   return {status:"unavailable",reason:["SQLiteError","Error"].includes(String(e?.name))?"database": "database"};
  }finally{try{db?.close()}catch{}}
