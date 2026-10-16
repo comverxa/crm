@@ -34,8 +34,8 @@ try{
  // Contatos ficticios apenas no navegador sem autenticacao, nunca no backend.
  await page.evaluate(()=>{
   if(!Array.isArray(leads)||!Array.isArray(lines))throw new Error("CRM session arrays unavailable");
-  leads.push({id:960001,name:"Contato QA Um",stage:"novo",line:2});
-  leads.push({id:960002,name:"Contato QA Dois",stage:"proposta",line:2});
+  leads.push({id:960001,name:"Contato QA Um",stage:"novo",line:2,phone:"00000000001"});
+  leads.push({id:960002,name:"Contato QA Dois",stage:"proposta",line:2,phone:"00000000002"});
   lines.push({slot:2,name:"Linha QA QR",mode:"qr"});
  });
  await page.locator("#app .cvx-bgt-launch").first().click();
@@ -72,6 +72,7 @@ try{
  await page.locator("#cvx-bc-msg").fill("Olá, {nome}! Mensagem de teste.");
  await page.evaluate(()=>{
   window.__qaOpenCalls=[];
+  if(!document.getElementById("replyText")){const reply=document.createElement("textarea");reply.id="replyText";document.getElementById("app").append(reply)}
   window.openThread=async(id)=>{window.__qaOpenCalls.push(id)};
  });
  await page.locator("#cvx-qa-next").click();
