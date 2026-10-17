@@ -8,6 +8,9 @@ on:
       - 'frontend/whatsapp-media-composer.mjs'
       - 'tests/whatsapp-media.test.mjs'
       - '.github/workflows/whatsapp-media-tests.yml'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
