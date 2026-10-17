@@ -52,13 +52,14 @@ function safeName(name, mime) {
  *   authorizeConversation: (request:Request, conversationId:string)=>Promise<
  *     null|{instance:string,recipient:string,tenantId:string,line:number}>,
  *   authorizeCsrf:(request:Request)=>Promise<boolean>,
+ *   rateLimit:(request:Request,tenantId:string)=>Promise<boolean>,
  *   reserveSend:(tenantId:string, idempotencyKey:string)=>Promise<"reserved"|"duplicate">,
  *   finishSend:(tenantId:string, idempotencyKey:string, data:object)=>Promise<void>,
  *   evolutionUrl:string, evolutionApiKey:string, fetchImpl?:typeof fetch
  * }} deps
  */
 export function makeMediaHandler(deps) {
-  for (const k of ["authorizeConversation","authorizeCsrf","reserveSend","finishSend"]) {
+  for (const k of ["authorizeConversation","authorizeCsrf","rateLimit","reserveSend","finishSend"]) {
     if (typeof deps[k] !== "function") throw new Error("Adaptador não configurado: " + k);
   }
   const base = new URL(deps.evolutionUrl);
@@ -72,11 +73,14 @@ export function makeMediaHandler(deps) {
       const url = new URL(request.url);
       if (url.pathname !== "/api/comverxa/whatsapp/media") return reply({error:"Rota não encontrada"},404);
       if (!(await deps.authorizeCsrf(request))) return reply({error:"Sessão/CSRF inválido"},403);
+      const contentLength=Number(request.headers.get("content-length")||0);
+      if(contentLength>(MAX_AUDIO+1024*128))return reply({error:"Anexo muito grande"},413);
       const form = await request.formData();
       const conversationId = String(form.get("conversationId") || "");
       if (!/^[a-zA-Z0-9_-]{1,96}$/.test(conversationId)) return reply({error:"Conversa inválida"},400);
       const authorized = await deps.authorizeConversation(request, conversationId);
       if (!authorized) return reply({error:"Conversa não autorizada"},403);
+      if (!(await deps.rateLimit(request,authorized.tenantId))) return reply({error:"Muitas tentativas de envio"},429);
       // O tenant, a linha e o destinatário devem ser derivados do banco AUTORIZADO.
       if (!authorized.tenantId || !Number.isInteger(authorized.line) ||
           !/^[\w-]{1,70}$/.test(authorized.instance) ||
