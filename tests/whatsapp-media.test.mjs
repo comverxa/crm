@@ -25,6 +25,7 @@ function harness(overrides={}) {
   const finished=[];
   const deps={
     authorizeCsrf:async()=>true,
+    rateLimit:async()=>true,
     authorizeConversation:async(_request,id)=>id==="chat_2"?
       {tenantId:"tenant-a",line:2,recipient:"5531999999999",instance:"whatsapp-2"}:null,
     reserveSend:async(t,k)=>{const id=t+":"+k;if(seen.has(id))return "duplicate";seen.add(id);return "reserved";},
@@ -87,4 +88,10 @@ test("arquivo com MIME de imagem mas conteúdo inválido é rejeitado",async()=>
 });
 test("sessão/isolamento/controle idempotente são exigidos no bootstrap",()=>{
   assert.throws(()=>makeMediaHandler({evolutionUrl:"https://evolution.example.test",evolutionApiKey:"x"}),/Adaptador não configurado/);
+});
+
+test("limita solicitações antes de ler arquivo e chamar Evolution",async()=>{
+ const h=harness({rateLimit:async()=>false});
+ const r=await h.handler(req(makeFile(pngBytes,"foto.png","image/png")));
+ assert.equal(r.status,429); assert.equal(h.calls.length,0);
 });
