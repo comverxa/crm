@@ -1,0 +1,31 @@
+name: WhatsApp media isolated tests
+on:
+  push:
+    branches:
+      - feature/whatsapp-audio-imagem
+    paths:
+      - 'backend/whatsapp-media-evolution.mjs'
+      - 'frontend/whatsapp-media-composer.mjs'
+      - 'tests/whatsapp-media.test.mjs'
+      - '.github/workflows/whatsapp-media-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Checar sintaxe
+        run: |
+          node --check backend/whatsapp-media-evolution.mjs
+          node --check frontend/whatsapp-media-composer.mjs
+          node --check tests/whatsapp-media.test.mjs
+      - name: Testar envio isolado (sem mensagens reais)
+        run: node --test tests/whatsapp-media.test.mjs
