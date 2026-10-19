@@ -6,10 +6,12 @@ on:
     paths:
       - 'backend/whatsapp-media-evolution.mjs'
       - 'backend/whatsapp-media-view.mjs'
+      - 'backend/whatsapp-media-status.mjs'
       - 'frontend/whatsapp-media-composer.mjs'
       - 'frontend/whatsapp-media-history.mjs'
       - 'tests/whatsapp-media.test.mjs'
       - 'tests/whatsapp-media-view.test.mjs'
+      - 'tests/whatsapp-media-status.test.mjs'
       - '.github/workflows/whatsapp-media-tests.yml'
   pull_request:
     branches:
@@ -32,10 +34,12 @@ jobs:
         run: |
           node --check backend/whatsapp-media-evolution.mjs
           node --check backend/whatsapp-media-view.mjs
+          node --check backend/whatsapp-media-status.mjs
           node --check frontend/whatsapp-media-composer.mjs
           node --check frontend/whatsapp-media-history.mjs
           node --check tests/whatsapp-media.test.mjs
           node --check tests/whatsapp-media-view.test.mjs
+          node --check tests/whatsapp-media-status.test.mjs
       - name: Testar envio isolado (sem mensagens reais)
         run: node --test tests/whatsapp-media.test.mjs tests/whatsapp-media-view.test.mjs tests/whatsapp-media-status.test.mjs
       - name: Validacao publica de producao - sem autenticacao nem escrita
