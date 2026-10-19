@@ -1,3 +1,16 @@
+// O Safari/iPhone pode identificar arquivos .m4a como application/octet-stream.
+const MEDIA_TYPES = Object.freeze({
+  png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",
+  ogg:"audio/ogg",opus:"audio/ogg",webm:"audio/webm",
+  m4a:"audio/mp4",mp4:"audio/mp4",mp3:"audio/mpeg"
+});
+const MEDIA_ALLOWED = new Set(Object.values(MEDIA_TYPES));
+export function mediaMimeFromFile(file){
+  const original=String(file?.type||"").split(";")[0].toLowerCase().trim();
+  if(MEDIA_ALLOWED.has(original))return original;
+  const extension=String(file?.name||"").toLowerCase().split(".").at(-1);
+  return MEDIA_TYPES[extension]||null;
+}
 /**
  * COMVERXA - Controles de imagem e gravação de voz.
  * Módulo isolado para integrar AO compositor da conversa (não ao site comercial).
@@ -42,11 +55,12 @@ export function mountWhatsAppMediaComposer(container, options) {
   let file=null,mediaURL=null,recorder=null,recordingStream=null,stopping=false,recordChunks=[];
   let busy=false,requestKey=null,selectionConversationId=null;
   const recordButton=makeButton("Gravar áudio",()=>toggleRecording());
-  controls.append(
-    makeButton("Imagem",()=>imgInput.click()),
-    makeButton("Arquivo de áudio",()=>audioInput.click()),
-    recordButton
-  );
+  const imageButton=makeButton("Imagem",()=>{if(!busy)imgInput.click();});
+  const audioButton=makeButton("Arquivo de áudio",()=>{if(!busy)audioInput.click();});
+  controls.append(imageButton,audioButton,recordButton);
+  function setSending(isSending){
+    for(const button of [imageButton,audioButton,recordButton,cancel])button.disabled=isSending;
+  }
   host.append(controls,imgInput,audioInput,details,status);
   container.append(host);
   const setStatus=(message)=>{status.textContent=message;};
@@ -62,14 +76,22 @@ export function mountWhatsAppMediaComposer(container, options) {
     send.disabled=false;setStatus("");
   }
   function preview(selected) {
+    // Não substituir o anexo enquanto o servidor pode estar processando o envio.
+    if(busy)return;
     reset(); if(!selected)return;
-    const type=String(selected.type||"").split(";")[0];
-    if(!type.startsWith("image/")&&!type.startsWith("audio/")){
-      setStatus("Selecione uma imagem ou áudio válido."); return;
+    const type=mediaMimeFromFile(selected);
+    if(!type){setStatus("Selecione uma imagem ou áudio válido.");return;}
+    const limit=type.startsWith("image/")?10*1024*1024:12*1024*1024;
+    if(!selected.size||selected.size>limit){
+      setStatus("O anexo está vazio ou ultrapassa o limite permitido.");return;
     }
     selectionConversationId=String(options.getConversationId()||"");
     if(!selectionConversationId){setStatus("Selecione uma conversa antes de anexar.");return;}
-    file=selected;mediaURL=URL.createObjectURL(file);
+    file=selected;
+    // MIME genérico é comum em anexos de áudio no Safari; usar MIME reconhecido só para preview.
+    const previewBlob=String(selected.type||"").split(";")[0].toLowerCase()===type
+      ?selected:new Blob([selected],{type});
+    mediaURL=URL.createObjectURL(previewBlob);
     const view=document.createElement(type.startsWith("image/")?"img":"audio");
     view.src=mediaURL;view.setAttribute("aria-label","Pré-visualização do anexo");
     if(view instanceof HTMLAudioElement)view.controls=true;
@@ -131,9 +153,9 @@ export function mountWhatsAppMediaComposer(container, options) {
       setStatus("Você mudou de conversa. Cancele este anexo e selecione-o novamente para evitar envio ao contato errado.");
       return;
     }
-    busy=true;send.disabled=true;
-    if(!crypto?.randomUUID){setStatus("Navegador incompatível com envio seguro.");busy=false;send.disabled=false;return;}
+    if(!globalThis.crypto?.randomUUID){setStatus("Navegador incompatível com envio seguro.");return;}
     requestKey=requestKey||crypto.randomUUID();
+    busy=true;send.disabled=true;setSending(true);
     setStatus("Enviando anexo pelo WhatsApp...");
     const form=new FormData();
     form.append("conversationId",conversationId);
@@ -155,7 +177,7 @@ export function mountWhatsAppMediaComposer(container, options) {
     }catch(err){
       setStatus(String(err.message||"Erro ao enviar")+". Verifique o histórico antes de tentar novamente.");
       // Mantém o botão desativado para evitar disparo duplicado após timeout.
-    }finally {busy=false;}
+    }finally {busy=false;setSending(false);}
   }
   return {
     destroy(){reset();host.remove();},
