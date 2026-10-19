@@ -40,7 +40,7 @@ export function mountWhatsAppMediaComposer(container, options) {
   status.className="cvx-media-status";
   details.append(media,caption,send,cancel);
   let file=null,mediaURL=null,recorder=null,recordingStream=null,stopping=false,recordChunks=[];
-  let busy=false,requestKey=null;
+  let busy=false,requestKey=null,selectionConversationId=null;
   const recordButton=makeButton("Gravar áudio",()=>toggleRecording());
   controls.append(
     makeButton("Imagem",()=>imgInput.click()),
@@ -56,7 +56,7 @@ export function mountWhatsAppMediaComposer(container, options) {
   function reset() {
     if(recorder?.state === "recording") {stopping=true;recorder.stop();}
     stopTracks();
-    file=null;requestKey=null;imgInput.value="";audioInput.value="";caption.value="";
+    file=null;requestKey=null;selectionConversationId=null;imgInput.value="";audioInput.value="";caption.value="";
     if(mediaURL)URL.revokeObjectURL(mediaURL);
     mediaURL=null;media.replaceChildren();details.hidden=true;recordButton.textContent="Gravar áudio";
     send.disabled=false;setStatus("");
@@ -67,6 +67,8 @@ export function mountWhatsAppMediaComposer(container, options) {
     if(!type.startsWith("image/")&&!type.startsWith("audio/")){
       setStatus("Selecione uma imagem ou áudio válido."); return;
     }
+    selectionConversationId=String(options.getConversationId()||"");
+    if(!selectionConversationId){setStatus("Selecione uma conversa antes de anexar.");return;}
     file=selected;mediaURL=URL.createObjectURL(file);
     const view=document.createElement(type.startsWith("image/")?"img":"audio");
     view.src=mediaURL;view.setAttribute("aria-label","Pré-visualização do anexo");
@@ -87,9 +89,14 @@ export function mountWhatsAppMediaComposer(container, options) {
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){
       setStatus("O navegador não permite gravação de áudio. Use Arquivo de áudio.");return;
     }
+    const recordingConversation=String(options.getConversationId()||"");
+    if(!recordingConversation){setStatus("Selecione uma conversa antes de gravar.");return;}
     reset();recordChunks=[];stopping=false;
     try {
       recordingStream=await navigator.mediaDevices.getUserMedia({audio:true});
+      if(String(options.getConversationId()||"")!==recordingConversation){
+        stopTracks();setStatus("Conversa alterada. Grave novamente para evitar envio ao contato errado.");return;
+      }
       const types=["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
       const supported=types.find(t=>MediaRecorder.isTypeSupported(t));
       recorder=new MediaRecorder(recordingStream,supported?{mimeType:supported}:{});
@@ -115,7 +122,12 @@ export function mountWhatsAppMediaComposer(container, options) {
     if(busy||!file)return;
     const conversationId=String(options.getConversationId()||"");
     if(!conversationId){setStatus("Selecione uma conversa para enviar.");return;}
+    if(conversationId!==selectionConversationId){
+      setStatus("Você mudou de conversa. Cancele este anexo e selecione-o novamente para evitar envio ao contato errado.");
+      return;
+    }
     busy=true;send.disabled=true;
+    if(!crypto?.randomUUID){setStatus("Navegador incompatível com envio seguro.");busy=false;send.disabled=false;return;}
     requestKey=requestKey||crypto.randomUUID();
     setStatus("Enviando anexo pelo WhatsApp...");
     const form=new FormData();
