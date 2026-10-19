@@ -73,3 +73,18 @@ test("rejects mismatching MIME data URI",async()=>{
 test("must configure tenant auth and rate limit",()=>{
  assert.throws(()=>makeMediaViewHandler({evolutionUrl:"https://example.test",evolutionApiKey:"x"}),/autenticação/);
 });
+
+test("rejeita HTML disfarçado de PNG no provedor",async()=>{
+ const fake=Buffer.from("<html>nunca exibir</html>");
+ const h=setup({fetchImpl:async()=>new Response(JSON.stringify({mimetype:"image/png",base64:fake.toString("base64")}),{status:200})});
+ const r=await h.handler(request());
+ assert.equal(r.status,415);
+ assert.equal(r.headers.get("X-Content-Type-Options"),"nosniff");
+});
+test("aceita áudio OGG quando MIME e conteúdo conferem",async()=>{
+ const h=setup({fetchImpl:async()=>new Response(JSON.stringify({mimetype:"audio/ogg",base64:wav.toString("base64")}),{status:200})});
+ const r=await h.handler(request("chat2","msg2"));
+ assert.equal(r.status,200);
+ assert.equal(r.headers.get("Content-Type"),"audio/ogg");
+ assert.deepEqual(Buffer.from(await r.arrayBuffer()),wav);
+});
