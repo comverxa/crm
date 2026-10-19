@@ -1,0 +1,48 @@
+name: WhatsApp media isolated tests
+on:
+  push:
+    branches:
+      - feature/whatsapp-audio-imagem
+    paths:
+      - 'backend/whatsapp-media-evolution.mjs'
+      - 'backend/whatsapp-media-view.mjs'
+      - 'backend/whatsapp-media-status.mjs'
+      - 'frontend/whatsapp-media-composer.mjs'
+      - 'frontend/whatsapp-media-history.mjs'
+      - 'tests/whatsapp-media.test.mjs'
+      - 'tests/whatsapp-media-view.test.mjs'
+      - 'tests/whatsapp-media-status.test.mjs'
+      - 'tests/whatsapp-media-composer.test.mjs'
+      - '.github/workflows/whatsapp-media-tests.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Checar sintaxe
+        run: |
+          node --check backend/whatsapp-media-evolution.mjs
+          node --check backend/whatsapp-media-view.mjs
+          node --check backend/whatsapp-media-status.mjs
+          node --check frontend/whatsapp-media-composer.mjs
+          node --check tests/whatsapp-media-composer.test.mjs
+          node --check frontend/whatsapp-media-history.mjs
+          node --check tests/whatsapp-media.test.mjs
+          node --check tests/whatsapp-media-view.test.mjs
+          node --check tests/whatsapp-media-status.test.mjs
+      - name: Testar envio isolado (sem mensagens reais)
+        run: node --test tests/whatsapp-media.test.mjs tests/whatsapp-media-view.test.mjs tests/whatsapp-media-status.test.mjs tests/whatsapp-media-composer.test.mjs
+      - name: Validacao publica de producao - sem autenticacao nem escrita
+        run: node tests/commercial-readiness.mjs
