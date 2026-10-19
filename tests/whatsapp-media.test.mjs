@@ -95,3 +95,10 @@ test("limita solicitações antes de ler arquivo e chamar Evolution",async()=>{
  const r=await h.handler(req(makeFile(pngBytes,"foto.png","image/png")));
  assert.equal(r.status,429); assert.equal(h.calls.length,0);
 });
+
+test("resposta 200 sem identificador permanece pendente",async()=>{
+ const h=harness({fetchImpl:async()=>new Response(JSON.stringify({status:"PENDING"}),{status:200})});
+ const r=await h.handler(req(makeFile(pngBytes,"foto.png","image/png")));
+ assert.equal(r.status,502);
+ assert.equal(h.finished[0].result.state,"uncertain");
+});
