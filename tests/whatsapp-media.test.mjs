@@ -123,3 +123,31 @@ test("imagem inclui os dois nomes do campo de arquivo por compatibilidade",async
  assert.equal(payload.fileName,"foto.png");
  assert.equal(payload.filename,"foto.png");
 });
+
+test("rejeita corpo multipart acima do limite mesmo sem Content-Length",async()=>{
+ const h=harness();
+ const tooLarge=makeFile(new Uint8Array(12*1024*1024+128*1024+256),"voz.webm","audio/webm");
+ const r=await h.handler(req(tooLarge,{idempotencyKey:"oversize-beyond-header-00001"}));
+ assert.equal(r.status,413);
+ assert.equal(h.calls.length,0);
+});
+test("ignora Content-Length falsamente baixo e impõe limite real",async()=>{
+ const h=harness();
+ const form=new FormData();
+ form.append("conversationId","chat_2");
+ form.append("idempotencyKey","oversize-fake-header-000001");
+ form.append("file",makeFile(new Uint8Array(12*1024*1024+128*1024+256),"voz.webm","audio/webm"));
+ const r=await h.handler(new Request("https://app.comverxa.com.br/api/comverxa/whatsapp/media",{
+   method:"POST",body:form,headers:{"Content-Length":"1"}
+ }));
+ assert.equal(r.status,413);
+ assert.equal(h.calls.length,0);
+});
+test("recusa body não multipart antes de enviar ao provedor",async()=>{
+ const h=harness();
+ const r=await h.handler(new Request("https://app.comverxa.com.br/api/comverxa/whatsapp/media",{
+  method:"POST",body:JSON.stringify({conversationId:"chat_2",file:"ignored"}),headers:{"Content-Type":"application/json"}
+ }));
+ assert.equal(r.status,400);
+ assert.equal(h.calls.length,0);
+});
