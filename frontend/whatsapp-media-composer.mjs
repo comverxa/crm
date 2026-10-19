@@ -104,6 +104,11 @@ export function mountWhatsAppMediaComposer(container, options) {
       recorder.addEventListener("stop",()=>{
         recordButton.disabled=false;stopTracks();
         if(stopping)return;
+        if(String(options.getConversationId()||"")!==recordingConversation){
+          recordChunks=[];
+          setStatus("Conversa alterada durante a gravação. Áudio descartado para proteger o destinatário.");
+          return;
+        }
         const typ=recorder.mimeType||supported||"audio/webm";
         const ext=typ.includes("mp4")?"m4a":typ.includes("ogg")?"ogg":"webm";
         const blob=new Blob(recordChunks,{type:typ});
