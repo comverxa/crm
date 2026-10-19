@@ -10,6 +10,20 @@ const ALLOWED_MIME = new Set([
  "audio/ogg","audio/webm","audio/mp4","audio/mpeg"
 ]);
 const MAX_BYTES = 16*1024*1024;
+function matchesMediaSignature(bytes,mime){
+ const buf=Buffer.from(bytes);
+ const head=buf.subarray(0,16);
+ if(mime==="image/png")return head.length>=8 && head.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+ if(mime==="image/jpeg")return head.length>=3 && head[0]===255 && head[1]===216 && head[2]===255;
+ if(mime==="image/webp")return head.length>=12 && head.toString("ascii",0,4)==="RIFF" && head.toString("ascii",8,12)==="WEBP";
+ if(mime==="audio/ogg")return head.length>=4 && head.toString("ascii",0,4)==="OggS";
+ if(mime==="audio/webm")return head.length>=4 && head[0]===0x1a && head[1]===0x45 && head[2]===0xdf && head[3]===0xa3;
+ if(mime==="audio/mp4")return head.length>=8 && head.toString("ascii",4,8)==="ftyp";
+ if(mime==="audio/mpeg")return head.length>=3 &&
+   (head.toString("ascii",0,3)==="ID3" || (head[0]===0xff && (head[1]&0xe0)===0xe0));
+ return false;
+}
+
 const noStore = {"Cache-Control":"no-store, private", "X-Content-Type-Options":"nosniff",
  "Cross-Origin-Resource-Policy":"same-origin", "X-Frame-Options":"DENY"};
 
@@ -72,6 +86,8 @@ export function makeMediaViewHandler(deps){
      return responseError(413,"Mídia grande ou inválida");
    const bytes=Buffer.from(raw,"base64");
    if(bytes.length<1||bytes.length>MAX_BYTES)return responseError(413,"Mídia grande ou vazia");
+   // Nunca confiar apenas no MIME vindo do fornecedor; validar a assinatura binária.
+   if(!matchesMediaSignature(bytes,mime))return responseError(415,"Conteúdo de mídia inválido");
    return new Response(bytes,{status:200,headers:{
     ...noStore,"Content-Type":mime, "Content-Disposition":"inline",
     "Content-Security-Policy":"default-src 'none'; sandbox",
