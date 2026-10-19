@@ -15,9 +15,12 @@ for(const size of [{width:390,height:844,name:"iPhone"},{width:1440,height:900,n
   assert.ok(metrics.outer<=metrics.inner+3,size.name+" page overflow "+JSON.stringify(metrics));
   const cta=page.getByRole("link",{name:/começar teste grátis/i}).first();
   assert.ok(await cta.isVisible(),size.name+" trial CTA invisible");
-  const demo=page.getByRole("link",{name:/Solicitar demonstração por e-mail/i});
+  const demo=page.getByRole("link",{name:/solicitar demonstração/i}).first();
   assert.ok(await demo.count(),size.name+" demo CTA missing");
-  assert.ok((await demo.first().getAttribute("href")).startsWith("mailto:"));
+  assert.ok((await demo.getAttribute("href")).includes("/captar"),size.name+" demo request must link to consent form");
+  const contract=page.getByRole("link",{name:/solicitar contratação/i}).first();
+  assert.ok(await contract.isVisible(),size.name+" assisted contracting CTA missing");
+  assert.equal(await contract.getAttribute("href"),"./contratar.html");
   const customerLinks=await page.locator('a[href="./acesso.html"]').count();
   assert.ok(customerLinks>=1,size.name+" customer access links missing");
   const links=await page.locator('a[href="./privacidade.html"],a[href="./termos.html"]').count();
@@ -37,7 +40,7 @@ for(const size of [{width:390,height:844,name:"iPhone"},{width:1440,height:900,n
  }catch(error){problems.push(size.name+": "+error.message)}
  finally{await page.close()}
 }
-for(const relative of ["privacidade.html","termos.html","acesso.html"]){
+for(const relative of ["privacidade.html","termos.html","acesso.html","contratar.html"]){
  const page=await browser.newPage({viewport:{width:375,height:812}});
  try{
   const response=await page.goto(base+relative,{waitUntil:"domcontentloaded",timeout:30000});
@@ -49,6 +52,15 @@ for(const relative of ["privacidade.html","termos.html","acesso.html"]){
    const signIn=page.locator("#login-btn");
    assert.ok(await signIn.isVisible());
    assert.equal(await signIn.getAttribute("href"),"https://app.comverxa.com.br/");
+  }
+  if(relative==="contratar.html"){
+   const form=page.locator("#sales-form");
+   assert.ok(await form.isVisible());
+   assert.ok(await page.locator('input[type="email"]').count(),"Buyer email missing");
+   assert.ok(await page.getByRole("button",{name:/preparar solicitação por e-mail/i}).isVisible());
+   assert.ok(await page.getByRole("button",{name:/copiar solicitação/i}).isVisible());
+   assert.ok((await page.locator("body").textContent()).includes("não realiza pagamento"),"Sales page must disclose no direct charge");
+   assert.ok(await page.locator('a[href="./privacidade.html"]').count(),"Privacy notice missing from order page");
   }
   console.log("PASS | "+relative+" legal page mobile");
  }catch(e){problems.push(relative+": "+e.message)}
