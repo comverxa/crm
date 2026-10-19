@@ -13,6 +13,56 @@ const AUDIO = new Set(["audio/ogg", "audio/webm", "audio/mp4", "audio/mpeg"]);
 const MAX_IMAGE = 10 * 1024 * 1024;
 const MAX_AUDIO = 12 * 1024 * 1024;
 
+const MAX_MULTIPART = MAX_AUDIO + 128 * 1024;
+
+/**
+ * Read multipart as a bounded stream: Content-Length is advisory and may be
+ * missing or false. Never call unbounded request.formData() on an upload.
+ * Auth/CSRF must be checked before invoking this parser.
+ */
+async function boundedMultipartFormData(request) {
+  const contentType = String(request.headers.get("content-type") || "");
+  if (!/^multipart\/form-data\s*;\s*boundary=/i.test(contentType)) {
+    return {error:"Envie uma mídia como formulário multipart",status:400};
+  }
+  const statedLength = request.headers.get("content-length");
+  if (statedLength != null) {
+    const size = Number(statedLength);
+    if (!Number.isSafeInteger(size) || size < 0)
+      return {error:"Tamanho de anexo inválido",status:400};
+    if (size > MAX_MULTIPART)
+      return {error:"Anexo muito grande",status:413};
+  }
+  if (!request.body) return {error:"Arquivo não informado",status:400};
+  const reader = request.body.getReader();
+  let bytesSeen = 0, exceeded = false;
+  const limited = new ReadableStream({
+    async pull(controller) {
+      try {
+        const {value,done} = await reader.read();
+        if (done) {controller.close(); return;}
+        bytesSeen += value.byteLength;
+        if (bytesSeen > MAX_MULTIPART) {
+          exceeded = true;
+          controller.error(new Error("multipart_limit_exceeded"));
+          void reader.cancel().catch(()=>{});
+          return;
+        }
+        controller.enqueue(value);
+      } catch (error) {controller.error(error);}
+    },
+    cancel(reason) {return reader.cancel(reason);}
+  });
+  try {
+    const form = await new Response(limited, {headers:{"Content-Type":contentType}}).formData();
+    return {form};
+  } catch {
+    return exceeded
+      ? {error:"Anexo muito grande",status:413}
+      : {error:"Formulário de mídia inválido",status:400};
+  }
+}
+
 const reply = (data, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
@@ -73,9 +123,9 @@ export function makeMediaHandler(deps) {
       const url = new URL(request.url);
       if (url.pathname !== "/api/comverxa/whatsapp/media") return reply({error:"Rota não encontrada"},404);
       if (!(await deps.authorizeCsrf(request))) return reply({error:"Sessão/CSRF inválido"},403);
-      const contentLength=Number(request.headers.get("content-length")||0);
-      if(contentLength>(MAX_AUDIO+1024*128))return reply({error:"Anexo muito grande"},413);
-      const form = await request.formData();
+      const upload = await boundedMultipartFormData(request);
+      if (upload.error) return reply({error:upload.error},upload.status);
+      const form = upload.form;
       const conversationId = String(form.get("conversationId") || "");
       if (!/^[a-zA-Z0-9_-]{1,96}$/.test(conversationId)) return reply({error:"Conversa inválida"},400);
       const authorized = await deps.authorizeConversation(request, conversationId);
