@@ -4,6 +4,14 @@
 
 ## Componentes preparados
 
+### Robustez adicionada em 19/10/2026 (somente branch de desenvolvimento)
+- Upload multipart lido com limite de bytes em streaming, mesmo sem Content-Length ou com cabeçalho falsificado.
+- Arquivos de mídia recebidos passam por validação de assinatura binária compatível com o MIME, evitando conteúdo disfarçado.
+- Compositor bloqueia troca/cancelamento de anexo enquanto a requisição pode estar em andamento.
+- Prévia reconhece `.m4a` do Safari/iPhone quando o navegador informa MIME genérico; o servidor continua verificando assinatura e tamanho.
+- Testes automatizados adicionais para limite, arquivo disfarçado, áudio OGG e formatos Safari. **Esses testes são isolados e NÃO equivalem a envio real num telefone.**
+
+
 - `backend/whatsapp-media-evolution.mjs`: recebe imagem (PNG/JPEG/WEBP) ou áudio (OGG/WEBM/M4A/MP3), valida tamanho e assinatura, encaminha à Evolution API v2 por `/message/sendMedia/{instance}` ou `/message/sendWhatsAppAudio/{instance}`.
 - `frontend/whatsapp-media-composer.mjs`: botões de imagem e anexo, gravação pelo microfone com `MediaRecorder` (iOS/Safari ou navegadores compatíveis), prévia, legenda, cancelar e confirmar.
 - `backend/whatsapp-media-view.mjs`: recuperação de imagens e áudios recebidos via proxy binário autenticado, sem expor a chave do fornecedor; precisa de vínculo autorizado por ID da mensagem.
