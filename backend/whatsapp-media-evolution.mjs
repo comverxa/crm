@@ -100,22 +100,37 @@ export function makeMediaHandler(deps) {
       const endpoint = image ? "sendMedia" : "sendWhatsAppAudio";
       const payload = image
         ? {number:authorized.recipient, mediatype:"image", mimetype:mime,
-           media:Buffer.from(bytes).toString("base64"), fileName:safeName(attachment.name,mime), caption}
+           media:Buffer.from(bytes).toString("base64"), fileName:safeName(attachment.name,mime), filename:safeName(attachment.name,mime), caption}
         : {number:authorized.recipient, audio:Buffer.from(bytes).toString("base64"), encoding:true};
       const path = "/message/" + endpoint + "/" + encodeURIComponent(authorized.instance);
       const target = new URL(base.href); target.pathname = base.pathname.replace(/\/$/,"") + path;
-      const provider = await fetcher(target.href, {
-        method:"POST",headers:{"Content-Type":"application/json",apikey:deps.evolutionApiKey},
-        body:JSON.stringify(payload),signal:AbortSignal.timeout(45000),redirect:"error"
-      });
+      let provider;
+      try {
+        provider = await fetcher(target.href, {
+          method:"POST",headers:{"Content-Type":"application/json",apikey:deps.evolutionApiKey},
+          body:JSON.stringify(payload),signal:AbortSignal.timeout(45000),redirect:"error"
+        });
+      } catch {
+        // Não fazer retry automático: timeout não prova que o provedor deixou de enviar.
+        await deps.finishSend(authorized.tenantId,idempotencyKey,{
+          state:"uncertain",providerAccepted:false,messageId:null,
+          type:image?"image":"audio",conversationId,line:authorized.line
+        });
+        return reply({error:"Envio com confirmação inconclusiva. Consulte o histórico antes de tentar novamente."},503);
+      }
       let providerResponse = {};
       try { providerResponse = await provider.json(); } catch {}
-      const externalMessageId = providerResponse?.key?.id || providerResponse?.data?.key?.id || null;
-      // Confirmação do fornecedor não é confirmação de entrega no destinatário.
-      const result = {ok:provider.ok,providerAccepted:provider.ok,messageId:externalMessageId,
-        type:image?"image":"audio",conversationId,line:authorized.line};
+      const candidate = providerResponse?.key?.id ?? providerResponse?.data?.key?.id;
+      const externalMessageId = typeof candidate==="string" && /^[A-Za-z0-9_-]{4,160}$/.test(candidate)?candidate:null;
+      const providerRejected = !provider.ok || providerResponse?.error ||
+        ["ERROR","FAILED","FAILURE"].includes(String(providerResponse?.status||"").toUpperCase());
+      // Aceite do provedor + ID de mensagem não equivale à entrega no destinatário.
+      const state = providerRejected?"provider_rejected":externalMessageId?"provider_accepted":"uncertain";
+      const result = {ok:state==="provider_accepted",providerAccepted:state==="provider_accepted",
+        state,messageId:externalMessageId,type:image?"image":"audio",conversationId,line:authorized.line};
       await deps.finishSend(authorized.tenantId,idempotencyKey,result);
-      if (!provider.ok) return reply({error:"Falha no envio pelo provedor",providerStatus:provider.status},502);
+      if(providerRejected) return reply({error:"Falha no envio pelo provedor",providerStatus:provider.status},502);
+      if(!externalMessageId) return reply({error:"O provedor não confirmou um ID de mensagem; consulte o histórico antes de tentar novamente."},502);
       return reply(result,202);
     } catch (e) {
       // Não registrar chaves, mídia, números nem dados de clientes.
