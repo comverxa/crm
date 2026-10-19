@@ -102,3 +102,24 @@ test("resposta 200 sem identificador permanece pendente",async()=>{
  assert.equal(r.status,502);
  assert.equal(h.finished[0].result.state,"uncertain");
 });
+
+test("falha do provedor persiste estado rejeitado",async()=>{
+ const h=harness({fetchImpl:async()=>new Response(JSON.stringify({error:"bad request"}),{status:400})});
+ const r=await h.handler(req(makeFile(pngBytes,"foto.png","image/png")));
+ assert.equal(r.status,502);
+ assert.equal(h.finished[0].result.state,"provider_rejected");
+ assert.equal(h.finished[0].result.ok,false);
+});
+test("falha de rede persiste estado incerto sem retry automático",async()=>{
+ const h=harness({fetchImpl:async()=>{throw new Error("network unavailable")}});
+ const r=await h.handler(req(makeFile(pngBytes,"foto.png","image/png")));
+ assert.equal(r.status,503);
+ assert.equal(h.finished[0].result.state,"uncertain");
+});
+test("imagem inclui os dois nomes do campo de arquivo por compatibilidade",async()=>{
+ const h=harness();
+ await h.handler(req(makeFile(pngBytes,"foto.png","image/png")));
+ const payload=JSON.parse(h.calls[0].options.body);
+ assert.equal(payload.fileName,"foto.png");
+ assert.equal(payload.filename,"foto.png");
+});
