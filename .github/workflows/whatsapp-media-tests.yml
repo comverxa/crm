@@ -37,4 +37,4 @@ jobs:
           node --check tests/whatsapp-media.test.mjs
           node --check tests/whatsapp-media-view.test.mjs
       - name: Testar envio isolado (sem mensagens reais)
-        run: node --test tests/whatsapp-media.test.mjs tests/whatsapp-media-view.test.mjs
+        run: node --test tests/whatsapp-media.test.mjs tests/whatsapp-media-view.test.mjs tests/whatsapp-media-status.test.mjs
