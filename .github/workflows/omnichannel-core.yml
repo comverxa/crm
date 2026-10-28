@@ -1,0 +1,20 @@
+name: COMVERXA - Omnichannel Core Unit Tests
+on:
+  push:
+    branches: [main, 'feature/**']
+    paths:
+      - 'backend/omnichannel-core.mjs'
+      - 'tests/omnichannel-core.test.mjs'
+      - '.github/workflows/omnichannel-core.yml'
+  workflow_dispatch:
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testar isolamento e eventos de mensagens (sem rede externa)
+        run: node --test tests/omnichannel-core.test.mjs
