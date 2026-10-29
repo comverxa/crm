@@ -101,6 +101,14 @@ async function loadRenewals(){
  for(const x of d.items)row(table,[x.id,x.sellerId,x.endsOn,n(x.daysUntil),x.band]);
  if(!d.items.length)row(table,["Nenhum contrato a renovar"]);
 }
+async function loadUsers(){
+ const d=await call("/api/pilot/users");
+ const tbody=$("usersTable"),options=$("sellerOptions");empty(tbody);empty(options);
+ for(const u of d.users){
+  row(tbody,[u.email,u.role,u.id]);
+  const opt=document.createElement("option");opt.value=u.id;opt.label=u.email+" — "+u.role;options.append(opt);
+ }
+}
 async function refresh(){
  const base=contextMonth();
  $("printReport").href="/api/commercial/report/print"+base;
@@ -110,6 +118,7 @@ async function refresh(){
  if(currentView==="goals")return loadRules();
  if(currentView==="team")return loadTeam();
  if(currentView==="renewals")return loadRenewals();
+ if(currentView==="users")return loadUsers();
 }
 function bindForm(id,endpoint,transform,after){
  $(id).addEventListener("submit",async e=>{
@@ -133,6 +142,7 @@ async function init(){
   $("printReport").hidden=false;
  }
  if(!["admin","master"].includes(currentUser.role)){$('#nav [data-view="users"]').hidden=true}
+ if(["admin","master","manager"].includes(currentUser.role))await loadUsers();
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
  $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("open")});
  $("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("open")});
@@ -148,7 +158,15 @@ async function init(){
  });
  bindForm("sellerGoalForm","/api/commercial/seller-plans",v=>({sellerId:v.sellerId,tiers:[
   {minSales:0,bonusCents:0},{minSales:Number(v.goal1),bonusCents:cents(v.bonus1)},{minSales:Number(v.goal2),bonusCents:cents(v.bonus2)}]}));
- bindForm("userForm","/api/pilot/users",v=>({email:v.email,password:v.password,role:v.role}));
+ $("userForm").addEventListener("submit",async e=>{
+  e.preventDefault();const btn=e.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
+  try{
+   const v=Object.fromEntries(new FormData(e.currentTarget).entries());
+   const created=await call("/api/pilot/users",{method:"POST",body:{email:v.email,password:v.password,role:v.role}});
+   notify("Usuário criado. ID do vendedor: "+created.id);
+   e.currentTarget.reset();await loadUsers();
+  }catch(error){notify(error.message,true)}finally{btn.disabled=false}
+ });
  $("passwordForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const v=Object.fromEntries(new FormData(e.currentTarget).entries());
