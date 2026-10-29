@@ -149,6 +149,15 @@ async function init(){
  bindForm("sellerGoalForm","/api/commercial/seller-plans",v=>({sellerId:v.sellerId,tiers:[
   {minSales:0,bonusCents:0},{minSales:Number(v.goal1),bonusCents:cents(v.bonus1)},{minSales:Number(v.goal2),bonusCents:cents(v.bonus2)}]}));
  bindForm("userForm","/api/pilot/users",v=>({email:v.email,password:v.password,role:v.role}));
+ $("passwordForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const v=Object.fromEntries(new FormData(e.currentTarget).entries());
+  if(v.newPassword!==v.confirmPassword){notify("Confirmação da senha não confere.",true);return}
+  const b=e.currentTarget.querySelector('button[type="submit"]');b.disabled=true;
+  try{await call("/api/auth/password",{method:"POST",body:{oldPassword:v.oldPassword,newPassword:v.newPassword}});
+   location.assign("/login");
+  }catch(error){notify("Não foi possível alterar a senha: "+error.message,true)}finally{b.disabled=false}
+ });
  try{await loadRules()}catch(e){if(e.message!=="Falha: 404")notify("Configure as regras da empresa em Metas e Comissão.",false)}
  try{await refresh()}catch(e){if(e.message.includes("Commission rules not configured")||e.message==="Verifique os campos e regras informadas"){notify("Configure suas metas em Metas e Comissão.",false);show("goals")}else notify(e.message,true)}
 }
