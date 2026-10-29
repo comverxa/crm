@@ -4,6 +4,7 @@ on:
     branches: [main, 'feature/**']
     paths:
       - 'backend/omnichannel-*.mjs'
+      - 'site/omnichannel-composer.mjs'
       - 'tests/omnichannel-*.test.mjs'
       - '.github/workflows/omnichannel-core.yml'
   pull_request:
