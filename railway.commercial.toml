@@ -1,0 +1,9 @@
+# This file applies ONLY when a separate service explicitly selects it.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.commercial"
+[deploy]
+healthcheckPath = "/healthz"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
