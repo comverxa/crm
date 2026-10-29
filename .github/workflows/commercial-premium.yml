@@ -26,5 +26,6 @@ jobs:
         run: |
           node --check backend/commercial-premium-core.mjs
           node --check backend/commercial-premium-store.mjs
+          node --check backend/commercial-premium-http.mjs
       - name: Testes integrados sem dados reais
         run: node --test tests/commercial-premium.test.mjs
