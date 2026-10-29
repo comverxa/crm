@@ -1,11 +1,11 @@
-# Only used by a new Railway service connected to this GitHub repository.
-# The existing CRM Bun Function is not connected to this repo.
+# Configuration scoped to branch feature/comverxa-premium-comercial-v1.
+# This branch is used ONLY for the isolated COMVERXA Commercial pilot.
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "Dockerfile.commercial"
 
 [deploy]
 healthcheckPath = "/healthz"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 5
+restartPolicyMaxRetries = 3
