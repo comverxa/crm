@@ -45,7 +45,10 @@ test("HTTP pilot login, secure session, CSRF, sales and logout end-to-end",async
  assert.equal(r.status,201);
  r=await fetch(base+"/api/commercial/summary?month=2026-10&asOf=2026-10-29",{headers:{cookie}});
  assert.equal(r.status,200);const dash=await r.json();
- assert.equal(dash.counts.sold,1);assert.equal(dash.commissions.effectiveCents,1625);
+ assert.equal(dash.counts.sold,1);assert.equal(dash.commissions.effectiveCents,0);assert.equal(dash.commissions.retainedCents,1625);
+ r=await post("/api/commercial/sales",{id:"TEST-01",sellerId:me.user.id,status:"sold",soldAt:"2026-10-20",premiumCents:15000,activationCents:2500,recurringCents:0,commissionState:"effective"});assert.equal(r.status,201);
+ r=await fetch(base+"/api/commercial/summary?month=2026-10&asOf=2026-10-29",{headers:{cookie}});
+ assert.equal((await r.json()).commissions.effectiveCents,1625);
  r=await fetch(base+"/api/commercial/report/print?month=2026-10&asOf=2026-10-29",{headers:{cookie}});
  assert.equal(r.status,200);assert.match(await r.text(),/Fechamento comercial/);
  r=await post("/api/auth/logout",{});assert.equal(r.status,200);
