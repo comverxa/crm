@@ -5,6 +5,7 @@ on:
     paths:
       - 'backend/commercial-premium-*.mjs'
       - 'tests/commercial-premium.test.mjs'
+      - 'tests/commercial-premium-v2.test.mjs'
       - 'tests/commercial-preview.test.mjs'
       - 'site/comverxa-premium-comercial.html'
       - '.github/workflows/commercial-premium.yml'
@@ -12,6 +13,7 @@ on:
     paths:
       - 'backend/commercial-premium-*.mjs'
       - 'tests/commercial-premium.test.mjs'
+      - 'tests/commercial-premium-v2.test.mjs'
       - 'tests/commercial-preview.test.mjs'
       - 'site/comverxa-premium-comercial.html'
       - '.github/workflows/commercial-premium.yml'
@@ -31,5 +33,7 @@ jobs:
           node --check backend/commercial-premium-core.mjs
           node --check backend/commercial-premium-store.mjs
           node --check backend/commercial-premium-http.mjs
+          node --check backend/commercial-premium-team.mjs
+          node --check backend/commercial-premium-reports.mjs
       - name: Testes integrados sem dados reais
-        run: node --test tests/commercial-premium.test.mjs tests/commercial-preview.test.mjs
+        run: node --test tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-preview.test.mjs
