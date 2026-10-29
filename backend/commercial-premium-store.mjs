@@ -98,7 +98,7 @@ export function createCommercialStore(db){
   teamSummary(s,{month,asOf,teamTargetSales=null}){
    assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
    const defaultRules=this.getRules(s);if(!defaultRules)throw Error("Commission rules not configured");
-   return teamDashboard({session:s,sales:this.listSales(s,month),plans:this.listSellerPlans(s),month,asOf,defaultRules,teamTargetSales});
+   return teamDashboard({session:s,sales:this.listSales(s,month),plans:this.listSellerPlans(s),month,asOf,defaultRules,teamTargetSales:teamTargetSales??defaultRules.teamTargetSales??null});
   },
   snapshot(s,{month,asOf}){
    const rules=this.getRules(s);if(!rules)throw Error("Commission rules not configured");
