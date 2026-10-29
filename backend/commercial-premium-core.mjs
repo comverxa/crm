@@ -128,7 +128,7 @@ export function renewalQueue({session,contracts,asOf,ownOnly=false}){
     const end=day(c.endsOn),daysUntil=Math.round((end-current)/86400000);
     const band=daysUntil<0?"overdue":daysUntil<=10?"within10":daysUntil<=30?"within30":"later";
     summary[band]++;
-    const nextReminder=([30,15,10].filter(n=>daysUntil<=n&&daysUntil>=0)[0])??null;
+    const nextReminder=([10,15,30].find(n=>daysUntil<=n&&daysUntil>=0))??null;
     // This is a suggested action only: no customer message is generated or sent.
     if(nextReminder!==null)reminders.push({contractId:c.id,daysUntil,reminderWindow:nextReminder});
     return {id:c.id,sellerId:c.sellerId,endsOn:c.endsOn,daysUntil,band,
