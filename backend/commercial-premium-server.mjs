@@ -114,6 +114,24 @@ export function createPremiumServer({
   if(path==="/api/auth/me"&&req.method==="GET"){
    const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role},csrf:s.csrf}):json(401,{error:"Unauthorized"});
   }
+  if(path==="/api/auth/password"&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   let data;try{data=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid request"})}
+   if(typeof data.oldPassword!=="string"||!validPass(data.newPassword)||data.oldPassword===data.newPassword)
+    return json(400,{error:"Invalid password"});
+   const u=stmt("SELECT salt,passhash FROM cvx_pilot_users WHERE id=? AND active=1").get(s.userId);
+   if(!u||!constantEquals(passwordHash(data.oldPassword,u.salt),u.passhash))
+    return json(403,{error:"Forbidden"});
+   const salt=randomBytes(16).toString("hex"),hash=passwordHash(data.newPassword,salt);
+   db.exec("BEGIN IMMEDIATE");try{
+    stmt("UPDATE cvx_pilot_users SET salt=?,passhash=? WHERE id=?").run(salt,hash,s.userId);
+    stmt("DELETE FROM cvx_pilot_sessions WHERE user_id=?").run(s.userId);
+    db.exec("COMMIT");
+   }catch(error){db.exec("ROLLBACK");throw error}
+   const secure=cookieSecure?"; Secure":"";
+   return json(200,{ok:true,reloginRequired:true},{"set-cookie":"cvx_pilot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
+  }
   if(path==="/api/auth/logout"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
