@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a1528"><title>COMVERXA | Premium Comercial — Protótipo</title>
+<style>
+:root{color-scheme:dark;--bg:#071225;--sidebar:#0c1930;--surface:#10223b;--surface2:#142b47;--border:#294361;--text:#f0f7ff;--muted:#9fb4ce;--cyan:#40d4e6;--blue:#488dff;--mint:#4be6bb;--gold:#ffca64;--red:#ff7788;--radius:17px;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0%,#132b50 0,transparent 35%),var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+.app{min-height:100vh;display:grid;grid-template-columns:258px minmax(0,1fr)}.sidebar{padding:27px 16px;background:linear-gradient(145deg,#14283f,#0c172b);border-right:1px solid var(--border);position:sticky;top:0;max-height:100vh;overflow-y:auto;z-index:5}
+.brand{display:flex;gap:12px;align-items:center;margin:0 13px 30px;font-size:22px;font-weight:850;letter-spacing:-.7px}.brand-mark{display:grid;place-items:center;color:#061626;background:linear-gradient(135deg,var(--cyan),var(--blue));width:38px;height:38px;border-radius:13px;font-size:25px;font-weight:900}
+.brand em{font-size:11px;font-style:normal;letter-spacing:1.3px;display:block;color:var(--cyan);font-weight:700}.nav{display:grid;gap:7px}.nav button{background:transparent;color:var(--muted);border:0;border-radius:12px;display:flex;align-items:center;gap:12px;text-align:left;padding:13px 14px;width:100%;font-weight:600}
+.nav button.active{background:#1b3b60;color:var(--text);box-shadow:inset 3px 0 var(--cyan)}.nav button:hover{color:#fff;background:#1a3452}.nav .symbol{font-size:19px;width:25px;display:inline-block;text-align:center}.sidebar-foot{margin-top:35px;padding:16px;border:1px solid var(--border);border-radius:14px;background:#0d2138;font-size:13px;color:var(--muted)}
+main{min-width:0;padding:24px clamp(16px,3.3vw,50px) 70px;max-width:1700px;width:100%;margin:auto}.top{display:flex;align-items:center;gap:14px;justify-content:space-between;margin-bottom:24px}.menu-button{display:none}.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.page-heading{margin:0 0 6px;font-size:clamp(26px,3vw,39px);letter-spacing:-1px}.subtitle{color:var(--muted);margin:0 0 24px;font-size:14px;line-height:1.55}
+h2{font-size:18px;letter-spacing:-.2px;margin:0 0 16px}h3{font-size:15px;margin:0 0 14px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;color:var(--cyan)}
+.card{background:linear-gradient(150deg,var(--surface),#0e1e34);border:1px solid var(--border);border-radius:var(--radius);padding:21px;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.two{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}.subgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kpi-label{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.6px}.kpi-value{font-size:clamp(25px,3vw,38px);font-weight:850;letter-spacing:-1px;margin:10px 0 8px;line-height:1.05}.kpi-desc{font-size:12px;color:var(--muted);line-height:1.45}.accent{color:var(--mint)}.gold{color:var(--gold)}.blue{color:var(--cyan)}.danger{color:var(--red)}
+hr{border:0;border-top:1px solid var(--border);margin:26px 0}.progress{height:8px;border-radius:20px;background:#25415d;overflow:hidden;margin:15px 0 9px}.progress>div{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--blue),var(--cyan));width:0;transition:width .25s}
+.tag{display:inline-flex;align-items:center;padding:6px 9px;border-radius:30px;font-size:11px;font-weight:800;background:#1e4454;color:var(--mint)}.tag.warn{background:#4f3427;color:var(--gold)}.tag.bad{background:#4c2935;color:var(--red)}
+.btn{padding:11px 15px;border:1px solid var(--border);border-radius:11px;color:var(--text);background:#1a3351;font-weight:750;white-space:nowrap}.btn.primary{color:#052034;border:0;background:linear-gradient(105deg,var(--cyan),#68aaff)}.btn:hover{filter:brightness(1.13)}
+select,input,textarea{width:100%;background:#0d1b2f;color:var(--text);border:1px solid #48607b;padding:11px 12px;border-radius:10px;min-height:43px}input[type="month"]{width:auto;min-width:165px}label{display:grid;gap:7px;font-size:13px;color:#d4e2f3}
+fieldset{border:0;padding:0;margin:0}.form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.form-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:600px;text-align:left}th{font-size:11px;letter-spacing:.7px;color:var(--muted);text-transform:uppercase;padding:13px 10px;border-bottom:1px solid var(--border)}td{padding:15px 10px;border-bottom:1px solid #233b54;font-size:13px}tr:last-child td{border-bottom:0}
+.empty{padding:36px 15px;text-align:center;color:var(--muted)}.bar-chart{height:176px;display:flex;align-items:end;gap:12px;padding:15px 10px 0}.bar{flex:1;border-radius:7px 7px 3px 3px;background:linear-gradient(0deg,var(--blue),var(--cyan));min-height:6px;max-width:75px;position:relative}.bar>span{position:absolute;bottom:-25px;font-size:11px;color:var(--muted);left:50%;transform:translateX(-50%)}.bar-wrap{padding-bottom:36px}
+.panel{display:none}.panel.active{display:block}.hidden{display:none!important}.note{font-size:12px;line-height:1.6;color:var(--muted);margin-top:16px}.strip{background:#102c3b;border:1px solid #245b65;border-radius:12px;padding:12px 15px;color:#bdf5f0;font-size:12px;margin-bottom:22px}.alerts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}.alerts .tag{font-size:12px;padding:9px 12px}
+.overlay{display:none}.top-title{display:flex;gap:12px;align-items:center}.month-control{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.nav-group-title{color:#8096ae;letter-spacing:1.3px;font-size:10px;margin:16px 14px 7px;font-weight:750}
+@media(max-width:1120px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}@media(max-width:760px){.app{display:block}.sidebar{position:fixed;top:0;bottom:0;left:0;width:280px;max-height:100vh;transform:translateX(-110%);transition:transform .22s;box-shadow:25px 0 60px #0008}.sidebar.open{transform:translateX(0)}.overlay.active{display:block;position:fixed;inset:0;background:#010816aa;z-index:4}.menu-button{display:inline-flex}.brand{margin-bottom:18px}main{padding:18px 14px 80px}.top{align-items:flex-start}.top-actions{justify-content:flex-end}input[type="month"]{min-width:140px;width:140px}.form-grid{grid-template-columns:1fr 1fr}.kpi-value{font-size:29px}.card{padding:16px}.grid{gap:10px}.top-title strong{display:none}}@media(max-width:470px){.form-grid,.subgrid{grid-template-columns:1fr}.month-control span{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-value{font-size:25px}.kpi-label{font-size:10px}.kpi-desc{font-size:11px}.btn{padding:10px}.page-heading{font-size:27px}}
+@media print{body{background:white;color:#111}.app{display:block}.sidebar,.overlay,.top-actions,.menu-button,.strip,.btn,.no-print,.form-footer{display:none!important}.panel{display:none!important}#painel{display:block!important}.card{background:white;color:#111;border-color:#aaa;break-inside:avoid}.kpi-desc,.kpi-label,.subtitle{color:#333}.progress{background:#ddd}main{padding:12px}.grid{grid-template-columns:repeat(4,1fr)}}
+</style></head>
+<body><div class="overlay" id="overlay"></div><div class="app">
+<aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+ <div class="brand"><span class="brand-mark">C</span><div>COMVERXA <em>PREMIUM COMERCIAL</em></div></div>
+ <div class="nav-group-title">GESTÃO</div>
+ <nav class="nav" id="nav">
+  <button class="active" type="button" data-page="painel"><span class="symbol">◫</span> Visão geral</button>
+  <button type="button" data-page="vendas"><span class="symbol">▣</span> Vendas</button>
+  <button type="button" data-page="leads"><span class="symbol">♧</span> Leads</button>
+  <button type="button" data-page="metas"><span class="symbol">◎</span> Metas inteligentes</button>
+  <button type="button" data-page="comissoes"><span class="symbol">◈</span> Comissões</button>
+  <button type="button" data-page="renovacoes"><span class="symbol">↻</span> Renovações</button>
+  <div class="nav-group-title">CONTA</div>
+  <button type="button" data-page="perfil"><span class="symbol">◉</span> Meu perfil</button>
+  <button type="button" data-page="assinatura"><span class="symbol">▤</span> Assinatura</button>
+ </nav>
+ <div class="sidebar-foot"><strong>Ambiente de demonstração</strong><p>Dados inteiramente fictícios. Nenhuma mensagem, cobrança ou alteração é enviada à produção.</p><span class="tag">Protótipo isolado</span></div>
+</aside>
+<main>
+<header class="top">
+ <div class="top-title"><button type="button" id="toggleMenu" class="btn menu-button" aria-label="Abrir menu">☰</button><strong>COMVERXA / Comercial</strong></div>
+ <div class="top-actions"><label class="month-control"><span>Competência</span><input id="month" type="month" value="2026-10" aria-label="Mês de referência"></label><button id="print" type="button" class="btn">⇩ PDF</button></div>
+</header>
+<div class="strip">PRÉVIA PREMIUM V1 · Exemplos fictícios para validação visual e de fluxos. Ainda não integrada ao CRM nem às informações de clientes.</div>
+<section class="panel active" id="painel">
+ <div class="eyebrow">Central de performance</div><h1 class="page-heading">Tudo que importa. Em um só lugar.</h1><p class="subtitle">Produtividade, resultado comercial, remuneração e carteira de renovações em uma única visão.</p>
+ <div class="alerts" id="alerts"></div>
+ <div class="grid" id="kpis"></div>
+ <hr><div class="two">
+  <div class="card"><h2>Evolução da meta</h2><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><div><div class="kpi-value blue" id="progressLabel"></div><span class="kpi-desc" id="metaCaption"></span></div><span class="tag" id="tierBadge">Próxima faixa</span></div><div class="progress"><div id="goalProgress"></div></div><p class="note" id="projectionNote"></p><div class="subgrid" id="pace"></div></div>
+  <div class="card"><h2>Vendas por semana</h2><div class="bar-wrap"><div class="bar-chart" id="weekChart"></div></div><p class="note">Apuração ilustrativa a partir das vendas registradas nesta prévia.</p></div>
+ </div><hr><div class="two"><div class="card"><h2>Resumo de ganhos</h2><div class="subgrid" id="earningCards"></div></div><div class="card"><h2>Renovações que merecem atenção</h2><div id="renewalSummary"></div></div></div>
+</section>
+<section class="panel" id="vendas"><div class="eyebrow">Operação comercial</div><h1 class="page-heading">Minhas vendas</h1><p class="subtitle">Registre uma venda, acompanhe o status e identifique sua origem.</p>
+ <div class="card"><h2>Registrar venda fictícia</h2><form id="saleForm"><div class="form-grid">
+  <label>Referência / cliente fictício<input name="customer" required maxlength="60" placeholder="Ex.: Cliente de demonstração"></label>
+  <label>Vendedor<input name="seller" required maxlength="40" value="Consultor 01"></label>
+  <label>Data da venda<input name="date" required type="date" value="2026-10-29"></label>
+  <label>Origem<select name="source"><option>Indicação</option><option>WhatsApp</option><option>Tráfego pago</option><option>Prospecção</option></select></label>
+  <label>UF<select name="state"><option>MG</option><option>SP</option><option>RJ</option><option>PR</option><option>ES</option><option>Outros</option></select></label>
+  <label>Produto<select name="product"><option>Seguro</option><option>Proteção veicular</option><option>Assistência</option></select></label>
+  <label>Valor da venda (R$)<input name="amount" type="number" min="0" max="999999" step=".01" value="150"></label>
+  <label>Ativação (R$)<input name="activation" type="number" min="0" max="999999" step=".01" value="50"></label>
+  <label>Status<select name="status"><option value="sold">Vendido</option><option value="negotiation">Em negociação</option><option value="lost">Perdido</option><option value="canceled">Cancelado</option></select></label>
+  <label>Placa mascarada (opcional)<input name="plate" maxlength="16" placeholder="***-1D23"></label>
+  <label>Vigência até (opcional)<input name="endDate" type="date"></label>
+  <label>Observações<input name="notes" maxlength="120" placeholder="Somente dados fictícios"></label>
+ </div><div class="form-footer"><button class="btn primary" type="submit">+ Registrar venda na prévia</button></div></form>
+ <p class="note">Esta prévia usa memória temporária do navegador; nenhum cadastro é enviado ou salvo no servidor.</p></div>
+ <hr><div class="card"><h2>Histórico da competência</h2><div class="scroll"><table><thead><tr><th>Cliente / referência</th><th>Data</th><th>Vendedor</th><th>UF</th><th>Origem</th><th>Valor</th><th>Status</th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
+</section>
+<section class="panel" id="leads"><div class="eyebrow">Funil de oportunidades</div><h1 class="page-heading">Leads e negociações</h1><p class="subtitle">Acompanhe o pipeline e as oportunidades que ainda precisam avançar.</p><div class="grid" id="leadCards"></div><hr><div class="card"><h2>Pipeline</h2><div id="leadSummary"></div></div></section>
+<section class="panel" id="metas"><div class="eyebrow">Gestão de performance</div><h1 class="page-heading">Metas inteligentes</h1><p class="subtitle">Objetivos progressivos e ritmo comercial com projeção e acompanhamento.</p><div class="two">
+<div class="card"><h2>Definição de metas da prévia</h2><form id="goalForm"><div class="form-grid"><label>Meta 1 (vendas)<input id="t1" type="number" min="1" max="100000" value="10"></label><label>Meta 2 (vendas)<input id="t2" type="number" min="2" max="100000" value="20"></label><label>Meta 3 (vendas)<input id="t3" type="number" min="3" max="100000" value="30"></label><label>Bônus meta 1 (R$)<input id="b1" type="number" min="0" step="1" value="250"></label><label>Bônus meta 2 (R$)<input id="b2" type="number" min="0" step="1" value="500"></label><label>Bônus meta 3 (R$)<input id="b3" type="number" min="0" step="1" value="900"></label></div><div class="form-footer"><button class="btn primary" type="submit">Aplicar regras nesta prévia</button></div></form></div>
+<div class="card"><h2>Faixas e alertas</h2><div id="tiers"></div><p class="note">O gestor poderá configurar essas regras por empresa e equipe após a integração autenticada.</p></div></div></section>
+<section class="panel" id="comissoes"><div class="eyebrow">Financeiro comercial</div><h1 class="page-heading">Comissões e remuneração</h1><p class="subtitle">Venda, ativação, recorrência, bonificações e valores retidos — sempre separados.</p><div class="grid" id="commissionCards"></div><hr>
+ <div class="card"><h2>Regras de comissão da prévia</h2><div class="form-grid"><label>Comissão sobre vendas (%)<input type="number" min="0" max="100" step=".1" id="salesRate" value="15"></label><label>Comissão de ativação (%)<input type="number" min="0" max="100" step=".1" id="activationRate" value="10"></label><label>Recorrência (%)<input type="number" min="0" max="100" step=".1" id="recurringRate" value="5"></label></div><p class="note">Alterações recalculam automaticamente os demonstrativos fictícios. Comissões reais dependem de regras contratuais e validação financeira.</p><div class="form-footer"><button class="btn primary" id="recalc" type="button">Recalcular</button></div></div>
+</section>
+<section class="panel" id="renovacoes"><div class="eyebrow">Carteira de segurados</div><h1 class="page-heading">Renovações e vencimentos</h1><p class="subtitle">Acompanhe as vigências e janelas de relacionamento de 30, 15 e 10 dias.</p><div class="grid" id="renewalCards"></div><hr><div class="card"><h2>Contratos na carteira da prévia</h2><div class="scroll"><table><thead><tr><th>Referência</th><th>Produto</th><th>Vigência</th><th>Dias</th><th>Prioridade</th></tr></thead><tbody id="renewalRows"></tbody></table></div><p class="note">Alertas são apenas visuais; não há mensagens automáticas nem cobrança.</p></div></section>
+<section class="panel" id="perfil"><div class="eyebrow">Minha conta</div><h1 class="page-heading">Perfil e preferências</h1><p class="subtitle">Identidade e configurações associadas à conta autenticada do CRM.</p><div class="card"><h2>Perfil de demonstração</h2><p>Conta: Consultor fictício · Empresa demonstrativa</p><p class="note">Edição de CPF/CNPJ, dados pessoais, credenciais, salário e permissões deverá usar os controles autenticados do COMVERXA, nunca esta página pública.</p></div></section>
+<section class="panel" id="assinatura"><div class="eyebrow">Administração financeira</div><h1 class="page-heading">Assinatura e pagamentos</h1><p class="subtitle">Visão do plano, situação, competência e documentos de cobrança.</p><div class="card"><h2>Integração financeira pendente</h2><p>Este módulo não coleta Pix nem processa pagamentos. A configuração de planos e vencimentos permanece sob responsabilidade do ADM Master do COMVERXA.</p><span class="tag warn">Cobrança real desativada</span></div></section>
+<footer class="note" style="margin-top:48px;border-top:1px solid var(--border);padding-top:20px">COMVERXA Premium Comercial · Protótipo demonstrativo independente · Nenhum cliente real ou linha WhatsApp conectado.</footer>
+</main></div>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const demo=[
+{id:"S01",customer:"Cliente Demonstrativo A",seller:"Consultor 01",date:"2026-10-04",source:"Indicação",state:"MG",product:"Seguro",amount:15000,activation:6000,recurring:3500,status:"sold",endDate:"2026-11-08"},
+{id:"S02",customer:"Cliente Demonstrativo B",seller:"Consultor 02",date:"2026-10-08",source:"WhatsApp",state:"SP",product:"Proteção veicular",amount:18000,activation:5000,recurring:2800,status:"sold",endDate:"2026-11-28"},
+{id:"S03",customer:"Cliente Demonstrativo C",seller:"Consultor 01",date:"2026-10-15",source:"Tráfego pago",state:"MG",product:"Seguro",amount:22000,activation:7000,recurring:4800,status:"sold",endDate:"2026-10-22"},
+{id:"S04",customer:"Lead Demonstrativo D",seller:"Consultor 02",date:"2026-10-17",source:"Prospecção",state:"RJ",product:"Assistência",amount:0,activation:0,recurring:0,status:"negotiation",endDate:""},
+{id:"S05",customer:"Lead Demonstrativo E",seller:"Consultor 01",date:"2026-10-18",source:"Indicação",state:"MG",product:"Seguro",amount:0,activation:0,recurring:0,status:"lost",endDate:""},
+{id:"S06",customer:"Cliente Demonstrativo F",seller:"Consultor 01",date:"2026-10-20",source:"WhatsApp",state:"MG",product:"Seguro",amount:19500,activation:4500,recurring:3900,status:"sold",endDate:"2026-12-13"}
+];
+let sales=demo.slice(),tiers=[{target:10,bonus:25000},{target:20,bonus:50000},{target:30,bonus:90000}],rates={sales:15,activation:10,recurring:5};
+const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl=c=>(Math.round(c)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const num=n=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1}).format(n);
+const current=()=>sales.filter(s=>s.date.slice(0,7)===$("month").value);
+const won=s=>s.status==="sold"||s.status==="active";
+function kpi(label,value,description,cls=""){return '<div class="card"><div class="kpi-label">'+safe(label)+'</div><div class="kpi-value '+cls+'">'+safe(value)+'</div><div class="kpi-desc">'+safe(description)+'</div></div>'}
+function smaller(label,value){return '<div style="border-top:1px solid var(--border);padding-top:14px"><div class="kpi-label">'+safe(label)+'</div><div style="font-size:23px;font-weight:850;margin-top:7px">'+safe(value)+'</div></div>'}
+function remainingDays(month){const ref=new Date(month+"-01T12:00:00Z"),yr=ref.getUTCFullYear(),mo=ref.getUTCMonth(),last=new Date(Date.UTC(yr,mo+1,0,12));const today=new Date();let elapsed=0,total=0;for(let n=1;n<=last.getUTCDate();n++){const d=new Date(Date.UTC(yr,mo,n,12)),wd=d.getUTCDay(),w=wd===0?0:wd===6?.5:1;total+=w;if(d<=today)elapsed+=w}return {total,elapsed,remaining:Math.max(0,total-elapsed)}}
+function render(){
+ const month=current(),sold=month.filter(won),n=sold.length,lost=month.filter(s=>s.status==="lost").length;
+ const achieved=tiers.filter(t=>n>=t.target).at(-1),next=tiers.find(t=>n<t.target),goal=next||tiers.at(-1);
+ const pct=Math.min(100,goal?Math.round(n*1000/goal.target)/10:0),day=remainingDays($("month").value);
+ const avg=day.elapsed?n/day.elapsed:0,projected=day.elapsed?Math.max(n,avg*day.total):n,req=next&&day.remaining?(next.target-n)/day.remaining:0;
+ const effective=sold.filter(s=>!s.retained).reduce((sum,s)=>sum+Math.round(s.amount*rates.sales/100)+Math.round(s.activation*rates.activation/100)+Math.round(s.recurring*rates.recurring/100),0);
+ const retained=sold.filter(s=>s.retained).reduce((sum,s)=>sum+Math.round(s.amount*rates.sales/100)+Math.round(s.activation*rates.activation/100)+Math.round(s.recurring*rates.recurring/100),0);
+ const bonus=achieved?achieved.bonus:0,bonusHeld=next?next.bonus:0;
+ const revenue=sold.reduce((sum,s)=>sum+s.amount+s.activation+s.recurring,0);
+ $("kpis").innerHTML=kpi("Vendas realizadas",String(n),"Confirmadas na competência","accent")+kpi("Meta atual",String(goal?.target||0),"Faixa progressiva configurada","blue")+kpi("Faltam para meta",String(Math.max(0,(next?.target||goal?.target||0)-n)),"Vendas adicionais necessárias")+kpi("Atingimento",num(pct)+"%","Evolução do objetivo","gold");
+ $("progressLabel").textContent=n+" / "+(goal?.target||0)+" vendas";$("goalProgress").style.width=pct+"%";
+ $("metaCaption").textContent="Bônus conquistado: "+brl(bonus);$("tierBadge").textContent=achieved?"Meta "+tiers.indexOf(achieved)+" batida":"Em evolução";
+ $("projectionNote").textContent="Projeção: "+num(projected)+" vendas · Média "+num(avg)+" por dia útil · Para a próxima meta: "+num(req)+" por dia útil restante.";
+ $("pace").innerHTML=smaller("Dias úteis totais",num(day.total))+smaller("Dias úteis restantes",num(day.remaining))+smaller("Média por dia",num(avg))+smaller("Ritmo necessário",num(req));
+ $("alerts").innerHTML='<span class="tag">✓ Acompanhamento da competência</span>'+(lost?'<span class="tag warn">'+lost+' oportunidade(s) perdida(s)</span>':"")+(req>avg*1.25?'<span class="tag bad">Atenção: acelerar ritmo de vendas</span>':"");
+ const byWeek=[0,0,0,0,0];sold.forEach(s=>{const w=Math.min(4,Math.floor((Number(s.date.slice(8,10))-1)/7));byWeek[w]++});
+ const maximum=Math.max(1,...byWeek);$("weekChart").innerHTML=byWeek.map((v,i)=>'<div class="bar" title="'+v+' vendas" style="height:'+Math.max(5,v/maximum*100)+'%"><span>S'+(i+1)+'</span></div>').join("");
+ $("earningCards").innerHTML=smaller("Comissão efetiva",brl(effective))+smaller("Comissão retida",brl(retained))+smaller("Bônus conquistado",brl(bonus))+smaller("Bônus da próxima faixa",brl(bonusHeld));
+ $("commissionCards").innerHTML=kpi("Base comercial",brl(revenue),"Vendas, ativações e recorrências")+kpi("Comissão efetiva",brl(effective),"Pelas regras configuradas","accent")+kpi("Comissão retida",brl(retained),"Aguardando liberação")+kpi("Bônus efetivo",brl(bonus),"Meta conquistada","gold");
+ $("tiers").innerHTML=tiers.map((t,i)=>'<div style="padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><div><strong>Meta '+(i+1)+': '+t.target+' vendas</strong><div class="kpi-desc">Bônus '+brl(t.bonus)+'</div></div><span class="tag '+(n>=t.target?"":"warn")+'">'+(n>=t.target?"Batida":"Faltam "+(t.target-n))+'</span></div>').join("");
+ const labels={sold:"Vendido",active:"Ativo",negotiation:"Em negociação",lost:"Perdido",canceled:"Cancelado"};
+ $("salesRows").innerHTML=month.length?month.map(s=>"<tr><td><strong>"+safe(s.customer)+"</strong></td><td>"+safe(s.date)+"</td><td>"+safe(s.seller)+"</td><td>"+safe(s.state)+"</td><td>"+safe(s.source)+"</td><td>"+brl(s.amount)+"</td><td><span class='tag "+(s.status==="lost"?"bad":s.status==="negotiation"?"warn":"")+"'>"+labels[s.status]+"</span></td></tr>").join(""):'<tr><td colspan="7" class="empty">Nenhum registro neste mês.</td></tr>';
+ const open=month.filter(s=>s.status==="negotiation"),conversion=n+open.length?Math.round(n/(n+open.length)*100):0;
+ $("leadCards").innerHTML=kpi("Oportunidades",String(month.length),"Total da competência")+kpi("Negociação",String(open.length),"Demandam acompanhamento")+kpi("Vendas",String(n),"Conversões registradas","accent")+kpi("Conversão estimada",conversion+"%","Vendas / (vendas + negociação)","blue");
+ $("leadSummary").innerHTML="<p>Leads em negociação: "+open.length+" · Perdas: "+lost+" · Cancelamentos: "+month.filter(s=>s.status==="canceled").length+".</p><p class='note'>Indicadores ilustrativos; as métricas reais usarão eventos e regras do CRM.</p>";
+ const now=new Date(),today=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()));
+ const contracts=sales.filter(s=>won(s)&&s.endDate).map(s=>({id:s.customer,product:s.product,end:s.endDate,days:Math.round((new Date(s.endDate+"T00:00:00Z")-today)/86400000)})).sort((a,b)=>a.days-b.days);
+ const overdue=contracts.filter(c=>c.days<0).length,near=contracts.filter(c=>c.days>=0&&c.days<=10).length,mid=contracts.filter(c=>c.days>10&&c.days<=30).length;
+ $("renewalCards").innerHTML=kpi("Vencidos",String(overdue),"Requerem análise de situação","danger")+kpi("Até 10 dias",String(near),"Ação prioritária","gold")+kpi("11 a 30 dias",String(mid),"Antecipar relacionamento","blue")+kpi("Após 30 dias",String(contracts.length-overdue-near-mid),"Monitoramento normal");
+ $("renewalSummary").innerHTML='<div class="subgrid">'+smaller("Vigências vencidas",String(overdue))+smaller("Nos próximos 30 dias",String(near+mid))+'</div><p class="note">Alertas automáticos serão integrados a contratos reais após homologação.</p>';
+ $("renewalRows").innerHTML=contracts.length?contracts.map(c=>"<tr><td>"+safe(c.id)+"</td><td>"+safe(c.product)+"</td><td>"+safe(c.end)+"</td><td>"+c.days+"</td><td><span class='tag "+(c.days<0?"bad":c.days<=30?"warn":"")+"'>"+(c.days<0?"Vencido":c.days<=10?"Crítico":c.days<=30?"Prioritário":"Programado")+"</span></td></tr>").join(""):'<tr><td colspan="5" class="empty">Nenhum contrato demonstrativo.</td></tr>';
+}
+function page(p){document.querySelectorAll(".panel").forEach(e=>e.classList.toggle("active",e.id===p));document.querySelectorAll("#nav button[data-page]").forEach(e=>e.classList.toggle("active",e.dataset.page===p));$("sidebar").classList.remove("open");$("overlay").classList.remove("active");scrollTo({top:0,behavior:"smooth"})}
+document.querySelectorAll("#nav button[data-page]").forEach(e=>e.addEventListener("click",()=>page(e.dataset.page)));
+$("toggleMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("active")});
+$("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("active")});
+$("print").addEventListener("click",()=>{page("painel");window.print()});
+$("month").addEventListener("change",render);
+$("saleForm").addEventListener("submit",e=>{
+ e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget).entries());const cents=x=>Math.round(Math.max(0,Number(x)||0)*100);
+ if(!values.customer.trim()||!values.seller.trim()||!values.date)return;
+ sales.unshift({id:"S"+Date.now(),customer:values.customer,seller:values.seller,date:values.date,source:values.source,state:values.state,product:values.product,amount:cents(values.amount),activation:cents(values.activation),recurring:0,status:values.status,endDate:values.endDate,plate:values.plate});
+ $("month").value=values.date.slice(0,7);e.currentTarget.reset();render();alert("Registro incluído apenas na prévia, sem envio para produção.");
+});
+$("goalForm").addEventListener("submit",e=>{
+ e.preventDefault();const t=[Number($("t1").value),Number($("t2").value),Number($("t3").value)],b=[Number($("b1").value),Number($("b2").value),Number($("b3").value)];
+ if(!(t[0]>=1&&t[1]>t[0]&&t[2]>t[1]&&b.every(x=>Number.isFinite(x)&&x>=0)&&b[0]<=b[1]&&b[1]<=b[2])){alert("As metas e os bônus devem ser progressivos.");return}
+ tiers=t.map((n,i)=>({target:n,bonus:Math.round(b[i]*100)}));render();
+});
+$("recalc").addEventListener("click",()=>{const v=[$("salesRate").value,$("activationRate").value,$("recurringRate").value].map(Number);if(v.some(x=>!Number.isFinite(x)||x<0||x>100)){alert("Informe taxas entre 0% e 100%.");return}rates={sales:v[0],activation:v[1],recurring:v[2]};render()});
+render();
+})();
+</script></body></html>
