@@ -4,6 +4,7 @@
  * the server and take encrypted backups before using this with real customer data.
  */
 import {assertScope,assertWriteScope,validateRules,salesSnapshot,renewalQueue,money} from "./commercial-premium-core.mjs";
+import {validateSellerPlan,teamDashboard} from "./commercial-premium-team.mjs";
 const ident=/^[a-zA-Z0-9_.:-]{1,100}$/;
 function id(s){if(typeof s!=="string"||!ident.test(s))throw Error("Invalid id");return s}
 function date(s){if(typeof s!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(s)||!Number.isFinite(Date.parse(s+"T00:00:00Z"))||new Date(s+"T00:00:00Z").toISOString().slice(0,10)!==s)throw Error("Invalid date");return s}
@@ -25,6 +26,7 @@ export function createCommercialStore(db){
  db.exec("CREATE INDEX IF NOT EXISTS cvx_comm_sales_month ON cvx_comm_sales(tenant_id,sold_at,seller_id)");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_comm_policies (tenant_id TEXT NOT NULL,id TEXT NOT NULL,seller_id TEXT NOT NULL,product_type TEXT NOT NULL,status TEXT NOT NULL,starts_on TEXT NOT NULL,ends_on TEXT NOT NULL,vehicle_ref TEXT,vehicle_plate_masked TEXT,external_contract_ref TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(tenant_id,id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_comm_policies_due ON cvx_comm_policies(tenant_id,status,ends_on)");
+ db.exec("CREATE TABLE IF NOT EXISTS cvx_comm_seller_plans (tenant_id TEXT NOT NULL,seller_id TEXT NOT NULL,plan_json TEXT NOT NULL,updated_at TEXT NOT NULL,actor_id TEXT NOT NULL,PRIMARY KEY(tenant_id,seller_id))");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_comm_audit (event_id INTEGER PRIMARY KEY AUTOINCREMENT,tenant_id TEXT NOT NULL,actor_id TEXT NOT NULL,action TEXT NOT NULL,entity_id TEXT NOT NULL,created_at TEXT NOT NULL)");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_comm_audit_scope ON cvx_comm_audit(tenant_id,event_id)");
  return {
@@ -41,13 +43,13 @@ export function createCommercialStore(db){
    const a={id:id(v.id),sellerId:id(v.sellerId),soldAt:date(v.soldAt),
     status:oneOf(v.status,["lead","negotiation","proposal","sold","active","lost","canceled"]),
     premiumCents:money(v.premiumCents??0),activationCents:money(v.activationCents??0),recurringCents:money(v.recurringCents??0),
-    commissionState:oneOf(v.commissionState??"effective",["effective","retained"])};
+    commissionState:s.role==="operator"?"retained":oneOf(v.commissionState??"retained",["effective","retained"])};
    assertWriteScope(s,s.tenantId,a.sellerId);
-   const prior=stmt(db,"SELECT seller_id FROM cvx_comm_sales WHERE tenant_id=? AND id=?").get(s.tenantId,a.id);
-   if(prior&&s.role==="operator"&&prior.seller_id!==s.userId)throw Error("Forbidden");
+   const prior=stmt(db,"SELECT seller_id,status,commission_state FROM cvx_comm_sales WHERE tenant_id=? AND id=?").get(s.tenantId,a.id);
+   if(prior&&s.role==="operator"&&(prior.seller_id!==s.userId||["sold","active"].includes(prior.status)))throw Error("Forbidden");
    const now=new Date().toISOString();
    const sql="INSERT INTO cvx_comm_sales (tenant_id,id,seller_id,sold_at,status,premium_cents,activation_cents,recurring_cents,commission_state,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id,id) DO UPDATE SET seller_id=excluded.seller_id,sold_at=excluded.sold_at,status=excluded.status,premium_cents=excluded.premium_cents,activation_cents=excluded.activation_cents,recurring_cents=excluded.recurring_cents,commission_state=excluded.commission_state,updated_at=excluded.updated_at";
-   tx(db,()=>{stmt(db,sql).run(s.tenantId,a.id,a.sellerId,a.soldAt,a.status,a.premiumCents,a.activationCents,a.recurringCents,a.commissionState,now,now);audit(db,s,prior?"SALE_UPDATED":"SALE_CREATED",a.id)});
+   tx(db,()=>{stmt(db,sql).run(s.tenantId,a.id,a.sellerId,a.soldAt,a.status,a.premiumCents,a.activationCents,a.recurringCents,a.commissionState,now,now);audit(db,s,prior?"SALE_UPDATED":"SALE_CREATED",a.id);if(prior?.commission_state==="retained"&&a.commissionState==="effective")audit(db,s,"COMMISSION_RELEASED",a.id)});
    return a;
   },
   listSales(s,month){
@@ -78,6 +80,25 @@ export function createCommercialStore(db){
    const sql="SELECT * FROM cvx_comm_policies WHERE tenant_id=?"+(s.role==="operator"?" AND seller_id=?":"")+" ORDER BY ends_on ASC LIMIT ?";
    const args=s.role==="operator"?[s.tenantId,s.userId,limit]:[s.tenantId,limit];
    return stmt(db,sql).all(...args).map(policy);
+  },
+  saveSellerPlan(s,input){
+   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   if(input?.tenantId!==undefined&&input.tenantId!==s.tenantId)throw Error("Not found");
+   const defaults=this.getRules(s);if(!defaults)throw Error("Commission rules not configured");
+   const plan=validateSellerPlan({...defaults,...input,tenantId:s.tenantId});
+   tx(db,()=>{
+    stmt(db,"INSERT INTO cvx_comm_seller_plans(tenant_id,seller_id,plan_json,updated_at,actor_id) VALUES (?,?,?,?,?) ON CONFLICT(tenant_id,seller_id) DO UPDATE SET plan_json=excluded.plan_json,updated_at=excluded.updated_at,actor_id=excluded.actor_id").run(s.tenantId,plan.sellerId,JSON.stringify(plan),new Date().toISOString(),s.userId);
+    audit(db,s,"SELLER_PLAN_UPDATED",plan.sellerId);
+   });return plan;
+  },
+  listSellerPlans(s){
+   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   return stmt(db,"SELECT plan_json FROM cvx_comm_seller_plans WHERE tenant_id=? ORDER BY seller_id ASC LIMIT 1001").all(s.tenantId).map(r=>JSON.parse(r.plan_json));
+  },
+  teamSummary(s,{month,asOf,teamTargetSales=null}){
+   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   const defaultRules=this.getRules(s);if(!defaultRules)throw Error("Commission rules not configured");
+   return teamDashboard({session:s,sales:this.listSales(s,month),plans:this.listSellerPlans(s),month,asOf,defaultRules,teamTargetSales});
   },
   snapshot(s,{month,asOf}){
    const rules=this.getRules(s);if(!rules)throw Error("Commission rules not configured");
