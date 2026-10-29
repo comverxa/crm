@@ -55,6 +55,27 @@ test("HTTP pilot login, secure session, CSRF, sales and logout end-to-end",async
  r=await fetch(base+"/api/auth/me",{headers:{cookie}});assert.equal(r.status,401);
  }finally{await stop(folder,app)}
 });
+test("password rotation invalidates existing sessions and old password",async()=>{
+ const {folder,app}=setup();try{
+  const base=await start(app);
+  const login=async(pass)=>fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password:pass})});
+  let response=await login(password);assert.equal(response.status,200);
+  const cookie=response.headers.get("set-cookie").split(";")[0];
+  const me=await (await fetch(base+"/api/auth/me",{headers:{cookie}})).json();
+  response=await fetch(base+"/api/auth/password",{method:"POST",
+   headers:{"content-type":"application/json",cookie,"x-csrf-token":me.csrf},
+   body:JSON.stringify({oldPassword:"wrong",newPassword:"NewStrongPassword-456!"})});
+  assert.equal(response.status,403);
+  response=await fetch(base+"/api/auth/password",{method:"POST",
+   headers:{"content-type":"application/json",cookie,"x-csrf-token":me.csrf},
+   body:JSON.stringify({oldPassword:password,newPassword:"NewStrongPassword-456!"})});
+  assert.equal(response.status,200);
+  assert.equal((await fetch(base+"/api/auth/me",{headers:{cookie}})).status,401);
+  assert.equal((await login(password)).status,401);
+  assert.equal((await login("NewStrongPassword-456!")).status,200);
+ }finally{await stop(folder,app)}
+});
+
 test("pilot user creation stays within tenant and operator cannot approve commission or access teams",async()=>{
  const {folder,app}=setup();try{
  const base=await start(app);
