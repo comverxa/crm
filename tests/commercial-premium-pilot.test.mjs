@@ -89,6 +89,7 @@ test("pilot user creation stays within tenant and operator cannot approve commis
  const userPassword="UserSecretTest-0001";
  r=await save("/api/pilot/users",{email:"operator@exemplo.test",password:userPassword,role:"operator"});
  assert.equal(r.status,201);const uid=(await r.json()).id;
+ r=await fetch(base+"/api/pilot/users",{headers:{cookie:adminCookie}});assert.equal(r.status,200);assert.ok((await r.json()).users.some(u=>u.id===uid));
  r=await login("operator@exemplo.test",userPassword);assert.equal(r.status,200);
  const operatorCookie=r.headers.get("set-cookie").split(";")[0];
  const op=await (await fetch(base+"/api/auth/me",{headers:{cookie:operatorCookie}})).json();
@@ -98,6 +99,7 @@ test("pilot user creation stays within tenant and operator cannot approve commis
  assert.equal(r.status,403);
  r=await save("/api/pilot/users",{email:"another@exemplo.test",password:userPassword,role:"operator"},operatorCookie,op.csrf);
  assert.equal(r.status,403);
+ r=await fetch(base+"/api/pilot/users",{headers:{cookie:operatorCookie}});assert.equal(r.status,403);
  r=await fetch(base+"/api/commercial/team?month=2026-10&asOf=2026-10-29",{headers:{cookie:operatorCookie}});
  assert.equal(r.status,403);
  r=await save("/api/commercial/sales",{id:"ONE",sellerId:uid,soldAt:"2026-10-20",status:"sold",premiumCents:10000,commissionState:"effective"});
