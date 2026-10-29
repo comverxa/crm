@@ -88,7 +88,7 @@ test("SQLite commits isolate tenants, protect seller writes and persist audit",(
 test("HTTP adapter defaults to disabled and enforces server auth, CSRF and tenant scope",async()=>{
  const db=new DatabaseSync(":memory:");
  try{
-  const store=createCommercialStore(db);store.saveRules(manager,rules);
+  const store=createCommercialStore(db);store.saveRules(manager,rules);store.saveRules(companyB,rules);
   let login=null,csrf=false;
   const serve=createCommercialHttpHandler({store,getSession:async()=>login,verifyCsrf:async()=>csrf,enabled:true});
   const get=(route)=>new Request("https://crm.test"+route);
