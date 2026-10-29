@@ -1,3 +1,8 @@
 **
-!backend
-!backend/prospect-standalone.ts
+!backend/
+!backend/commercial-premium-*.mjs
+!site/
+!site/comverxa-premium-operacional.html
+!site/comverxa-premium-operacional.js
+!site/comverxa-premium-login.js
+!Dockerfile.commercial
