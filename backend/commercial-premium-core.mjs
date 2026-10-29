@@ -51,6 +51,7 @@ export function validateRules(rules) {
     activationRateBps:rate(rules.activationRateBps??0),
     recurringRateBps:rate(rules.recurringRateBps??0),
     fixedSalaryCents:money(rules.fixedSalaryCents??0),
+    teamTargetSales:(()=>{const v=rules.teamTargetSales??null;if(v!==null&&(!Number.isSafeInteger(v)||v<1||v>1_000_000))throw Error("Invalid team goal");return v})(),
     halfSaturday:!!rules.halfSaturday,
     holidays:Array.isArray(rules.holidays)?rules.holidays.slice(0,60).map(s=>iso(day(s))):[],
   };
