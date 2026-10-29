@@ -52,7 +52,7 @@ test("seller cannot release their own commission nor rewrite a closed sale",()=>
 test("seller plans persist by tenant and cannot be edited by operators",()=>{
  const db=new DatabaseSync(":memory:");
  try{
- const store=createCommercialStore(db);store.saveRules(manager,basic);store.saveRules(other,basic);
+ const store=createCommercialStore(db);store.saveRules(manager,{...basic,teamTargetSales:6});store.saveRules(other,basic);
  const plan=store.saveSellerPlan(manager,{sellerId:"s1",tiers:[{minSales:0,bonusCents:0},{minSales:1,bonusCents:4000}]});
  assert.equal(plan.salesRateBps,1000);
  store.saveSellerPlan(other,{sellerId:"s1",tiers:[{minSales:0,bonusCents:0},{minSales:3,bonusCents:9000}]});
@@ -61,7 +61,7 @@ test("seller plans persist by tenant and cannot be edited by operators",()=>{
  assert.throws(()=>store.saveSellerPlan(operator,{sellerId:"s1",tiers:basic.tiers}),/Forbidden/);
  assert.throws(()=>store.saveSellerPlan(manager,{tenantId:"B",sellerId:"s1",tiers:basic.tiers}),/Not found/);
  store.upsertSale(manager,sale("sale-1","s1"));
- const dash=store.teamSummary(manager,{month:"2026-10",asOf:"2026-10-20",teamTargetSales:6});
+ const dash=store.teamSummary(manager,{month:"2026-10",asOf:"2026-10-20"});
  assert.equal(dash.totals.achievedBonusCents,4000);
  assert.equal(dash.teamGoal.remainingSales,5);
  }finally{db.close()}
@@ -105,4 +105,8 @@ test("HTTP reports return role-filtered data, proper security headers and no cro
  const otherTeam=await app(get("/api/commercial/team"+month));
  assert.equal((await otherTeam.json()).totals.amountCents,40000);
  }finally{db.close()}
+});
+
+test("invalid team goal is rejected before persisting",()=>{
+ const db=new DatabaseSync(":memory:");try{const store=createCommercialStore(db);assert.throws(()=>store.saveRules(manager,{...basic,teamTargetSales:-3}),/Invalid team goal/);assert.equal(store.getRules(manager),null)}finally{db.close()}
 });
