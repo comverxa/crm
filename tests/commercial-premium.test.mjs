@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {DatabaseSync} from "node:sqlite";
 import {assertScope,assertWriteScope,validateRules,workdays,salesSnapshot,renewalQueue} from "../backend/commercial-premium-core.mjs";
 import {createCommercialStore} from "../backend/commercial-premium-store.mjs";
+import {createCommercialHttpHandler} from "../backend/commercial-premium-http.mjs";
 const manager={tenantId:"empresa-A",userId:"gestor-A",role:"manager"};
 const seller={tenantId:"empresa-A",userId:"vendedor-1",role:"operator"};
 const otherSeller={tenantId:"empresa-A",userId:"vendedor-2",role:"operator"};
@@ -81,5 +82,32 @@ test("SQLite commits isolate tenants, protect seller writes and persist audit",(
   assert.equal(store.renewals(seller,{asOf:"2026-10-29"}).summary.within10,1);
   assert.equal(store.listPolicies(companyB).length,1);
   assert.ok(store.listAudit(manager).some(x=>x.action==="POLICY_CREATED"));
+ }finally{db.close()}
+});
+
+test("HTTP adapter defaults to disabled and enforces server auth, CSRF and tenant scope",async()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const store=createCommercialStore(db);store.saveRules(manager,rules);
+  let login=null,csrf=false;
+  const serve=createCommercialHttpHandler({store,getSession:async()=>login,verifyCsrf:async()=>csrf,enabled:true});
+  const get=(route)=>new Request("https://crm.test"+route);
+  const post=(route,body)=>new Request("https://crm.test"+route,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  const disabled=createCommercialHttpHandler({store,getSession:async()=>manager,verifyCsrf:async()=>true});
+  assert.equal((await disabled(get("/api/commercial/rules"))).status,503);
+  assert.equal((await serve(get("/api/commercial/rules"))).status,401);
+  login=seller;
+  assert.equal((await serve(post("/api/commercial/rules",rules))).status,403);
+  csrf=true;
+  assert.equal((await serve(post("/api/commercial/rules",rules))).status,403);
+  assert.equal((await serve(post("/api/commercial/sales",{...data[3],sellerId:"vendedor-1"}))).status,404);
+  const mine=await serve(post("/api/commercial/sales",{...data[0]}));
+  assert.equal(mine.status,201);
+  const owner=await serve(get("/api/commercial/summary?month=2026-10&asOf=2026-10-20"));
+  assert.equal(owner.status,200);
+  assert.equal((await owner.json()).counts.sold,1);
+  login=companyB;
+  const other=await serve(get("/api/commercial/summary?month=2026-10&asOf=2026-10-20"));
+  assert.equal((await other.json()).counts.sold,0);
  }finally{db.close()}
 });
