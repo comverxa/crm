@@ -35,6 +35,7 @@ fieldset{border:0;padding:0;margin:0}.form-grid{display:grid;grid-template-colum
   <button type="button" data-page="vendas"><span class="symbol">▣</span> Vendas</button>
   <button type="button" data-page="leads"><span class="symbol">♧</span> Leads</button>
   <button type="button" data-page="metas"><span class="symbol">◎</span> Metas inteligentes</button>
+  <button type="button" data-page="equipe"><span class="symbol">♙</span> Equipe e performance</button>
   <button type="button" data-page="comissoes"><span class="symbol">◈</span> Comissões</button>
   <button type="button" data-page="renovacoes"><span class="symbol">↻</span> Renovações</button>
   <div class="nav-group-title">CONTA</div>
@@ -77,13 +78,29 @@ fieldset{border:0;padding:0;margin:0}.form-grid{display:grid;grid-template-colum
  <hr><div class="card"><h2>Histórico da competência</h2><div class="scroll"><table><thead><tr><th>Cliente / referência</th><th>Data</th><th>Vendedor</th><th>UF</th><th>Origem</th><th>Valor</th><th>Status</th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
 </section>
 <section class="panel" id="leads"><div class="eyebrow">Funil de oportunidades</div><h1 class="page-heading">Leads e negociações</h1><p class="subtitle">Acompanhe o pipeline e as oportunidades que ainda precisam avançar.</p><div class="grid" id="leadCards"></div><hr><div class="card"><h2>Pipeline</h2><div id="leadSummary"></div></div></section>
+<section class="panel" id="equipe">
+ <div class="eyebrow">Gestão de equipe</div><h1 class="page-heading">Performance por consultor</h1>
+ <p class="subtitle">Ranking, produtividade, comissões e metas individuais, em uma visão premium do gestor.</p>
+ <div class="grid" id="teamCards"></div><hr>
+ <div class="two">
+ <div class="card"><h2>Meta coletiva da empresa</h2>
+ <label>Objetivo da equipe (vendas)<input id="teamGoal" type="number" min="1" max="100000" value="30"></label>
+ <p class="note">A meta coletiva não altera o bônus individual do vendedor.</p>
+ <div class="progress"><div id="teamProgress"></div></div><p class="kpi-desc" id="teamProgressLabel"></p></div>
+ <div class="card"><h2>Regras demonstrativas</h2><p class="kpi-desc">Consultores têm metas próprias, conforme plano definido pelo gestor. Comissão pendente não é automaticamente liberada.</p>
+ <p class="note">No CRM integrado, alterações de metas e salários exigirão permissão e auditoria.</p></div>
+ </div>
+ <hr><div class="card"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+ <h2>Ranking da equipe</h2><button class="btn" type="button" id="exportTeam">Exportar fechamento CSV</button></div>
+ <div class="scroll"><table><thead><tr><th>Consultor</th><th>Vendas</th><th>Meta individual</th><th>Atingimento</th><th>Receita</th><th>Comissão prevista</th><th>Situação</th></tr></thead><tbody id="teamRows"></tbody></table></div></div>
+ </section>
 <section class="panel" id="metas"><div class="eyebrow">Gestão de performance</div><h1 class="page-heading">Metas inteligentes</h1><p class="subtitle">Objetivos progressivos e ritmo comercial com projeção e acompanhamento.</p><div class="two">
 <div class="card"><h2>Definição de metas da prévia</h2><form id="goalForm"><div class="form-grid"><label>Meta 1 (vendas)<input id="t1" type="number" min="1" max="100000" value="10"></label><label>Meta 2 (vendas)<input id="t2" type="number" min="2" max="100000" value="20"></label><label>Meta 3 (vendas)<input id="t3" type="number" min="3" max="100000" value="30"></label><label>Bônus meta 1 (R$)<input id="b1" type="number" min="0" step="1" value="250"></label><label>Bônus meta 2 (R$)<input id="b2" type="number" min="0" step="1" value="500"></label><label>Bônus meta 3 (R$)<input id="b3" type="number" min="0" step="1" value="900"></label></div><div class="form-footer"><button class="btn primary" type="submit">Aplicar regras nesta prévia</button></div></form></div>
 <div class="card"><h2>Faixas e alertas</h2><div id="tiers"></div><p class="note">O gestor poderá configurar essas regras por empresa e equipe após a integração autenticada.</p></div></div></section>
 <section class="panel" id="comissoes"><div class="eyebrow">Financeiro comercial</div><h1 class="page-heading">Comissões e remuneração</h1><p class="subtitle">Venda, ativação, recorrência, bonificações e valores retidos — sempre separados.</p><div class="grid" id="commissionCards"></div><hr>
  <div class="card"><h2>Regras de comissão da prévia</h2><div class="form-grid"><label>Comissão sobre vendas (%)<input type="number" min="0" max="100" step=".1" id="salesRate" value="15"></label><label>Comissão de ativação (%)<input type="number" min="0" max="100" step=".1" id="activationRate" value="10"></label><label>Recorrência (%)<input type="number" min="0" max="100" step=".1" id="recurringRate" value="5"></label><label>Salário fixo de referência (R$)<input type="number" min="0" max="999999" step=".01" id="fixedSalary" value="2300"></label></div><p class="note">Alterações recalculam automaticamente os demonstrativos fictícios. Comissões reais dependem de regras contratuais e validação financeira.</p><div class="form-footer"><button class="btn primary" id="recalc" type="button">Recalcular</button></div></div>
 </section>
-<section class="panel" id="renovacoes"><div class="eyebrow">Carteira de segurados</div><h1 class="page-heading">Renovações e vencimentos</h1><p class="subtitle">Acompanhe as vigências e janelas de relacionamento de 30, 15 e 10 dias.</p><div class="grid" id="renewalCards"></div><hr><div class="card"><h2>Contratos na carteira da prévia</h2><div class="scroll"><table><thead><tr><th>Referência</th><th>Produto</th><th>Vigência</th><th>Dias</th><th>Prioridade</th></tr></thead><tbody id="renewalRows"></tbody></table></div><p class="note">Alertas são apenas visuais; não há mensagens automáticas nem cobrança.</p></div></section>
+<section class="panel" id="renovacoes"><div class="eyebrow">Carteira de segurados</div><h1 class="page-heading">Renovações e vencimentos</h1><p class="subtitle">Acompanhe as vigências e janelas de relacionamento de 30, 15 e 10 dias.</p><div class="grid" id="renewalCards"></div><hr><div class="card"><h2>Contratos na carteira da prévia</h2><div class="scroll"><table><thead><tr><th>Referência</th><th>Produto</th><th>Vigência</th><th>Dias</th><th>Prioridade</th><th>Ação de contato</th></tr></thead><tbody id="renewalRows"></tbody></table></div><p class="note">Alertas são apenas visuais; não há mensagens automáticas nem cobrança.</p></div></section>
 <section class="panel" id="perfil"><div class="eyebrow">Minha conta</div><h1 class="page-heading">Perfil e preferências</h1><p class="subtitle">Identidade e configurações associadas à conta autenticada do CRM.</p><div class="card"><h2>Perfil de demonstração</h2><p>Conta: Consultor fictício · Empresa demonstrativa</p><p class="note">Edição de CPF/CNPJ, dados pessoais, credenciais, salário e permissões deverá usar os controles autenticados do COMVERXA, nunca esta página pública.</p></div></section>
 <section class="panel" id="assinatura"><div class="eyebrow">Administração financeira</div><h1 class="page-heading">Assinatura e pagamentos</h1><p class="subtitle">Visão do plano, situação, competência e documentos de cobrança.</p><div class="card"><h2>Integração financeira pendente</h2><p>Este módulo não coleta Pix nem processa pagamentos. A configuração de planos e vencimentos permanece sob responsabilidade do ADM Master do COMVERXA.</p><span class="tag warn">Cobrança real desativada</span></div></section>
 <footer class="note" style="margin-top:48px;border-top:1px solid var(--border);padding-top:20px">COMVERXA Premium Comercial · Protótipo demonstrativo independente · Nenhum cliente real ou linha WhatsApp conectado.</footer>
@@ -101,6 +118,7 @@ const demo=[
 {id:"S06",customer:"Cliente Demonstrativo F",seller:"Consultor 01",date:"2026-10-20",source:"WhatsApp",state:"MG",product:"Seguro",amount:19500,activation:4500,recurring:3900,status:"sold",endDate:"2026-12-13"}
 ];
 let sales=demo.slice(),tiers=[{target:10,bonus:25000},{target:20,bonus:50000},{target:30,bonus:90000}],rates={sales:15,activation:10,recurring:5,salary:230000};
+let teamGoal=30;const sellerGoals={"Consultor 01":8,"Consultor 02":7};const demoContacts=new Set();
 const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const brl=c=>(Math.round(c)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const num=n=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1}).format(n);
@@ -131,15 +149,26 @@ function render(){
  $("tiers").innerHTML=tiers.map((t,i)=>'<div style="padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"><div><strong>Meta '+(i+1)+': '+t.target+' vendas</strong><div class="kpi-desc">Bônus '+brl(t.bonus)+'</div></div><span class="tag '+(n>=t.target?"":"warn")+'">'+(n>=t.target?"Batida":"Faltam "+(t.target-n))+'</span></div>').join("");
  const labels={sold:"Vendido",active:"Ativo",negotiation:"Em negociação",lost:"Perdido",canceled:"Cancelado"};
  $("salesRows").innerHTML=month.length?month.map(s=>"<tr><td><strong>"+safe(s.customer)+"</strong></td><td>"+safe(s.date)+"</td><td>"+safe(s.seller)+"</td><td>"+safe(s.state)+"</td><td>"+safe(s.source)+"</td><td>"+brl(s.amount)+"</td><td><span class='tag "+(s.status==="lost"?"bad":s.status==="negotiation"?"warn":"")+"'>"+labels[s.status]+"</span></td></tr>").join(""):'<tr><td colspan="7" class="empty">Nenhum registro neste mês.</td></tr>';
+ const sellers=[...new Set([...Object.keys(sellerGoals),...month.map(s=>s.seller)])];
+ const teamData=sellers.map(seller=>{
+  const rows=month.filter(x=>x.seller===seller),wins=rows.filter(won),goal=sellerGoals[seller]||10;
+  const amount=wins.reduce((sum,s)=>sum+s.amount+s.activation+s.recurring,0);
+  const commission=wins.reduce((sum,s)=>sum+(s.retained?0:Math.round(s.amount*rates.sales/100)+Math.round(s.activation*rates.activation/100)+Math.round(s.recurring*rates.recurring/100)),0);
+  return {seller,sales:wins.length,goal,amount,commission,completion:Math.min(100,Math.round(wins.length/goal*100)),pending:rows.filter(x=>x.status==="negotiation").length};
+ }).sort((a,b)=>b.sales-a.sales||b.amount-a.amount||a.seller.localeCompare(b.seller));
+ $("teamCards").innerHTML=kpi("Consultores",String(sellers.length),"Com metas individuais")+kpi("Vendas da equipe",String(n),"Competência selecionada","accent")+kpi("Objetivo coletivo",String(teamGoal),"Meta independente")+kpi("Faltam",String(Math.max(0,teamGoal-n)),"Para objetivo da equipe","gold");
+ $("teamProgress").style.width=Math.min(100,Math.round(n/teamGoal*100))+"%";
+ $("teamProgressLabel").textContent=n+" de "+teamGoal+" vendas · "+Math.min(100,Math.round(n/teamGoal*100))+"% da meta coletiva";
+ $("teamRows").innerHTML=teamData.map(r=>"<tr><td><strong>"+safe(r.seller)+"</strong></td><td>"+r.sales+"</td><td>"+r.goal+"</td><td>"+r.completion+"%</td><td>"+brl(r.amount)+"</td><td>"+brl(r.commission)+"</td><td><span class='tag "+(r.sales>=r.goal?"":"warn")+"'>"+(r.sales>=r.goal?"Meta atingida":"Em evolução")+"</span></td></tr>").join("");
  const open=month.filter(s=>s.status==="negotiation"),conversion=n+open.length?Math.round(n/(n+open.length)*100):0;
  $("leadCards").innerHTML=kpi("Oportunidades",String(month.length),"Total da competência")+kpi("Negociação",String(open.length),"Demandam acompanhamento")+kpi("Vendas",String(n),"Conversões registradas","accent")+kpi("Conversão estimada",conversion+"%","Vendas / (vendas + negociação)","blue");
  $("leadSummary").innerHTML="<p>Leads em negociação: "+open.length+" · Perdas: "+lost+" · Cancelamentos: "+month.filter(s=>s.status==="canceled").length+".</p><p class='note'>Indicadores ilustrativos; as métricas reais usarão eventos e regras do CRM.</p>";
  const now=new Date(),today=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()));
  const contracts=sales.filter(s=>won(s)&&s.endDate).map(s=>({id:s.customer,product:s.product,end:s.endDate,days:Math.round((new Date(s.endDate+"T00:00:00Z")-today)/86400000)})).sort((a,b)=>a.days-b.days);
- const overdue=contracts.filter(c=>c.days<0).length,near=contracts.filter(c=>c.days>=0&&c.days<=10).length,mid=contracts.filter(c=>c.days>10&&c.days<=30).length;
- $("renewalCards").innerHTML=kpi("Vencidos",String(overdue),"Requerem análise de situação","danger")+kpi("Até 10 dias",String(near),"Ação prioritária","gold")+kpi("11 a 30 dias",String(mid),"Antecipar relacionamento","blue")+kpi("Após 30 dias",String(contracts.length-overdue-near-mid),"Monitoramento normal");
+ const overdue=contracts.filter(c=>c.days<0).length,near=contracts.filter(c=>c.days>=0&&c.days<=10).length,mid15=contracts.filter(c=>c.days>10&&c.days<=15).length,mid30=contracts.filter(c=>c.days>15&&c.days<=30).length,mid=mid15+mid30;
+ $("renewalCards").innerHTML=kpi("Vencidos",String(overdue),"Requerem análise de situação","danger")+kpi("Até 10 dias",String(near),"Ação prioritária","gold")+kpi("11 a 15 dias",String(mid15),"Contato antecipado","blue")+kpi("16 a 30 dias",String(mid30),"Planejar abordagem","blue");
  $("renewalSummary").innerHTML='<div class="subgrid">'+smaller("Vigências vencidas",String(overdue))+smaller("Nos próximos 30 dias",String(near+mid))+'</div><p class="note">Alertas automáticos serão integrados a contratos reais após homologação.</p>';
- $("renewalRows").innerHTML=contracts.length?contracts.map(c=>"<tr><td>"+safe(c.id)+"</td><td>"+safe(c.product)+"</td><td>"+safe(c.end)+"</td><td>"+c.days+"</td><td><span class='tag "+(c.days<0?"bad":c.days<=30?"warn":"")+"'>"+(c.days<0?"Vencido":c.days<=10?"Crítico":c.days<=30?"Prioritário":"Programado")+"</span></td></tr>").join(""):'<tr><td colspan="5" class="empty">Nenhum contrato demonstrativo.</td></tr>';
+ $("renewalRows").innerHTML=contracts.length?contracts.map(c=>"<tr><td>"+safe(c.id)+"</td><td>"+safe(c.product)+"</td><td>"+safe(c.end)+"</td><td>"+c.days+"</td><td><span class='tag "+(c.days<0?"bad":c.days<=30?"warn":"")+"'>"+(c.days<0?"Vencido":c.days<=10?"Crítico":c.days<=15?"Até 15 dias":c.days<=30?"Até 30 dias":"Programado")+"</span></td><td>"+(c.days>=0&&c.days<=30?"<button type='button' class='btn' data-demo-contact='"+safe(c.id)+"'>"+(demoContacts.has(c.id)?"Contato registrado":"Registrar contato")+"</button>":"—")+"</td></tr>").join(""):'<tr><td colspan="6" class="empty">Nenhum contrato demonstrativo.</td></tr>';
 }
 function page(p){document.querySelectorAll(".panel").forEach(e=>e.classList.toggle("active",e.id===p));document.querySelectorAll("#nav button[data-page]").forEach(e=>e.classList.toggle("active",e.dataset.page===p));$("sidebar").classList.remove("open");$("overlay").classList.remove("active");scrollTo({top:0,behavior:"smooth"})}
 document.querySelectorAll("#nav button[data-page]").forEach(e=>e.addEventListener("click",()=>page(e.dataset.page)));
@@ -147,6 +176,28 @@ $("toggleMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("ope
 $("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("active")});
 $("print").addEventListener("click",()=>{page("painel");window.print()});
 $("month").addEventListener("change",render);
+$("teamGoal").addEventListener("change",()=>{
+ const n=Number($("teamGoal").value);if(!Number.isSafeInteger(n)||n<1||n>100000){alert("Informe uma meta válida.");$("teamGoal").value=teamGoal;return}
+ teamGoal=n;render();
+});
+$("renewalRows").addEventListener("click",e=>{
+ const b=e.target.closest("[data-demo-contact]");if(!b)return;
+ const key=b.getAttribute("data-demo-contact");if(demoContacts.has(key))demoContacts.delete(key);else demoContacts.add(key);
+ render();
+});
+$("exportTeam").addEventListener("click",()=>{
+ const month=current(),sellers=[...new Set([...Object.keys(sellerGoals),...month.map(r=>r.seller)])];
+ const csvCell=v=>{const val=String(v??"").replace(/[\r\n]/g," ").replace(/"/g,'""');return '"'+(/^\s*[=+\-@]/.test(val)?"'"+val:val)+'"'};
+ const lines=[["periodo","vendedor","vendas","meta","receita_centavos","comissao_prevista_centavos"].map(csvCell).join(";")];
+ for(const seller of sellers){
+  const wins=month.filter(x=>x.seller===seller&&won(x));
+  const revenue=wins.reduce((sum,s)=>sum+s.amount+s.activation+s.recurring,0);
+  const commission=wins.filter(s=>!s.retained).reduce((sum,s)=>sum+Math.round(s.amount*rates.sales/100)+Math.round(s.activation*rates.activation/100)+Math.round(s.recurring*rates.recurring/100),0);
+  lines.push([$("month").value,seller,wins.length,sellerGoals[seller]||10,revenue,commission].map(csvCell).join(";"));
+ }
+ const csv="\uFEFF"+lines.join("\r\n")+"\r\n",url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;a.download="comverxa-equipe-demonstracao-"+$("month").value+".csv";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+});
 $("saleForm").addEventListener("submit",e=>{
  e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget).entries());const cents=x=>Math.round(Math.max(0,Number(x)||0)*100);
  if(!values.customer.trim()||!values.seller.trim()||!values.date)return;
