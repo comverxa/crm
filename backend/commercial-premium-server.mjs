@@ -139,6 +139,12 @@ export function createPremiumServer({
    const secure=cookieSecure?"; Secure":"";
    return json(200,{ok:true},{"set-cookie":"cvx_pilot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
   }
+  if(path==="/api/pilot/users"&&req.method==="GET"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!["master","admin","manager"].includes(s.role))return json(403,{error:"Forbidden"});
+   const users=stmt("SELECT id,email,role,active FROM cvx_pilot_users WHERE tenant_id=? ORDER BY role,email LIMIT 300").all(s.tenantId);
+   return json(200,{users});
+  }
   if(path==="/api/pilot/users"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!["admin","master"].includes(s.role))return json(403,{error:"Forbidden"});
