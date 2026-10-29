@@ -1,0 +1,30 @@
+name: COMVERXA Premium Comercial v1
+on:
+  push:
+    branches: [feature/comverxa-premium-comercial-v1]
+    paths:
+      - 'backend/commercial-premium-*.mjs'
+      - 'tests/commercial-premium.test.mjs'
+      - '.github/workflows/commercial-premium.yml'
+  pull_request:
+    paths:
+      - 'backend/commercial-premium-*.mjs'
+      - 'tests/commercial-premium.test.mjs'
+      - '.github/workflows/commercial-premium.yml'
+permissions:
+  contents: read
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar sintaxe
+        run: |
+          node --check backend/commercial-premium-core.mjs
+          node --check backend/commercial-premium-store.mjs
+      - name: Testes integrados sem dados reais
+        run: node --test tests/commercial-premium.test.mjs
