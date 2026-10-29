@@ -50,6 +50,7 @@ export function validateRules(rules) {
     tiers,salesRateBps:rate(rules.salesRateBps??0),
     activationRateBps:rate(rules.activationRateBps??0),
     recurringRateBps:rate(rules.recurringRateBps??0),
+    fixedSalaryCents:money(rules.fixedSalaryCents??0),
     halfSaturday:!!rules.halfSaturday,
     holidays:Array.isArray(rules.holidays)?rules.holidays.slice(0,60).map(s=>iso(day(s))):[],
   };
@@ -114,7 +115,12 @@ export function salesSnapshot({session,sales,month,asOf,rules,ownOnly=false}){
       remaining:next?next.minSales-counts.sold:0,completionPct:completion,
       achievedBonusCents:achieved?.bonusCents??0,nextBonusCents:next?.bonusCents??0},
     commissions:{effectiveCents:effective,retainedCents:retained},
-    revenueCents:revenue,pace:{averageDaily:rounded(avg*100)/100,requiredDaily:rounded(required*100)/100,
+    revenueCents:revenue,earnings:{
+      fixedSalaryCents:session.role==="operator"?cfg.fixedSalaryCents:null,
+      variableCents:effective+(achieved?.bonusCents??0),
+      totalCents:session.role==="operator"?cfg.fixedSalaryCents+effective+(achieved?.bonusCents??0):null,
+      nextTierPotentialBonusCents:next?.bonusCents??0,
+    },pace:{averageDaily:rounded(avg*100)/100,requiredDaily:rounded(required*100)/100,
       projectedSales:rounded(projected*10)/10,projectedTargetPct:target.minSales?rounded(projected*1000/target.minSales)/10:100,
       atRisk:!!next&&days.remaining>0&&required>avg*1.25,
       periodClosed:days.remaining===0},
