@@ -94,6 +94,7 @@ test("official Meta phone verified via Graph, encrypted token and signed inbound
   assert.equal(validated.state,"validated");
   assert.equal((await wa.officialStatus(master)).state,"verified");
   assert.equal((await wa.list(other))[1].configured,false);
+  await assert.rejects(wa.registerOfficial(other,{phoneNumberId:"123456789012345",accessToken:officialToken}),/UNIQUE constraint/);
   const stored=JSON.stringify(db.prepare("SELECT * FROM cvx_com_wa_channels").all());
   assert.ok(!stored.includes(officialToken));
   assert.ok(!stored.includes(appSecret));
