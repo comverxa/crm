@@ -98,6 +98,55 @@ async function loadLeads(){
  }
  if(!result.leads.length)row(tbody,["Nenhum lead para os filtros selecionados"]);
 }
+const waStates={
+ connected:["Conectado","online"],verified:["Credenciais verificadas","online"],
+ validated:["Identidade Meta validada","online"],waiting_scan:["Aguardando leitura","pending"],
+ waiting_qr:["Aguardando QR Code","pending"],pending:["Aguardando conexão","pending"],
+ connecting:["Conectando","pending"],unavailable:["Provedor indisponível","offline"],
+ disconnected:["Desconectado","offline"],provider_missing:["Credenciais do provedor pendentes","offline"],
+ not_configured:["Não configurado","offline"],unknown:["Estado não confirmado","offline"]
+};
+const waUserCanConfigure=()=>["master","admin","manager"].includes(currentUser?.role);
+function showWaState(id,state){
+ const el=$(id),data=waStates[state]||waStates.unknown;
+ el.textContent=data[0];el.dataset.kind=data[1];
+}
+async function loadWhatsApp(){
+ const status=$("waGlobalStatus");
+ status.textContent="Consultando os dois canais autorizados...";
+ try{
+  const data=await call("/api/wa/channels");
+  const items=data.channels||[];
+  if(items.length!==2||items[0].slot!==1||items[1].slot!==2)throw Error("Configuração inesperada de canais");
+  const qr=items[0],official=items[1];
+  showWaState("waQrState",qr.state);showWaState("waMetaState",official.state);
+  $("waQrNumber").textContent=qr.displayNumber||"Linha 01";
+  $("waMetaNumber").textContent=official.displayNumber||"Linha 02";
+  const active=items.filter(i=>["connected","verified"].includes(i.state)).length;
+  status.textContent="2 canais disponíveis · "+active+" verificado(s) pelo provedor · Sincronização depende dos webhooks e conexão ativa.";
+  if(!data.integrationAvailable)status.textContent="2 canais definidos. Os segredos de conexão do servidor ainda precisam ser configurados.";
+  $("waQrConnect").disabled=!waUserCanConfigure()||!data.integrationAvailable||qr.state==="provider_missing";
+  $("waMetaForm").querySelectorAll("input,button[type=submit]").forEach(el=>el.disabled=!waUserCanConfigure()||!data.integrationAvailable);
+  $("waMetaWebhook").disabled=!waUserCanConfigure()||!official.configured;
+  $("waQrInfo").textContent=qr.configured?"Use Atualizar para consultar a conexão. O QR Code só é exibido quando o provedor o disponibiliza.":"Uma única sessão QR por empresa.";
+  $("waMetaInfo").textContent=official.configured?"Número validado. A configuração do webhook da Meta é necessária para sincronização de mensagens.":"Conecte uma única conta oficial Meta por empresa.";
+ }catch(error){status.textContent="Não foi possível consultar as conexões: "+error.message}
+}
+async function loadWaInbox(){
+ const slot=Number($("waInboxSlot").value),tbody=$("waInboxTable");empty(tbody);
+ try{
+  const {messages}=await call("/api/wa/inbox?slot="+slot);
+  for(const msg of messages){
+   const tr=document.createElement("tr");
+   for(const value of [
+    slot===1?"QR · Evolution":"API Meta",msg.contact,msg.kind,
+    msg.body||"Mensagem de mídia (conteúdo não armazenado)",new Date(msg.occurredAt).toLocaleString("pt-BR")
+   ])tr.append(textEl("td",value));
+   tbody.append(tr);
+  }
+  if(!messages.length)row(tbody,["Sem mensagens recebidas e validadas neste canal"]);
+ }catch(error){row(tbody,["Não foi possível consultar mensagens: "+error.message])}
+}
 async function loadSales(){
  const d=await call("/api/commercial/sales"+contextMonth());
  const t=$("salesTable");empty(t);
@@ -223,6 +272,7 @@ async function refresh(){
  $("exportCsv").href="/api/commercial/report.csv"+base;
  if(currentView==="dashboard")return loadDashboard();
  if(currentView==="sales")return loadSales();
+ if(currentView==="whatsapp")return loadWhatsApp();
  if(currentView==="leads")return loadLeads();
  if(currentView==="goals")return loadRules();
  if(currentView==="team")return loadTeam();
@@ -295,6 +345,55 @@ async function init(){
   });
  }
 
+ $("waRefresh").addEventListener("click",()=>loadWhatsApp());
+ $("waQrCheck").addEventListener("click",()=>loadWhatsApp());
+ $("waLoadInbox").addEventListener("click",()=>loadWaInbox());
+ $("waInboxSlot").addEventListener("change",()=>loadWaInbox());
+ $("waQrConnect").addEventListener("click",async event=>{
+  const button=event.currentTarget;button.disabled=true;
+  $("waQrPanel").hidden=true;$("waQrInfo").textContent="Solicitando QR Code ao provedor Evolution...";
+  try{
+   const setup=await call("/api/wa/qr/register",{method:"POST",body:{}});
+   if(!setup.configured)throw Error("Evolution ainda não está configurada no servidor");
+   const result=await call("/api/wa/qr/connect",{method:"POST",body:{}});
+   if(result.connected){$("waQrInfo").textContent="Sessão conectada. Confira o estado da linha.";showWaState("waQrState","connected");return}
+   if(result.qrDataUrl){
+    const url=result.qrDataUrl;
+    if(!/^data:image\/png;base64,[A-Za-z0-9+/=]{100,300000}$/.test(url))throw Error("QR recebido em formato inválido");
+    $("waQrImage").src=url;$("waQrPanel").hidden=false;
+    showWaState("waQrState","waiting_scan");$("waQrInfo").textContent="Escaneie o QR Code usando o WhatsApp do celular. O código é temporário.";
+   }else{
+    showWaState("waQrState","waiting_qr");$("waQrInfo").textContent="O provedor ainda não retornou uma imagem QR. Tente novamente após verificar a instância.";
+   }
+  }catch(error){$("waQrInfo").textContent="Não foi possível obter QR Code: "+error.message;notify("Falha de conexão do canal QR.",true)}
+  finally{button.disabled=false}
+ });
+ $("waMetaForm").addEventListener("submit",async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');button.disabled=true;
+  const f=new FormData(form);$("waMetaInfo").textContent="Validando Phone Number ID na Meta...";
+  try{
+   const data=await call("/api/wa/official/register",{method:"POST",body:{
+    phoneNumberId:String(f.get("phoneNumberId")||"").trim(),
+    accessToken:String(f.get("accessToken")||"").trim()
+   }});
+   form.elements.accessToken.value="";
+   $("waMetaInfo").textContent="Número "+(data.displayNumber||"")+" validado. Configure o webhook antes de considerar a sincronização ativa.";
+   notify("Conexão Meta validada no servidor. Falta habilitar o webhook no painel Meta.");
+   await loadWhatsApp();
+  }catch(error){$("waMetaInfo").textContent="Meta ainda não validada: "+error.message}
+  finally{button.disabled=false}
+ });
+ $("waMetaWebhook").addEventListener("click",async()=>{
+  try{
+   const d=await call("/api/wa/official/webhook-setup");
+   $("waWebhookUrl").value=d.callbackUrl;$("waWebhookToken").value=d.verifyToken;
+   $("waWebhookPanel").hidden=false;
+  }catch(error){notify("Webhook indisponível: "+error.message,true)}
+ });
+ $("waRevealWebhook").addEventListener("click",()=>{
+  const field=$("waWebhookToken");field.type=field.type==="password"?"text":"password";
+  $("waRevealWebhook").textContent=field.type==="password"?"Mostrar token":"Ocultar token";
+ });
  $("refreshLeads").addEventListener("click",()=>loadLeads().catch(e=>notify(e.message,true)));
  $("leadTable").addEventListener("click",async event=>{
   const button=event.target.closest("button[data-action]");if(!button)return;
