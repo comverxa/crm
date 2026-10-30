@@ -52,6 +52,10 @@ export function createCommercialHttpHandler({store,leads=null,getSession,verifyC
       return json(201,{activity:leads.recordActivity(session,leadId,input)});
     }
    }
+   if(action==="configuration-status"&&req.method==="GET")return json(200,{
+    configured:store.getRules(session)!==null,
+    canConfigure:["master","admin","manager"].includes(session.role)
+   });
    if(action==="summary"&&req.method==="GET")return json(200,store.snapshot(session,{month,asOf}));
    if(action==="team"&&req.method==="GET")return json(200,store.teamSummary(session,{month,asOf}));
    if(action==="seller-plans"&&req.method==="GET")return json(200,{plans:store.listSellerPlans(session)});
