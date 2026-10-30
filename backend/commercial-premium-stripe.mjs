@@ -127,7 +127,7 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},base
     if(!isId(subscriptionId,"sub")||!isId(customerId,"cus"))throw Error("Invoice lacks subscription or customer");
     const row=stmt(db,"SELECT * FROM cvx_pilot_stripe_subscriptions WHERE subscription_id=? AND customer_id=?").get(subscriptionId,customerId);
     if(!row)throw Error("Stripe subscription mapping unavailable; retry webhook");
-    if(type==="invoice.paid"&&object.status==="paid"&&isId(object.id,"in")){
+    if(type==="invoice.paid"&&object.status==="paid"&&Number.isSafeInteger(object.amount_paid)&&object.amount_paid>0&&isId(object.id,"in")){
      const isCanceled=row.status==="canceled"||row.entitlement==="canceled";
      if(!isCanceled)stmt(db,"UPDATE cvx_pilot_stripe_subscriptions SET status='active',entitlement='active',last_paid_invoice=?,updated_at=? WHERE subscription_id=?")
       .run(object.id,now(),subscriptionId);
