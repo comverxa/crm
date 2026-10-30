@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {createHmac} from "node:crypto";
 import {DatabaseSync} from "node:sqlite";
+import {mkdtempSync,rmSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
+import {createPremiumServer} from "../backend/commercial-premium-server.mjs";
 import {createStripeBilling,verifyStripeEvent} from "../backend/commercial-premium-stripe.mjs";
 const secret="sk_test_mockonly1234567890",webhookSecret="whsec_only_unit_tests123456";
 const priceIds={starter:"price_StarterTest01",professional:"price_ProTest001",business:"price_BizTest001"};
@@ -96,4 +100,39 @@ test("Stripe unbound invoice returns error for provider retry, no unintended ten
   assert.equal(app.status("company-A").subscriptions.length,0);
   assert.equal(db.prepare("SELECT COUNT(*) AS c FROM cvx_pilot_stripe_events").get().c,0);
  }finally{db.close()}
+});
+
+test("HTTP SaaS Stripe endpoints require authenticated tenant, password rotation and CSRF",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"cvx-stripe-http-"));
+ const app=createPremiumServer({dbPath:join(dir,"pilot.sqlite"),
+  bootstrapEmail:"admin@exemplo.test",bootstrapPassword:"BootPassTest-2026-1234",cookieSecure:false,
+  stripeConfig:{secretKey:secret,webhookSecret,priceIds,clock:()=>timestamp,
+   fetchImpl:async()=>new Response(JSON.stringify({id:sid,url:"https://checkout.stripe.com/c/pay/test-session"}),{status:200})}});
+ try{
+  await new Promise(resolve=>app.server.listen(0,"127.0.0.1",resolve));
+  const base="http://127.0.0.1:"+app.server.address().port;
+  const post=(path,body,headers={})=>fetch(base+path,{method:"POST",headers:{"content-type":"application/json",...headers},body:JSON.stringify(body)});
+  assert.equal((await fetch(base+"/api/billing/stripe/status")).status,401);
+  assert.equal((await post("/api/billing/stripe/checkout",{plan:"starter"})).status,401);
+  const first=await post("/api/auth/login",{email:"admin@exemplo.test",password:"BootPassTest-2026-1234"});
+  assert.equal(first.status,200);
+  const cookie=first.headers.get("set-cookie").split(";")[0];
+  const session=await(await fetch(base+"/api/auth/me",{headers:{cookie}})).json();
+  assert.equal(session.mustChangePassword,true);
+  let r=await post("/api/billing/stripe/checkout",{plan:"starter"},{cookie,"x-csrf-token":session.csrf});
+  assert.equal(r.status,403);
+  r=await post("/api/auth/password",{oldPassword:"BootPassTest-2026-1234",newPassword:"ChangedPassTest-2026-1234"},{cookie,"x-csrf-token":session.csrf});
+  assert.equal(r.status,200);
+  const login=await post("/api/auth/login",{email:"admin@exemplo.test",password:"ChangedPassTest-2026-1234"});
+  const cookie2=login.headers.get("set-cookie").split(";")[0];
+  const user=await(await fetch(base+"/api/auth/me",{headers:{cookie:cookie2}})).json();
+  r=await post("/api/billing/stripe/checkout",{plan:"starter"},{cookie:cookie2,"x-csrf-token":"invalid"});
+  assert.equal(r.status,403);
+  r=await post("/api/billing/stripe/checkout",{plan:"starter"},{cookie:cookie2,"x-csrf-token":user.csrf});
+  assert.equal(r.status,200);assert.equal((await r.json()).testMode,true);
+  r=await fetch(base+"/api/billing/stripe/status",{headers:{cookie:cookie2}});
+  assert.equal(r.status,200);assert.equal((await r.json()).availablePlans.length,3);
+  r=await post("/api/billing/stripe/webhook",{fake:"event"},{});
+  assert.equal(r.status,400);
+ }finally{await app.close();rmSync(dir,{recursive:true,force:true})}
 });
