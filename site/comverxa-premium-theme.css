@@ -93,3 +93,21 @@ tr:hover td{background:#20507125}
  .wa-card{padding:17px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+/* Executive cockpit */
+.dashboard-secondary{margin-top:17px}
+.dashboard-funnel{display:grid;gap:13px;margin-top:20px}
+.dash-funnel-item{display:grid;grid-template-columns:90px minmax(0,1fr) 33px;align-items:center;gap:12px}
+.dash-funnel-item>span{color:#acc3d4;font-size:12px}
+.dash-funnel-item>strong{font-size:13px;text-align:right;color:#d9f9fd}
+.dash-funnel-track{height:10px;border-radius:9px;background:#1e3951;overflow:hidden}
+.dash-funnel-track>div{height:100%;background:linear-gradient(90deg,#3b9fa5,#62d8d5);border-radius:9px;min-width:0}
+.dash-funnel-item:nth-child(4) .dash-funnel-track>div{background:linear-gradient(90deg,#638aff,#91b6ff)}
+.dash-funnel-item:nth-child(5) .dash-funnel-track>div{background:linear-gradient(90deg,#35bb84,#76f1b5)}
+.dash-funnel-item:nth-child(6) .dash-funnel-track>div{background:linear-gradient(90deg,#9a6260,#d69d85)}
+.dash-wa{display:grid;gap:11px;margin:16px 0}
+.dash-wa-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border:1px solid #304d61;border-radius:11px;background:#0e283b}
+.dash-wa-item span{font-size:13px;color:#e1eefe}
+.dash-wa-item strong{font-size:11px;color:#a7bacd}
+.dash-wa-item strong[data-kind="online"]{color:#61e9b6}
+.dash-wa-item strong[data-kind="pending"]{color:#ffd188}
