@@ -28,7 +28,7 @@ function constantEquals(a,b){
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const page=(title,main)=>'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'+escape(title)+'</title><style>body{background:#071225;color:#eef6ff;font:16px system-ui;margin:0;min-height:100vh;display:grid;place-items:center}main{max-width:440px;width:90vw;border:1px solid #284664;background:#10243c;border-radius:18px;padding:27px}h1{margin:5px 0}label{display:block;margin-top:18px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;margin-top:6px;border-radius:9px}input{background:#081930;color:#fff;border:1px solid #52708e}button{color:#061626;background:#52d1e8;border:0;font-weight:800;margin-top:20px}small,p{color:#a5bbd3;line-height:1.5}</style></head><body><main>'+main+'</main></body></html>';
-const loginPage=page("COMVERXA — Acesso Comercial",'<div style="color:#52d1e8;font-weight:800">COMVERXA PREMIUM</div><h1>Entrar no Comercial</h1><p>Ambiente piloto isolado do CRM principal.</p><form id="form"><label>E-mail<input autocomplete="username" type="email" name="email" required></label><label>Senha<input autocomplete="current-password" type="password" name="password" required></label><button type="submit">Acessar com segurança</button><p id="info" role="status"></p></form><small>Sem cadastro público, pagamentos ou envios de WhatsApp neste ambiente.</small><script src="/assets/commercial-login.js" defer></script>');
+const loginPage=page("COMVERXA — Acesso Comercial",'<div style="color:#52d1e8;font-weight:800">COMVERXA PREMIUM</div><h1>Entrar no Comercial</h1><p>Ambiente piloto isolado do CRM principal.</p><form id="form"><label>E-mail<input autocomplete="username" type="email" name="email" required></label><label>Senha<input autocomplete="current-password" type="password" name="password" required></label><button type="submit">Acessar com segurança</button><p id="info" role="status"></p></form><a href="/forgot" style="color:#52d1e8">Esqueci minha senha</a><small>Sem cadastro público, pagamentos ou envios de WhatsApp neste ambiente.</small><script src="/assets/commercial-login.js" defer></script>');
 const cookieValue=s=>{const m=/(?:^|;\s*)cvx_pilot_session=([A-Za-z0-9_-]{32,100})(?:;|$)/.exec(s||"");return m?.[1]||null};
 
 export function createPremiumServer({
@@ -36,10 +36,16 @@ export function createPremiumServer({
   htmlPath=new URL("../site/comverxa-premium-operacional.html",import.meta.url),
   jsPath=new URL("../site/comverxa-premium-operacional.js",import.meta.url),
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
-  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false
+  recoveryJsPath=new URL("../site/comverxa-premium-recovery.js",import.meta.url),
+  recoveryHtmlPath=new URL("../site/comverxa-premium-recovery.html",import.meta.url),
+  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,
+  publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
+ const allowedOrigin=new URL(publicOrigin);
+ if(allowedOrigin.protocol!=="https:"||allowedOrigin.pathname!=="/"||allowedOrigin.search||allowedOrigin.hash)
+  throw Error("Invalid public recovery origin");
  if(typeof bootstrapTenant!=="string"||!/^[a-zA-Z0-9_.:-]{1,100}$/.test(bootstrapTenant))throw Error("Invalid tenant");
  const db=new DatabaseSync(dbPath);
  db.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON");
@@ -48,6 +54,8 @@ export function createPremiumServer({
   db.exec("ALTER TABLE cvx_pilot_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_sessions (session_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES cvx_pilot_users(id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_expires ON cvx_pilot_sessions(expires_at)");
+ db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_recovery (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL,used_at INTEGER,created_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES cvx_pilot_users(id))");
+ db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_recovery_user ON cvx_pilot_recovery(user_id,expires_at)");
  const store=createCommercialStore(db);
  const leads=createLeadsStore(db);
  const tenants=createTenantStore(db);
@@ -81,7 +89,8 @@ export function createPremiumServer({
   verifyCsrf:async(req,s)=>csrfOk(req,s)
  });
  const html=readFileSync(htmlPath,"utf-8");
- const appJs=readFileSync(jsPath,"utf-8"),loginJs=readFileSync(loginJsPath,"utf-8");
+ const appJs=readFileSync(jsPath,"utf-8"),loginJs=readFileSync(loginJsPath,"utf-8"),
+  recoveryJs=readFileSync(recoveryJsPath,"utf-8"),recoveryHtml=readFileSync(recoveryHtmlPath,"utf-8");
  if(!html.includes("COMVERXA")||html.length<500)throw Error("Invalid app page");
  const baseHeaders={"cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","x-frame-options":"DENY","content-security-policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' "};
  const withHeaders=(response)=>{
@@ -102,12 +111,58 @@ export function createPremiumServer({
    if(!origin&&!["same-origin","none"].includes(req.headers.get("sec-fetch-site")||"same-origin"))return json(403,{error:"Forbidden"});
   }
   if(path==="/healthz")return json(200,{status:"ok",service:"commercial-pilot"});
-  if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"))return new Response(path.endsWith("login.js")?loginJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
+  if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"||path==="/assets/commercial-recovery.js"))return new Response(path.endsWith("login.js")?loginJs:path.endsWith("recovery.js")?recoveryJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(path==="/")return Response.redirect(url.origin+(sessionFrom(req)?"/app":"/login"),303);
   if(path==="/login"&&req.method==="GET")return new Response(loginPage,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
+  if((path==="/forgot"||path==="/reset")&&req.method==="GET")return new Response(recoveryHtml,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
   if(path==="/app"&&req.method==="GET"){
    if(!sessionFrom(req))return Response.redirect(url.origin+"/login",303);
    return new Response(html,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
+  }
+  if(path==="/api/auth/forgot"&&req.method==="POST"){
+   if(!sendRecoveryEmail)return json(503,{error:"Email recovery unavailable"});
+   let data;try{data=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid request"})}
+   const candidate=String(data?.email||"").trim().toLowerCase();
+   if(!validEmail(candidate))return json(400,{error:"Invalid email"});
+   const neutral=json(202,{ok:true});
+   if(!rateLimit("forgot:"+ip+"|"+candidate))return neutral;
+   const user=stmt("SELECT id,tenant_id,email FROM cvx_pilot_users WHERE email=? AND active=1").get(candidate);
+   if(!user||!tenants.isEnabled(user.tenant_id))return neutral;
+   const token=randomBytes(32).toString("base64url"),tokenHash=secureHash(token),expires=now()+15*60*1000;
+   try{
+    db.exec("BEGIN IMMEDIATE");
+    stmt("DELETE FROM cvx_pilot_recovery WHERE user_id=?").run(user.id);
+    stmt("INSERT INTO cvx_pilot_recovery(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)").run(tokenHash,user.id,expires,now());
+    db.exec("COMMIT");
+    const resetUrl=new URL("/reset",publicOrigin);resetUrl.searchParams.set("token",token);
+    await sendRecoveryEmail({to:user.email,resetUrl:resetUrl.href});
+   }catch(error){
+    try{db.exec("ROLLBACK")}catch{}
+    stmt("DELETE FROM cvx_pilot_recovery WHERE token_hash=?").run(tokenHash);
+    console.warn("CVX_RECOVERY_EMAIL_ERROR",JSON.stringify({kind:error?.name||"Error"}));
+   }
+   return neutral;
+  }
+  if(path==="/api/auth/reset"&&req.method==="POST"){
+   let data;try{data=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid request"})}
+   const token=data?.token,newPassword=data?.newPassword;
+   if(typeof token!=="string"||! /^[A-Za-z0-9_-]{40,100}$/.test(token)||!validPass(newPassword))
+    return json(400,{error:"Invalid token or password"});
+   if(!rateLimit("reset:"+ip))return json(429,{error:"Too many attempts"});
+   const hash=secureHash(token);
+   const row=stmt("SELECT r.user_id,r.expires_at,r.used_at,u.active,u.tenant_id FROM cvx_pilot_recovery r JOIN cvx_pilot_users u ON u.id=r.user_id WHERE r.token_hash=?").get(hash);
+   if(!row||row.used_at!==null||row.expires_at<=now()||row.active!==1||!tenants.isEnabled(row.tenant_id))
+    return json(400,{error:"Invalid or expired token"});
+   const salt=randomBytes(16).toString("hex"),passhash=passwordHash(newPassword,salt);
+   try{
+    db.exec("BEGIN IMMEDIATE");
+    const consumed=stmt("UPDATE cvx_pilot_recovery SET used_at=? WHERE token_hash=? AND used_at IS NULL AND expires_at>?").run(now(),hash,now());
+    if(consumed.changes!==1)throw Error("Expired token");
+    stmt("UPDATE cvx_pilot_users SET salt=?,passhash=?,must_change_password=0 WHERE id=?").run(salt,passhash,row.user_id);
+    stmt("DELETE FROM cvx_pilot_sessions WHERE user_id=?").run(row.user_id);
+    db.exec("COMMIT");
+    return json(200,{ok:true,reloginRequired:true});
+   }catch(error){try{db.exec("ROLLBACK")}catch{}return json(400,{error:"Invalid or expired token"})}
   }
   if(path==="/api/auth/login"&&req.method==="POST"){
    let data;
