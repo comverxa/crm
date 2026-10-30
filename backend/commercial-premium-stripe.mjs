@@ -7,6 +7,7 @@
  * Existing lifetime grants from the main CRM are never written or inspected.
  */
 import {createHmac,timingSafeEqual,randomUUID} from "node:crypto";
+import {publicPriceCatalog,validateCatalogPrices} from "./commercial-premium-pricing.mjs";
 const PLAN_SET=new Set(["starter","professional","business"]);
 const TEST_SECRET=/^sk_test_[a-zA-Z0-9_]{10,}$/;
 const PRICE_ID=/^price_[a-zA-Z0-9]{5,}$/;
@@ -39,7 +40,7 @@ function asForm(fields){
  for(const [name,value] of Object.entries(fields))if(value!==null&&value!==undefined)data.set(name,scalar(value));
  return data;
 }
-export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},baseUrl,
+export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},priceIdsAnnual={},baseUrl,
   fetchImpl=fetch,clock=()=>Date.now()}={}){
  if(!db||typeof db.prepare!=="function")throw Error("SQLite required");
  if(!TEST_SECRET.test(secretKey||""))throw Error("Stripe TEST key required");
@@ -47,13 +48,21 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},base
  const base=new URL(baseUrl);
  if(base.protocol!=="https:"||base.username||base.password||base.search||base.hash||base.pathname!=="/")
   throw Error("HTTPS public origin required");
- const prices={};
- for(const plan of PLAN_SET){const value=priceIds[plan];if(value&&!PRICE_ID.test(value))throw Error("Invalid Stripe price ID");if(value)prices[plan]=value}
- if(!Object.keys(prices).length)throw Error("No test prices configured");
+ validateCatalogPrices({monthly:priceIds,annual:priceIdsAnnual});
+ const prices={monthly:{},annual:{}};
+ for(const plan of PLAN_SET){
+  if(priceIds[plan])prices.monthly[plan]=priceIds[plan];
+  if(priceIdsAnnual[plan])prices.annual[plan]=priceIdsAnnual[plan];
+ }
+ if(!Object.keys(prices.monthly).length&&!Object.keys(prices.annual).length)throw Error("No test prices configured");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_stripe_checkout (intent_id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,plan TEXT NOT NULL,price_id TEXT NOT NULL,session_id TEXT UNIQUE,checkout_url TEXT,created_at TEXT NOT NULL,consumed_at TEXT)");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_checkout_tenant ON cvx_pilot_stripe_checkout(tenant_id,created_at)");
+ if(!stmt(db,"PRAGMA table_info(cvx_pilot_stripe_checkout)").all().some(x=>x.name==="billing_cycle"))
+  db.exec("ALTER TABLE cvx_pilot_stripe_checkout ADD COLUMN billing_cycle TEXT NOT NULL DEFAULT 'monthly'");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_stripe_subscriptions(subscription_id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,customer_id TEXT NOT NULL,plan TEXT NOT NULL,status TEXT NOT NULL,entitlement TEXT NOT NULL DEFAULT 'pending',last_paid_invoice TEXT,updated_at TEXT NOT NULL)");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_stripe_subtenant ON cvx_pilot_stripe_subscriptions(tenant_id,updated_at)");
+ if(!stmt(db,"PRAGMA table_info(cvx_pilot_stripe_subscriptions)").all().some(x=>x.name==="billing_cycle"))
+  db.exec("ALTER TABLE cvx_pilot_stripe_subscriptions ADD COLUMN billing_cycle TEXT NOT NULL DEFAULT 'monthly'");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_stripe_events(event_id TEXT PRIMARY KEY,event_type TEXT NOT NULL,processed_at TEXT NOT NULL)");
  async function postStripe(path,body,idempotencyKey){
   const response=await fetchImpl("https://api.stripe.com/v1/"+path,{
@@ -64,27 +73,32 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},base
   return result;
  }
  function status(tenantId){
-  const rows=stmt(db,"SELECT subscription_id,plan,status,entitlement,updated_at FROM cvx_pilot_stripe_subscriptions WHERE tenant_id=? ORDER BY updated_at DESC LIMIT 10").all(tenantId);
-  return {configured:true,testMode:true,availablePlans:Object.keys(prices),
-   subscriptions:rows.map(x=>({subscriptionId:x.subscription_id,plan:x.plan,status:x.status,
+  const rows=stmt(db,"SELECT subscription_id,plan,billing_cycle,status,entitlement,updated_at FROM cvx_pilot_stripe_subscriptions WHERE tenant_id=? ORDER BY updated_at DESC LIMIT 10").all(tenantId);
+  return {configured:true,checkoutEnabled:true,testMode:true,availablePlans:Object.keys(prices.monthly),
+   availableCycles:Object.fromEntries([...PLAN_SET].map(plan=>[plan,
+     ["monthly","annual"].filter(cycle=>!!prices[cycle][plan])])),
+   catalog:publicPriceCatalog(),
+   subscriptions:rows.map(x=>({subscriptionId:x.subscription_id,plan:x.plan,cycle:x.billing_cycle,status:x.status,
     entitlement:x.entitlement,updatedAt:x.updated_at})),billingMode:"test_only"};
  }
- async function checkout(tenantId,plan,email){
-  if(!/^[A-Za-z0-9_.:-]{1,100}$/.test(tenantId)||!PLAN_SET.has(plan)||!prices[plan])throw Error("Invalid tenant or plan");
+ async function checkout(tenantId,plan,email,cycle="monthly"){
+  if(!/^[A-Za-z0-9_.:-]{1,100}$/.test(tenantId)||!PLAN_SET.has(plan)
+   ||!["monthly","annual"].includes(cycle)||!prices[cycle][plan])throw Error("Invalid tenant, plan or cycle");
+  const priceId=prices[cycle][plan];
   if(typeof email!=="string"||!email.includes("@")||email.length>200)throw Error("Invalid email");
   // Never allow several open checkout URLs for a single tenant without a time-bound lock.
   // Reuse a valid recent session; Stripe itself also deduplicates the provider request.
-  const latest=stmt(db,"SELECT * FROM cvx_pilot_stripe_checkout WHERE tenant_id=? AND plan=? AND session_id IS NOT NULL AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(tenantId,plan);
-  if(latest&&clock()-Date.parse(latest.created_at)<15*60*1000)return {url:latest.checkout_url,testMode:true};
+  const latest=stmt(db,"SELECT * FROM cvx_pilot_stripe_checkout WHERE tenant_id=? AND plan=? AND price_id=? AND session_id IS NOT NULL AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(tenantId,plan,priceId);
+  if(latest&&clock()-Date.parse(latest.created_at)<15*60*1000)return {url:latest.checkout_url,testMode:true,cycle};
   const intent=randomUUID(),createdAt=new Date(clock()).toISOString();
-  stmt(db,"INSERT INTO cvx_pilot_stripe_checkout(intent_id,tenant_id,plan,price_id,created_at) VALUES(?,?,?,?,?)")
-   .run(intent,tenantId,plan,prices[plan],createdAt);
+  stmt(db,"INSERT INTO cvx_pilot_stripe_checkout(intent_id,tenant_id,plan,price_id,billing_cycle,created_at) VALUES(?,?,?,?,?,?)")
+   .run(intent,tenantId,plan,priceId,cycle,createdAt);
   try{
    const session=await postStripe("checkout/sessions",{
     mode:"subscription",success_url:base.origin+"/app?checkout=return",
     cancel_url:base.origin+"/app?checkout=canceled",customer_email:email,
-    client_reference_id:tenantId,"line_items[0][price]":prices[plan],"line_items[0][quantity]":"1",
-    "metadata[tenant_id]":tenantId,"metadata[plan]":plan,"metadata[intent_id]":intent,
+    client_reference_id:tenantId,"line_items[0][price]":priceId,"line_items[0][quantity]":"1",
+    "metadata[tenant_id]":tenantId,"metadata[plan]":plan,"metadata[cycle]":cycle,"metadata[intent_id]":intent,
     "subscription_data[metadata][tenant_id]":tenantId,
     "subscription_data[metadata][intent_id]":intent
    },"cvx_pilot_checkout_"+intent);
@@ -92,7 +106,7 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},base
     throw Error("Invalid Stripe test checkout response");
    stmt(db,"UPDATE cvx_pilot_stripe_checkout SET session_id=?,checkout_url=? WHERE intent_id=?")
     .run(session.id,session.url,intent);
-   return {url:session.url,testMode:true};
+   return {url:session.url,testMode:true,cycle};
   }catch(error){
    // Leave the checkout intent for audit; a second request uses a new intent.
    throw error;
@@ -109,7 +123,9 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},base
     const intent=stmt(db,"SELECT * FROM cvx_pilot_stripe_checkout WHERE intent_id=?").get(meta.intent_id||"");
     const subscriptionId=objId(object.subscription),customerId=objId(object.customer);
     if(!intent||intent.session_id!==object.id||intent.tenant_id!==meta.tenant_id
-      ||intent.plan!==meta.plan||object.client_reference_id!==intent.tenant_id
+      ||intent.plan!==meta.plan||intent.billing_cycle!==(meta.cycle||"monthly")
+      ||intent.price_id!==prices[intent.billing_cycle]?.[intent.plan]
+      ||object.client_reference_id!==intent.tenant_id
       ||object.mode!=="subscription"||object.status!=="complete"
       ||!isId(subscriptionId,"sub")||!isId(customerId,"cus"))
       throw Error("Checkout intent mismatch");
@@ -117,8 +133,8 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},base
     if(assigned&&(assigned.tenant_id!==intent.tenant_id||assigned.customer_id!==customerId))
       throw Error("Stripe subscription already assigned");
     if(!assigned){
-     stmt(db,"INSERT INTO cvx_pilot_stripe_subscriptions(subscription_id,tenant_id,customer_id,plan,status,entitlement,updated_at) VALUES(?,?,?,?,?,?,?)")
-      .run(subscriptionId,intent.tenant_id,customerId,intent.plan,"pending","pending",now());
+     stmt(db,"INSERT INTO cvx_pilot_stripe_subscriptions(subscription_id,tenant_id,customer_id,plan,billing_cycle,status,entitlement,updated_at) VALUES(?,?,?,?,?,?,?,?)")
+      .run(subscriptionId,intent.tenant_id,customerId,intent.plan,intent.billing_cycle,"pending","pending",now());
     }
     stmt(db,"UPDATE cvx_pilot_stripe_checkout SET consumed_at=? WHERE intent_id=?").run(now(),intent.intent_id);
    } else if(["invoice.paid","invoice.payment_failed"].includes(type)){
