@@ -1,0 +1,34 @@
+/**
+ * External smoke test: public pages and anonymous access restrictions.
+ * No customer credentials and no POST requests.
+ * Run from GitHub Actions to validate actual Railway ingress, TLS and responses.
+ */
+import assert from "node:assert/strict";
+const origin=(process.env.CVX_COM_SMOKE_URL||"https://comverxa-comercial-piloto-production.up.railway.app").replace(/\/$/,"");
+if(!origin.startsWith("https://"))throw Error("Public smoke test requires HTTPS");
+async function get(path,{redirect="follow"}={}){
+ const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
+ try{return await fetch(origin+path,{method:"GET",redirect,cache:"no-store",signal:controller.signal})}
+ finally{clearTimeout(timeout)}
+}
+const health=await get("/healthz");
+assert.equal(health.status,200,"Health endpoint must be HTTP 200");
+const state=await health.json();
+assert.equal(state.status,"ok");
+assert.equal(state.service,"commercial-pilot");
+for(const [path,expected] of [["/login","Entrar no Comercial"],["/forgot","Recuperação de acesso"]]){
+ const res=await get(path);
+ assert.equal(res.status,200,path+" must open");
+ assert.match(res.headers.get("content-type")||"",/text\/html/);
+ assert.match(res.headers.get("cache-control")||"",/no-store/);
+ assert.match(res.headers.get("x-frame-options")||"",/deny/i);
+ assert.ok((await res.text()).includes(expected),path+" title is missing");
+}
+const internal=await get("/app",{redirect:"manual"});
+assert.equal(internal.status,303,"Unauthenticated app must redirect");
+assert.match(internal.headers.get("location")||"",/\/login$/);
+const userApi=await get("/api/auth/me");
+assert.equal(userApi.status,401,"Anonymous account info must not be returned");
+const backup=await get("/api/pilot/backups/status");
+assert.equal(backup.status,401,"Anonymous backup status must not be returned");
+console.log("COMVERXA_PUBLIC_SMOKE_OK: login, health, recovery, protected app and backup");
