@@ -54,6 +54,7 @@ jobs:
           node --check backend/commercial-premium-server.mjs
           node --check backend/commercial-premium-offsite-backup.mjs
           node --check backend/commercial-premium-mail.mjs
+          node --check backend/commercial-premium-stripe.mjs
           node --check backend/commercial-migration-inspect.mjs
           node --check site/comverxa-premium-recovery.js
           node --check backend/commercial-premium-launch.mjs
