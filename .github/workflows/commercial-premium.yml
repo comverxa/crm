@@ -38,6 +38,7 @@ jobs:
           node --check backend/commercial-premium-store.mjs
           node --check backend/commercial-premium-http.mjs
           node --check backend/commercial-premium-team.mjs
+          node --check backend/commercial-premium-tenants.mjs
           node --check backend/commercial-premium-reports.mjs
           node --check backend/commercial-premium-server.mjs
           node --check backend/commercial-premium-launch.mjs
