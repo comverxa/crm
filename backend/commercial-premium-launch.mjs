@@ -37,6 +37,13 @@ const stripeConfig=stripeRequested?{
  secretKey:env.CVX_STRIPE_TEST_SECRET_KEY,webhookSecret:env.CVX_STRIPE_TEST_WEBHOOK_SECRET,
  priceIds:stripePrices,priceIdsAnnual:stripeAnnual
 }:null;
+const whatsAppConfig=env.CVX_WA_ENCRYPTION_KEY?{
+ credentialKey:env.CVX_WA_ENCRYPTION_KEY,
+ evolutionUrl:env.CVX_WA_EVOLUTION_URL||"",
+ evolutionApiKey:env.CVX_WA_EVOLUTION_API_KEY||"",
+ metaAppSecret:env.CVX_WA_META_APP_SECRET||"",
+ metaGraphVersion:env.CVX_WA_META_GRAPH_VERSION||"v23.0"
+}:null;
 const app=createPremiumServer({
  dbPath:env.CVX_COM_DB_PATH,
  bootstrapEmail:env.CVX_COM_ADMIN_EMAIL,
@@ -45,7 +52,7 @@ const app=createPremiumServer({
  enablePlatformMaster:env.CVX_COM_ENABLE_MASTER==="1",
  cookieSecure:env.CVX_COM_COOKIE_INSECURE_LOCAL_ONLY!=="1",
  offsiteBackupConfig,backupSchedule:configured,
- publicOrigin:env.CVX_COM_PUBLIC_ORIGIN||"https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail,stripeConfig
+ publicOrigin:env.CVX_COM_PUBLIC_ORIGIN||"https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail,stripeConfig,whatsAppConfig
 });
 app.server.listen(port,"0.0.0.0",()=>console.log("COMVERXA Premium isolated pilot listening on PORT",port));
 for(const signal of ["SIGINT","SIGTERM"])process.on(signal,()=>app.server.close(()=>{app.db.close();process.exit(0)}));
