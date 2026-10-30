@@ -54,7 +54,7 @@ section{margin-bottom:24px}.error{color:#ff9ba4}.muted{color:var(--muted)}#mobil
 <label>Identificador único<input name="tenantId" required pattern="[a-zA-Z0-9_.:-]{1,100}" placeholder="corretora-abc"></label>
 <label>Nome fantasia<input name="companyName" required maxlength="100" placeholder="Corretora ABC"></label>
 <label>Plano<select name="plan"><option value="starter">Starter</option><option value="professional">Professional</option><option value="business">Business</option></select></label>
-<label>Licenças / usuários<input name="seatLimit" type="number" required min="1" max="500" value="5"></label>
+<label>Usuários incluídos no plano<input name="seatLimit" type="number" required min="1" max="8" value="1" readonly></label>
 <label>E-mail do administrador<input name="adminEmail" type="email" required></label>
 <label>Senha provisória (mín. 12 caracteres)<input name="adminPassword" type="password" minlength="12" required autocomplete="new-password"></label></div>
 <div class="form-actions"><button type="submit" class="btn primary">Criar empresa e conta administradora</button></div></form>
