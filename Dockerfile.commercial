@@ -13,6 +13,7 @@ COPY backend/commercial-premium-offsite-backup.mjs backend/
 COPY backend/commercial-premium-mail.mjs backend/
 COPY backend/commercial-premium-stripe.mjs backend/
 COPY backend/commercial-premium-pricing.mjs backend/
+COPY backend/commercial-premium-whatsapp.mjs backend/
 COPY backend/commercial-premium-launch.mjs backend/
 COPY site/comverxa-premium-operacional.html site/
 COPY site/comverxa-premium-operacional.js site/
