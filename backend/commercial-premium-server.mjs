@@ -18,6 +18,7 @@ import {createLeadsStore} from "./commercial-premium-leads.mjs";
 import {createOffsiteBackup} from "./commercial-premium-offsite-backup.mjs";
 import {createStripeBilling} from "./commercial-premium-stripe.mjs";
 import {publicPriceCatalog} from "./commercial-premium-pricing.mjs";
+import {createCommercialWhatsApp} from "./commercial-premium-whatsapp.mjs";
 
 const secureHash=s=>createHash("sha256").update(s).digest("hex");
 const json=(status,body,headers={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff",...headers}});
@@ -41,7 +42,7 @@ export function createPremiumServer({
   recoveryJsPath=new URL("../site/comverxa-premium-recovery.js",import.meta.url),
   recoveryHtmlPath=new URL("../site/comverxa-premium-recovery.html",import.meta.url),
   now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,
-  publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null,stripeConfig=null
+  publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null,stripeConfig=null,whatsAppConfig=null
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
@@ -65,6 +66,7 @@ export function createPremiumServer({
  const stmt=sql=>db.prepare(sql);
  const offsite=offsiteBackupConfig?createOffsiteBackup({db,dbPath,config:offsiteBackupConfig}):null;
  const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,...stripeConfig}):null;
+ const wa=whatsAppConfig?createCommercialWhatsApp({db,publicOrigin,...whatsAppConfig}):null;
  const scheduleHandles=[];
  const email=bootstrapEmail.trim().toLowerCase();
  if(!stmt("SELECT id FROM cvx_pilot_users WHERE email=?").get(email)){
@@ -95,7 +97,7 @@ export function createPremiumServer({
  const appJs=readFileSync(jsPath,"utf-8"),loginJs=readFileSync(loginJsPath,"utf-8"),
   recoveryJs=readFileSync(recoveryJsPath,"utf-8"),recoveryHtml=readFileSync(recoveryHtmlPath,"utf-8");
  if(!html.includes("COMVERXA")||html.length<500)throw Error("Invalid app page");
- const baseHeaders={"cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","x-frame-options":"DENY","content-security-policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' "};
+ const baseHeaders={"cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","x-frame-options":"DENY","content-security-policy":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' "};
  const withHeaders=(response)=>{
   const h=new Headers(response.headers);for(const [k,v]of Object.entries(baseHeaders))if(!h.has(k))h.set(k,v);
   return new Response(response.body,{status:response.status,headers:h});
@@ -108,7 +110,8 @@ export function createPremiumServer({
   let url;try{url=new URL(req.url)}catch{return json(400,{error:"Invalid URL"})}
   const path=url.pathname;
   // Explicitly refuse cross-origin writes, not only CSRF.
-  if(req.method!=="GET"&&req.method!=="HEAD"){
+  const fromProvider=(path.startsWith("/api/wa/qr/webhook/")||/^\/api\/wa\/meta\/[^/]+\/webhook$/.test(path)||path==="/api/billing/stripe/webhook");
+  if(req.method!=="GET"&&req.method!=="HEAD"&&!fromProvider){
    const origin=req.headers.get("origin");
    if(origin&&origin!==url.origin)return json(403,{error:"Forbidden"});
    if(!origin&&!["same-origin","none"].includes(req.headers.get("sec-fetch-site")||"same-origin"))return json(403,{error:"Forbidden"});
@@ -214,6 +217,74 @@ export function createPremiumServer({
   }
   if((path.startsWith("/api/pilot/")||path.startsWith("/api/commercial/")||path.startsWith("/api/platform/"))&&sessionFrom(req)?.mustChangePassword)
    return json(403,{error:"Password change required"});
+  // Public Meta webhook is signed by the app secret; GET challenge is checked
+  // against a per-tenant secret. QR webhook is protected by an opaque 192-bit path.
+  const metaHook=/^\/api\/wa\/meta\/([^/]+)\/webhook$/.exec(path);
+  if(metaHook){
+   if(!wa)return json(503,{error:"WhatsApp integration unavailable"});
+   const tenant=decodeURIComponent(metaHook[1]);
+   if(req.method==="GET"){
+    const mode=url.searchParams.get("hub.mode"),token=url.searchParams.get("hub.verify_token"),
+     challenge=url.searchParams.get("hub.challenge");
+    if(mode==="subscribe"&&token&&challenge&&/^[0-9]{1,100}$/.test(challenge)&&wa.verifyMeta(tenant,token))
+     return new Response(challenge,{status:200,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
+    return json(403,{error:"Webhook verification failed"});
+   }
+   if(req.method==="POST"){
+    const bytes=Buffer.from(await req.arrayBuffer());
+    if(bytes.length>512000)return json(413,{error:"Payload too large"});
+    try{wa.metaWebhook(tenant,bytes,req.headers.get("x-hub-signature-256"));return json(200,{received:true})}
+    catch{return json(401,{error:"Invalid webhook"})}
+   }
+   return json(405,{error:"Method not allowed"});
+  }
+  if(path.startsWith("/api/wa/qr/webhook/")){
+   if(req.method!=="POST")return json(405,{error:"Method not allowed"});
+   if(!wa)return json(503,{error:"WhatsApp integration unavailable"});
+   let payload;try{payload=JSON.parse(await textBytes(req,512000))}catch{return json(400,{error:"Invalid JSON"})}
+   try{wa.qrWebhook(path.slice("/api/wa/qr/webhook/".length),payload);return json(200,{received:true})}
+   catch{return json(401,{error:"Invalid webhook"})}
+  }
+  if(path.startsWith("/api/wa/")){
+   const ss=sessionFrom(req);
+   if(!ss)return json(401,{error:"Unauthorized"});
+   if(ss.mustChangePassword)return json(403,{error:"Password change required"});
+   if(!wa){
+    if(path==="/api/wa/channels"&&req.method==="GET")
+     return json(200,{channels:[
+      {slot:1,mode:"qr",label:"WhatsApp 1 · QR Code",state:"not_configured",configured:false},
+      {slot:2,mode:"official",label:"WhatsApp 2 · API oficial Meta",state:"not_configured",configured:false}
+     ],integrationAvailable:false});
+    return json(503,{error:"WhatsApp provider not configured"});
+   }
+   if(path==="/api/wa/channels"&&req.method==="GET")return json(200,{channels:await wa.list(ss),integrationAvailable:true});
+   if(path==="/api/wa/inbox"&&req.method==="GET"){
+    const slot=Number(url.searchParams.get("slot"));
+    if(![1,2].includes(slot))return json(400,{error:"Invalid channel"});
+    return json(200,{slot,messages:wa.inbox(ss,slot)});
+   }
+   if(["/api/wa/qr/register","/api/wa/qr/connect","/api/wa/official/register"].includes(path)&&req.method==="POST"){
+    if(!["master","admin","manager"].includes(ss.role)||!csrfOk(req,ss))return json(403,{error:"Forbidden"});
+    try{
+     if(path==="/api/wa/qr/register")return json(200,await wa.registerQr(ss));
+     if(path==="/api/wa/qr/connect")return json(200,await wa.qrCode(ss));
+     const input=JSON.parse(await textBytes(req,4096));
+     return json(200,await wa.registerOfficial(ss,input));
+    }catch(error){
+     const problem=String(error?.message||"");
+     if(problem.startsWith("Invalid "))return json(400,{error:"Invalid WhatsApp settings"});
+     if(problem==="Forbidden")return json(403,{error:"Forbidden"});
+     console.warn("CVX_WA_PROVIDER_ERROR",JSON.stringify({kind:error?.name||"Error"}));
+     return json(503,{error:"WhatsApp provider unavailable or credentials invalid"});
+    }
+   }
+   if(path==="/api/wa/official/webhook-setup"&&req.method==="GET"){
+    if(!["master","admin","manager"].includes(ss.role))return json(403,{error:"Forbidden"});
+    try{return json(200,wa.webhookDetails(ss))}
+    catch{return json(404,{error:"Official channel not configured"})}
+   }
+   return json(404,{error:"Not found"});
+  }
   if(path==="/api/billing/stripe/webhook"&&req.method==="POST"){
    if(!billing)return json(503,{error:"Stripe test integration unavailable"});
    const length=Number(req.headers.get("content-length")||0);
