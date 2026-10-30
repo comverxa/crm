@@ -22,7 +22,7 @@ function apiEndpoint(value){
  if(!value)return null;
  const u=new URL(value);
  if(!["https:","http:"].includes(u.protocol)||u.username||u.password||u.search||u.hash)throw Error("Invalid Evolution endpoint");
- if(u.protocol!=="https:"&&!["localhost","127.0.0.1"].includes(u.hostname))throw Error("Evolution endpoint must use HTTPS");
+ if(u.protocol!=="https:"&&!["localhost","127.0.0.1"].includes(u.hostname)&&!u.hostname.endsWith(".railway.internal"))throw Error("Evolution endpoint must use HTTPS");
  return u.href.replace(/\/$/,"");
 }
 function defaultReply(status,value){return {status,value}}
