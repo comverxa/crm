@@ -12,6 +12,7 @@ const app=createPremiumServer({
  bootstrapEmail:env.CVX_COM_ADMIN_EMAIL,
  bootstrapPassword:env.CVX_COM_ADMIN_PASSWORD,
  bootstrapTenant:env.CVX_COM_TENANT||"pilot-empresa",
+ enablePlatformMaster:env.CVX_COM_ENABLE_MASTER==="1",
  cookieSecure:env.CVX_COM_COOKIE_INSECURE_LOCAL_ONLY!=="1"
 });
 app.server.listen(port,"0.0.0.0",()=>console.log("COMVERXA Premium isolated pilot listening on PORT",port));
