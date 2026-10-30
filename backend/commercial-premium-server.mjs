@@ -260,10 +260,16 @@ export function createPremiumServer({
      return json(200,{channels:[
       {slot:1,mode:"qr",label:"WhatsApp 1 · QR Code",state:"not_configured",configured:false},
       {slot:2,mode:"official",label:"WhatsApp 2 · API oficial Meta",state:"not_configured",configured:false}
-     ],integrationAvailable:false});
+     ],integrationAvailable:false,providerConfigured:{qr:false,official:false}});
     return json(503,{error:"WhatsApp provider not configured"});
    }
-   if(path==="/api/wa/channels"&&req.method==="GET")return json(200,{channels:await wa.list(ss),integrationAvailable:true});
+   if(path==="/api/wa/channels"&&req.method==="GET")return json(200,{
+    channels:await wa.list(ss),integrationAvailable:true,
+    providerConfigured:{
+     qr:!!(whatsAppConfig?.evolutionUrl&&whatsAppConfig?.evolutionApiKey),
+     official:!!whatsAppConfig?.metaAppSecret
+    }
+   });
    if(path==="/api/wa/inbox"&&req.method==="GET"){
     const slot=Number(url.searchParams.get("slot"));
     if(![1,2].includes(slot))return json(400,{error:"Invalid channel"});
