@@ -3,15 +3,21 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const script = readFileSync(new URL('../site/comverxa-premium-login.js', import.meta.url), 'utf8');
-function browser(fetchImpl) {
-  const button = {disabled:false}, info={textContent:''}, redirects=[];
+function browser(fetchImpl,{password=' keep spaces ',search=''}={}) {
+  const button = {disabled:false}, info={textContent:''}, redirects=[],replaced=[];
+  const passwordInput={value:password,autocomplete:'current-password',focused:false,focus(){this.focused=true}};
   let onSubmit;
-  const form={querySelector:s=>{assert.equal(s,'button[type="submit"]');return button},addEventListener:(n,cb)=>{assert.equal(n,'submit');onSubmit=cb}};
+  const form={querySelector:s=>{
+    if(s==='button[type="submit"]')return button;
+    if(s==='input[name="password"]')return passwordInput;
+    throw Error('Unexpected query '+s);
+  },addEventListener:(n,cb)=>{assert.equal(n,'submit');onSubmit=cb}};
   const document={getElementById:id=>id==='form'?form:id==='info'?info:null};
-  function FormDataMock(){this.get=n=>n==='email'?'  User@Example.Test ':n==='password'?' keep spaces ':null}
-  vm.runInNewContext(script,{document,FormData:FormDataMock,fetch:fetchImpl,location:{assign:path=>redirects.push(path)}},{timeout:1000});
+  function FormDataMock(){this.get=n=>n==='email'?'  User@Example.Test ':n==='password'?passwordInput.value:null}
+  vm.runInNewContext(script,{document,FormData:FormDataMock,fetch:fetchImpl,URLSearchParams,
+    location:{search,assign:path=>redirects.push(path)},history:{replaceState:(a,b,path)=>replaced.push(path)}},{timeout:1000});
   const submit=()=>onSubmit({preventDefault(){}});
-  return {button,info,redirects,submit};
+  return {button,info,redirects,replaced,passwordInput,submit};
 }
 test('401 differentiates credentials from connection failure; email normalized, password preserved',async()=>{
   let options;
@@ -20,7 +26,9 @@ test('401 differentiates credentials from connection failure; email normalized, 
   assert.deepEqual(JSON.parse(options.body),{email:'user@example.test',password:' keep spaces '});
   assert.equal(options.credentials,'same-origin');
   assert.match(b.info.textContent,/senha não conferem/);
-  assert.match(b.info.textContent,/separado do CRM principal/);
+  assert.match(b.info.textContent,/pelo menos 12 caracteres/);
+  assert.equal(b.passwordInput.value,'');
+  assert.equal(b.passwordInput.focused,true);
   assert.equal(b.button.disabled,false);
 });
 test('duplicate submissions are ignored until first response settles',async()=>{
@@ -46,4 +54,21 @@ test('suspension, server errors and network errors present distinct messages',as
   const b=browser(async()=>{throw Error('network')});await b.submit();
   assert.match(b.info.textContent,/Falha de conexão/);
   assert.equal(b.button.disabled,false);
+});
+
+test('short autofilled password is rejected before any server request',async()=>{
+  let requests=0;
+  const b=browser(async()=>{requests++;return {ok:false,status:401}},{password:'oito1234'});
+  await b.submit();
+  assert.equal(requests,0);
+  assert.match(b.info.textContent,/pelo menos 12 caracteres/);
+  assert.equal(b.passwordInput.value,'');
+  assert.equal(b.button.disabled,false);
+});
+test('successful reset return clears old autofill and shows login guidance',()=>{
+  const b=browser(async()=>({ok:true,status:200}),{password:'cached-old-password',search:'?senha_atualizada=1'});
+  assert.equal(b.passwordInput.value,'');
+  assert.equal(b.passwordInput.autocomplete,'off');
+  assert.match(b.info.textContent,/Senha redefinida com sucesso/);
+  assert.deepEqual(b.replaced,['/login']);
 });

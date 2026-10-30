@@ -28,7 +28,8 @@ $("resetForm").addEventListener("submit",async event=>{
  btn.disabled=true;
  try{
   await send("/api/auth/reset",{token,newPassword:data.get("password")});
-  $("status").textContent="Senha redefinida. Todas as sessões antigas foram encerradas. Entre novamente.";
+  $("status").textContent="Senha redefinida. Entre com a nova senha, digitada manualmente.";
   form.reset();
+  location.assign("/login?senha_atualizada=1");
  }catch(err){$("status").textContent=err.message}finally{btn.disabled=false}
 });
