@@ -28,6 +28,16 @@ const theme=await get("/assets/commercial-theme.css");
 assert.equal(theme.status,200,"Premium theme must be publicly served");
 assert.match(theme.headers.get("content-type")||"",/text\/css/);
 assert.match(await theme.text(),/wa-channel-grid/);
+// Verify the active Railway release really serves the non-blocking menu fix.
+const appScriptResponse=await get("/assets/commercial.js");
+assert.equal(appScriptResponse.status,200,"Commercial client script must load");
+assert.match(appScriptResponse.headers.get("content-type")||"",/javascript/);
+const activeScript=await appScriptResponse.text();
+assert.match(activeScript,/function show\(view\)/,"Menu navigation function missing");
+assert.match(activeScript,/addEventListener\("click",\(\)=>show\(b\.dataset\.view\)\)/,"Menu click handlers missing");
+assert.doesNotMatch(activeScript,/await\s+loadUsers\(\)/,"User lookup must not block sidebar binding");
+assert.match(activeScript,/Dashboard empresarial/,"Enterprise dashboard mode missing");
+assert.match(activeScript,/Dashboard individual/,"Individual dashboard mode missing");
 const internal=await get("/app",{redirect:"manual"});
 assert.equal(internal.status,303,"Unauthenticated app must redirect");
 assert.match(internal.headers.get("location")||"",/\/login$/);
@@ -41,4 +51,4 @@ for(const endpoint of ["/api/platform/companies","/api/commercial/leads","/api/c
  const response=await get(endpoint);
  assert.equal(response.status,401,"Anonymous access must be rejected on "+endpoint);
 }
-console.log("COMVERXA_PUBLIC_SMOKE_OK: login, health, recovery, protected app, billing, tenant and lead APIs");
+console.log("COMVERXA_PUBLIC_SMOKE_OK: login, health, recovery, sidebar JS, role dashboards, protected app, billing, tenant and lead APIs");
