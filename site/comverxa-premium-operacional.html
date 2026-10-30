@@ -49,7 +49,7 @@ section{margin-bottom:24px}.error{color:#ff9ba4}.muted{color:var(--muted)}#mobil
    <label>Token de acesso oficial<input name="accessToken" type="password" required autocomplete="off" placeholder="Token protegido no servidor"></label>
    <div class="wa-actions"><button class="btn primary" type="submit">Validar API oficial</button><button class="btn" id="waMetaWebhook" type="button">Configurar webhook</button></div>
   </form>
-  <div id="waWebhookPanel" hidden class="wa-webhook-panel"><label>Endereço de webhook<input id="waWebhookUrl" readonly></label><label>Token de verificação<input id="waWebhookToken" readonly type="password"></label><button type="button" class="btn" id="waRevealWebhook">Mostrar token</button><p class="note">Informe esses dados apenas no painel seguro do Meta Developers. A configuração no Meta é necessária para receber mensagens.</p></div>
+  <div id="waWebhookPanel" hidden class="wa-webhook-panel"><label>Endereço de webhook<input id="waWebhookUrl" readonly></label><label>Token de verificação<input id="waWebhookToken" readonly type="password" data-no-password-toggle></label><button type="button" class="btn" id="waRevealWebhook">Mostrar token</button><p class="note">Informe esses dados apenas no painel seguro do Meta Developers. A configuração no Meta é necessária para receber mensagens.</p></div>
   <p class="note" id="waMetaInfo"></p>
  </div>
 </div>
