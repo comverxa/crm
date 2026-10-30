@@ -17,6 +17,7 @@ import {createTenantStore} from "./commercial-premium-tenants.mjs";
 import {createLeadsStore} from "./commercial-premium-leads.mjs";
 import {createOffsiteBackup} from "./commercial-premium-offsite-backup.mjs";
 import {createStripeBilling} from "./commercial-premium-stripe.mjs";
+import {publicPriceCatalog} from "./commercial-premium-pricing.mjs";
 
 const secureHash=s=>createHash("sha256").update(s).digest("hex");
 const json=(status,body,headers={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff",...headers}});
@@ -232,7 +233,7 @@ export function createPremiumServer({
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!["master","admin","manager"].includes(s.role))return json(403,{error:"Forbidden"});
    return json(200,billing?billing.status(s.tenantId):
-    {configured:false,testMode:true,availablePlans:[],subscriptions:[],billingMode:"test_only"});
+    {configured:false,checkoutEnabled:false,testMode:true,availablePlans:[],availableCycles:{},catalog:publicPriceCatalog(),subscriptions:[],billingMode:"test_only"});
   }
   if(path==="/api/billing/stripe/checkout"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
@@ -246,7 +247,7 @@ export function createPremiumServer({
     if(!company||company.status!=="active")return json(403,{error:"Company disabled"});
     // Lifetime seats are managed by the MAIN CRM. Do not auto-charge its platform-owned demo tenant.
     if(s.role==="master"&&s.tenantId===bootstrapTenant)return json(403,{error:"Platform account cannot be billed"});
-    return json(200,await billing.checkout(s.tenantId,data.plan,s.email));
+    return json(200,await billing.checkout(s.tenantId,data.plan,s.email,data.cycle??"monthly"));
    }catch(error){console.warn("CVX_TEST_CHECKOUT_ERROR",JSON.stringify({kind:error?.name||"Error"}));return json(503,{error:"Stripe test checkout unavailable"})}
   }
   if(path==="/api/pilot/company"&&req.method==="GET"){
