@@ -14,6 +14,7 @@ import {DatabaseSync} from "node:sqlite";
 import {createCommercialStore} from "./commercial-premium-store.mjs";
 import {createCommercialHttpHandler} from "./commercial-premium-http.mjs";
 import {createTenantStore} from "./commercial-premium-tenants.mjs";
+import {createLeadsStore} from "./commercial-premium-leads.mjs";
 
 const secureHash=s=>createHash("sha256").update(s).digest("hex");
 const json=(status,body,headers={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff",...headers}});
@@ -47,6 +48,7 @@ export function createPremiumServer({
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_sessions (session_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES cvx_pilot_users(id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_expires ON cvx_pilot_sessions(expires_at)");
  const store=createCommercialStore(db);
+ const leads=createLeadsStore(db);
  const tenants=createTenantStore(db);
  tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto");
  const stmt=sql=>db.prepare(sql);
@@ -72,7 +74,7 @@ export function createPremiumServer({
  };
  const csrfOk=(req,session)=>constantEquals(req.headers.get("x-csrf-token")||"",session.csrf);
  const commercial=createCommercialHttpHandler({
-  store,enabled:true,getSession:async req=>sessionFrom(req),
+  store,leads,enabled:true,getSession:async req=>sessionFrom(req),
   verifyCsrf:async(req,s)=>csrfOk(req,s)
  });
  const html=readFileSync(htmlPath,"utf-8");
@@ -237,7 +239,7 @@ export function createPremiumServer({
    finally{try{verify?.close()}catch{}try{if(existsSync(snapshot))unlinkSync(snapshot)}catch{}backupRunning=false}
   }
   if(path.startsWith("/api/commercial/")){
-    if(req.method==="POST"&&["/api/commercial/sales","/api/commercial/policies","/api/commercial/seller-plans"].includes(path)){
+    if(req.method==="POST"&&["/api/commercial/sales","/api/commercial/policies","/api/commercial/seller-plans","/api/commercial/leads"].includes(path)){
       const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
       const data=await req.clone().json().catch(()=>null);
       if(data&&typeof data.sellerId==="string"){
