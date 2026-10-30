@@ -35,6 +35,7 @@ export function createCommercialWhatsApp({db,publicOrigin,credentialKey,evolutio
  const stmt=sql=>db.prepare(sql);
  db.exec("CREATE TABLE IF NOT EXISTS cvx_com_wa_channels (tenant_id TEXT NOT NULL,slot INTEGER NOT NULL CHECK(slot IN (1,2)),mode TEXT NOT NULL,instance_name TEXT,phone_id TEXT,display_number TEXT NOT NULL DEFAULT '',credential_enc TEXT,callback_enc TEXT,hook_hash TEXT,provider_state TEXT NOT NULL DEFAULT 'not_configured',updated_at TEXT NOT NULL,PRIMARY KEY(tenant_id,slot))");
  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS cvx_com_wa_instance_unique ON cvx_com_wa_channels(instance_name) WHERE instance_name IS NOT NULL");
+ db.exec("CREATE UNIQUE INDEX IF NOT EXISTS cvx_com_wa_phone_unique ON cvx_com_wa_channels(phone_id) WHERE phone_id IS NOT NULL");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_com_wa_messages (tenant_id TEXT NOT NULL,slot INTEGER NOT NULL CHECK(slot IN (1,2)),provider_id TEXT NOT NULL,contact TEXT NOT NULL,body TEXT NOT NULL,kind TEXT NOT NULL,direction TEXT NOT NULL,occurred_at TEXT NOT NULL,received_at TEXT NOT NULL,PRIMARY KEY(tenant_id,slot,provider_id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_com_wa_message_recent ON cvx_com_wa_messages(tenant_id,slot,received_at)");
  function entry(tenant,slot){
@@ -198,6 +199,7 @@ export function createCommercialWhatsApp({db,publicOrigin,credentialKey,evolutio
   for(const item of items.slice(0,100)){
    const k=item?.key||{},message=item?.message||{};
    if(k.fromMe===true)continue;
+   if(String(k.remoteJid||"").endsWith("@g.us")||String(k.remoteJid||"").includes("@broadcast"))continue;
    const contact=String(k.remoteJid||"").split("@")[0];
    if(insertMessage(line.tenant_id,1,{id:k.id,contact,
       body:message.conversation||message.extendedTextMessage?.text||"",
