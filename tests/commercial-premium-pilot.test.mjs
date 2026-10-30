@@ -7,8 +7,8 @@ import {join} from "node:path";
 import {createPremiumServer} from "../backend/commercial-premium-server.mjs";
 const password="SecureTestPasswordOnly-2026!";
 const email="admin@exemplo.test";
-function setup(){const folder=mkdtempSync(join(tmpdir(),"cvx-pilot-"));const app=createPremiumServer({
- dbPath:join(folder,"pilot.sqlite"),bootstrapEmail:email,bootstrapPassword:password,cookieSecure:false
+function setup(options={}){const folder=mkdtempSync(join(tmpdir(),"cvx-pilot-"));const app=createPremiumServer({
+ dbPath:join(folder,"pilot.sqlite"),bootstrapEmail:email,bootstrapPassword:password,cookieSecure:false,...options
  });return {folder,app}}
 async function start(app){await new Promise(resolve=>app.server.listen(0,"127.0.0.1",resolve));return "http://127.0.0.1:"+app.server.address().port}
 async function stop(folder,app){await app.close();rmSync(folder,{recursive:true,force:true})}
@@ -154,5 +154,52 @@ test("pilot backup requires admin, CSRF and confirmation; download restores as v
  try{assert.equal(Object.values(restored.prepare("PRAGMA integrity_check").get())[0],"ok");
  assert.equal(restored.prepare("SELECT COUNT(*) AS c FROM cvx_pilot_users").get().c,1);
  }finally{restored.close()}
+ }finally{await stop(folder,app)}
+});
+
+test("SaaS master onboards two isolated companies with seat quota and suspension",async()=>{
+ const {folder,app}=setup({enablePlatformMaster:true});
+ try{
+  const base=await start(app);
+  const login=async(email,password)=>fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});
+  const first=await login(email,password);
+  const master=await unlock(base,first.headers.get("set-cookie").split(";")[0],email,password);
+  assert.equal(master.me.user.role,"master");
+  const post=async(url,data,cookie=master.cookie,csrf=master.me.csrf)=>fetch(base+url,{
+   method:"POST",headers:{"content-type":"application/json",cookie,"x-csrf-token":csrf},body:JSON.stringify(data)});
+  const company={
+    tenantId:"company-B",companyName:"Corretora B",plan:"professional",seatLimit:2,
+    adminEmail:"admin-b@exemplo.test",adminPassword:"StrongCompanyBStart-234"
+  };
+  let r=await post("/api/platform/companies",company);
+  assert.equal(r.status,201);
+  assert.equal((await r.json()).company.billingMode,"sandbox");
+  r=await fetch(base+"/api/platform/companies",{headers:{cookie:master.cookie}});
+  assert.equal(r.status,200);assert.equal((await r.json()).companies.length,2);
+  const loginB=await login(company.adminEmail,company.adminPassword);
+  assert.equal(loginB.status,200);
+  const adminB=await unlock(base,loginB.headers.get("set-cookie").split(";")[0],company.adminEmail,company.adminPassword);
+  r=await post("/api/platform/companies",{...company,tenantId:"company-C",adminEmail:"admin-c@exemplo.test"},adminB.cookie,adminB.me.csrf);
+  assert.equal(r.status,403);
+  r=await post("/api/commercial/rules",{tiers:[{minSales:0,bonusCents:0},{minSales:1,bonusCents:2500}],salesRateBps:1000},adminB.cookie,adminB.me.csrf);
+  assert.equal(r.status,200);
+  r=await post("/api/commercial/sales",{id:"B1",sellerId:adminB.me.user.id,status:"sold",soldAt:"2026-10-29",premiumCents:7000},adminB.cookie,adminB.me.csrf);
+  assert.equal(r.status,201);
+  r=await fetch(base+"/api/commercial/sales?month=2026-10",{headers:{cookie:master.cookie}});
+  assert.equal(r.status,200);assert.equal((await r.json()).sales.length,0);
+  r=await post("/api/pilot/users",{email:"seller-b@exemplo.test",password:"VeryStrongSellerB-111",role:"operator"},adminB.cookie,adminB.me.csrf);
+  assert.equal(r.status,201);
+  r=await post("/api/pilot/users",{email:"seller-b2@exemplo.test",password:"VeryStrongSellerB-222",role:"operator"},adminB.cookie,adminB.me.csrf);
+  assert.equal(r.status,409);assert.equal((await r.json()).error,"Seat limit reached");
+  r=await post("/api/platform/companies/company-B/status",{status:"suspended"});
+  assert.equal(r.status,200);
+  r=await fetch(base+"/api/auth/me",{headers:{cookie:adminB.cookie}});
+  assert.equal(r.status,401);
+  r=await login(company.adminEmail,company.adminPassword+"-rotated");
+  assert.equal(r.status,403);
+  r=await post("/api/platform/companies/company-B/status",{status:"active"});
+  assert.equal(r.status,200);
+  r=await login(company.adminEmail,company.adminPassword+"-rotated");
+  assert.equal(r.status,200);
  }finally{await stop(folder,app)}
 });
