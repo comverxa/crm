@@ -7,8 +7,10 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createPremiumServer} from "../backend/commercial-premium-server.mjs";
 import {createStripeBilling,verifyStripeEvent} from "../backend/commercial-premium-stripe.mjs";
+import {publicPriceCatalog} from "../backend/commercial-premium-pricing.mjs";
 const secret="sk_test_mockonly1234567890",webhookSecret="whsec_only_unit_tests123456";
 const priceIds={starter:"price_StarterTest01",professional:"price_ProTest001",business:"price_BizTest001"};
+const annualIds={starter:"price_StarterYear01",professional:"price_ProYear001",business:"price_BizYear001"};
 const timestamp=Date.parse("2026-10-30T01:00:00.000Z");
 const planOrigin="https://comverxa-comercial-piloto-production.up.railway.app";
 function signature(payload,ts=Math.floor(timestamp/1000)){
@@ -19,7 +21,7 @@ const evt=(id,type,obj)=>({id,type,livemode:false,data:{object:obj}});
 const sid="cs_test_checkout_0001",sub="sub_test_000001",customer="cus_test_000001";
 function context(db){
  let form,calls=0;
- const app=createStripeBilling({db,secretKey:secret,webhookSecret,priceIds,baseUrl:planOrigin,clock:()=>timestamp,
+ const app=createStripeBilling({db,secretKey:secret,webhookSecret,priceIds,priceIdsAnnual:annualIds,baseUrl:planOrigin,clock:()=>timestamp,
   fetchImpl:async(url,request)=>{
    calls++;assert.equal(url,"https://api.stripe.com/v1/checkout/sessions");
    assert.equal(request.method,"POST");
@@ -135,4 +137,33 @@ test("HTTP SaaS Stripe endpoints require authenticated tenant, password rotation
   r=await post("/api/billing/stripe/webhook",{fake:"event"},{});
   assert.equal(r.status,400);
  }finally{await app.close();rmSync(dir,{recursive:true,force:true})}
+});
+
+test("approved catalog has exactly the six authorized BRL monthly/yearly values",()=>{
+ const catalog=publicPriceCatalog();
+ const plans={
+  starter:[9990,99900,1],professional:[21990,219900,3],business:[39990,399900,8]
+ };
+ for(const [plan,[month,year,seats]] of Object.entries(plans)){
+  assert.equal(catalog[plan].monthlyCents,month);
+  assert.equal(catalog[plan].annualCents,year);
+  assert.equal(catalog[plan].seats,seats);
+  assert.equal(catalog[plan].annualSavingsCents,month*12-year);
+  assert.equal(catalog[plan].realPaymentsEnabled,false);
+ }
+});
+test("annual checkout uses exact server-side Stripe annual Price and tags billing cycle",async()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const ctx=context(db);
+  const status=ctx.app.status("company-A");
+  assert.equal(status.catalog.business.annualCents,399900);
+  assert.deepEqual(status.availableCycles.business,["monthly","annual"]);
+  const session=await ctx.app.checkout("company-A","business","billing@example.test","annual");
+  assert.equal(session.cycle,"annual");
+  assert.equal(ctx.form.get("line_items[0][price]"),annualIds.business);
+  assert.equal(ctx.form.get("metadata[cycle]"),"annual");
+  assert.equal(ctx.form.get("client_reference_id"),"company-A");
+  assert.equal(db.prepare("SELECT billing_cycle FROM cvx_pilot_stripe_checkout LIMIT 1").get().billing_cycle,"annual");
+ }finally{db.close()}
 });
