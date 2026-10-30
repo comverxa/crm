@@ -207,3 +207,63 @@ test("SaaS master onboards two isolated companies with seat quota and suspension
   assert.equal(r.status,200);
  }finally{await stop(folder,app)}
 });
+
+
+test("role dashboards remain scoped before and after commission setup",async()=>{
+ const {folder,app}=setup();try{
+  const base=await start(app);
+  const login=async(emailAddress,pass)=>{
+   const r=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:emailAddress,password:pass})});
+   assert.equal(r.status,200);return r.headers.get("set-cookie").split(";")[0];
+  };
+  const admin=await unlock(base,await login(email,password),email,password);
+  const get=(route,cookie)=>fetch(base+route,{headers:{cookie}});
+  const post=(route,body,cookie=admin.cookie,csrf=admin.me.csrf)=>fetch(base+route,{
+   method:"POST",headers:{"content-type":"application/json",cookie,"x-csrf-token":csrf},body:JSON.stringify(body)
+  });
+  let r=await get("/api/commercial/configuration-status",admin.cookie);
+  assert.deepEqual(await r.json(),{configured:false,canConfigure:true});
+  const users=[];
+  for(let n=1;n<=2;n++){
+   const address="seller"+n+"@exemplo.test",pass="SafeDemoSellerPass-"+n+"-2026!";
+   r=await post("/api/pilot/users",{email:address,password:pass,role:"operator"});
+   assert.equal(r.status,201);const user=await r.json();
+   const auth=await unlock(base,await login(address,pass),address,pass);
+   users.push({id:user.id,...auth});
+   r=await get("/api/commercial/configuration-status",auth.cookie);
+   assert.deepEqual(await r.json(),{configured:false,canConfigure:false});
+   r=await post("/api/commercial/leads",{name:"Lead real do teste "+n,sellerId:user.id,
+     stage:n===1?"lead":"negotiation",temperature:n===1?"hot":"warm"});
+   assert.equal(r.status,201);
+  }
+  for(const u of users){
+   r=await get("/api/commercial/leads/summary",u.cookie);
+   assert.equal(r.status,200);const leadSummary=await r.json();
+   assert.equal(leadSummary.total,1,"operator must see only assigned leads");
+   r=await get("/api/commercial/leads",u.cookie);
+   assert.equal((await r.json()).leads.length,1);
+  }
+  r=await get("/api/commercial/leads/summary",admin.cookie);
+  assert.equal((await r.json()).total,2,"admin sees company-wide leads");
+  r=await post("/api/commercial/rules",{tiers:[{minSales:0,bonusCents:0},{minSales:2,bonusCents:1000}],salesRateBps:1000});
+  assert.equal(r.status,200);
+  for(let n=0;n<users.length;n++){
+   r=await post("/api/commercial/sales",{id:"ROLE-SALE-"+(n+1),sellerId:users[n].id,
+     status:"sold",soldAt:"2026-10-20",premiumCents:10000*(n+1)});
+   assert.equal(r.status,201);
+  }
+  const summaryPath="/api/commercial/summary?month=2026-10&asOf=2026-10-29";
+  for(let n=0;n<users.length;n++){
+   r=await get(summaryPath,users[n].cookie);assert.equal(r.status,200);
+   const metrics=await r.json();assert.equal(metrics.counts.sold,1);
+   assert.equal(metrics.revenueCents,10000*(n+1));
+   r=await get("/api/commercial/team?month=2026-10&asOf=2026-10-29",users[n].cookie);
+   assert.equal(r.status,403,"operator may not read company totals");
+  }
+  r=await get(summaryPath,admin.cookie);assert.equal(r.status,200);
+  const enterprise=await r.json();assert.equal(enterprise.counts.sold,2);
+  assert.equal(enterprise.revenueCents,30000);
+  r=await get("/api/commercial/team?month=2026-10&asOf=2026-10-29",admin.cookie);
+  assert.equal(r.status,200);assert.equal((await r.json()).totals.sales,2);
+ }finally{await stop(folder,app)}
+});
