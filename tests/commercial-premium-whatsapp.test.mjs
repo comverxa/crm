@@ -156,12 +156,42 @@ test("pilot HTTP rejects anonymous WhatsApp data and forbids third channel and s
   const session=await(await fetch(base+"/api/auth/me",{headers:{cookie:auth}})).json();
   r=await fetch(base+"/api/wa/channels",{headers:{cookie:auth}});
   assert.equal(r.status,200);
-  assert.deepEqual((await r.json()).channels.map(x=>x.slot),[1,2]);
+  const channelInfo=await r.json();
+  assert.deepEqual(channelInfo.channels.map(x=>x.slot),[1,2]);
+  assert.deepEqual(channelInfo.providerConfigured,{qr:true,official:true});
   r=await fetch(base+"/api/wa/qr/register",{method:"POST",headers:{"content-type":"application/json",cookie:auth,"x-csrf-token":"bad"},body:"{}"});
   assert.equal(r.status,403);
   r=await fetch(base+"/api/wa/qr/register",{method:"POST",headers:{"content-type":"application/json",cookie:auth,"x-csrf-token":session.csrf},body:"{}"});
   assert.equal(r.status,200);
   r=await fetch(base+"/api/wa/inbox?slot=3",{headers:{cookie:auth}});
   assert.equal(r.status,400);
+ }finally{await app.close();rmSync(dir,{recursive:true,force:true})}
+});
+
+test("read-only channel readiness refuses to imply Meta is configured without app secret",async()=>{
+ const dir=mkdtempSync(join(tmpdir(),"cvx-wa-missing-secret-"));
+ const account="readiness@example.test",pass="SufficientReadinessPassword-2026!";
+ const app=createPremiumServer({dbPath:join(dir,"pilot.sqlite"),bootstrapEmail:account,
+  bootstrapPassword:pass,cookieSecure:false,publicOrigin:origin,
+  whatsAppConfig:{credentialKey:secret,evolutionUrl:"https://evolution.example",evolutionApiKey:"evolution-test-key"}});
+ try{
+  await new Promise(resolve=>app.server.listen(0,"127.0.0.1",resolve));
+  const base="http://127.0.0.1:"+app.server.address().port;
+  let r=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},
+   body:JSON.stringify({email:account,password:pass})});
+  let cookie=r.headers.get("set-cookie").split(";")[0];
+  const me=await(await fetch(base+"/api/auth/me",{headers:{cookie}})).json();
+  r=await fetch(base+"/api/auth/password",{method:"POST",headers:{"content-type":"application/json",cookie,"x-csrf-token":me.csrf},
+   body:JSON.stringify({oldPassword:pass,newPassword:pass+"-rotated"})});
+  assert.equal(r.status,200);
+  r=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},
+   body:JSON.stringify({email:account,password:pass+"-rotated"})});
+  cookie=r.headers.get("set-cookie").split(";")[0];
+  r=await fetch(base+"/api/wa/channels",{headers:{cookie}});
+  assert.equal(r.status,200);
+  const channels=await r.json();
+  assert.equal(channels.integrationAvailable,true);
+  assert.deepEqual(channels.providerConfigured,{qr:true,official:false});
+  assert.deepEqual(channels.channels.map(x=>x.slot),[1,2]);
  }finally{await app.close();rmSync(dir,{recursive:true,force:true})}
 });
