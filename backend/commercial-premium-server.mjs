@@ -94,6 +94,7 @@ export function createPremiumServer({
   verifyCsrf:async(req,s)=>csrfOk(req,s)
  });
  const html=readFileSync(htmlPath,"utf-8");
+ const themeCss=readFileSync(new URL("../site/comverxa-premium-theme.css",import.meta.url),"utf-8");
  const appJs=readFileSync(jsPath,"utf-8"),loginJs=readFileSync(loginJsPath,"utf-8"),
   recoveryJs=readFileSync(recoveryJsPath,"utf-8"),recoveryHtml=readFileSync(recoveryHtmlPath,"utf-8");
  if(!html.includes("COMVERXA")||html.length<500)throw Error("Invalid app page");
