@@ -64,13 +64,20 @@ test("Stripe signed events: only matched completed checkout + paid invoice grant
   assert.equal(ctx.app.handleWebhook(signed.bytes,signed.signature,{clock:()=>timestamp}).duplicate,true);
   let subscription=ctx.app.status("company-A").subscriptions[0];
   assert.equal(subscription.entitlement,"pending");
+  await assert.rejects(ctx.app.checkout("company-A","professional","owner@example.test"),/Subscription already exists/);
   let failed=evt("evt_invoice_fail001","invoice.payment_failed",{id:"in_fail_0001",customer,subscription:sub,status:"open"});
   const f=signature(failed);ctx.app.handleWebhook(f.bytes,f.signature,{clock:()=>timestamp});
   assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"pending");
   const free=signature(evt("evt_invoice_free01","invoice.paid",{id:"in_free_00001",customer,subscription:sub,status:"paid",amount_paid:0}));
   ctx.app.handleWebhook(free.bytes,free.signature,{clock:()=>timestamp});
   assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"pending");
-  const paid=evt("evt_invoice_paid01","invoice.paid",{id:"in_paid_00001",customer,subscription:sub,status:"paid",amount_paid:3000});
+  const mismatch=signature(evt("evt_wrongprice01","invoice.paid",{
+   id:"in_wrong_00001",customer,subscription:sub,status:"paid",amount_paid:3000,currency:"brl",
+   lines:{data:[{price:{id:priceIds.business}}]}}));
+  assert.throws(()=>ctx.app.handleWebhook(mismatch.bytes,mismatch.signature,{clock:()=>timestamp}),/invoice currency or price mismatch/);
+  assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"pending");
+  const paid=evt("evt_invoice_paid01","invoice.paid",{id:"in_paid_00001",customer,subscription:sub,status:"paid",amount_paid:3000,
+   currency:"brl",lines:{data:[{price:{id:priceIds.starter}}]}});
   const p=signature(paid);ctx.app.handleWebhook(p.bytes,p.signature,{clock:()=>timestamp});
   subscription=ctx.app.status("company-A").subscriptions[0];
   assert.equal(subscription.status,"active");assert.equal(subscription.entitlement,"active");
@@ -78,7 +85,8 @@ test("Stripe signed events: only matched completed checkout + paid invoice grant
   const canceled=evt("evt_sub_deleted01","customer.subscription.deleted",{id:sub,customer,status:"canceled"});
   const c=signature(canceled);ctx.app.handleWebhook(c.bytes,c.signature,{clock:()=>timestamp});
   assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"canceled");
-  const latePaid=signature(evt("evt_invoice_paid02","invoice.paid",{id:"in_paid_00002",customer,subscription:sub,status:"paid",amount_paid:3000}));
+  const latePaid=signature(evt("evt_invoice_paid02","invoice.paid",{id:"in_paid_00002",customer,subscription:sub,status:"paid",amount_paid:3000,
+    currency:"brl",lines:{data:[{pricing:{price_details:{price:priceIds.starter}}}]}}));
   ctx.app.handleWebhook(latePaid.bytes,latePaid.signature,{clock:()=>timestamp});
   assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"canceled");
  }finally{db.close()}
@@ -165,5 +173,20 @@ test("annual checkout uses exact server-side Stripe annual Price and tags billin
   assert.equal(ctx.form.get("metadata[cycle]"),"annual");
   assert.equal(ctx.form.get("client_reference_id"),"company-A");
   assert.equal(db.prepare("SELECT billing_cycle FROM cvx_pilot_stripe_checkout LIMIT 1").get().billing_cycle,"annual");
+ }finally{db.close()}
+});
+
+test("one tenant cannot open conflicting parallel or cross-plan Stripe Checkouts",async()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const ctx=context(db);
+  await ctx.app.checkout("company-C","starter","admin@example.test","monthly");
+  await assert.rejects(
+    ctx.app.checkout("company-C","professional","admin@example.test","annual"),
+    /Another checkout is still open/
+  );
+  const same=await ctx.app.checkout("company-C","starter","admin@example.test","monthly");
+  assert.equal(same.testMode,true);
+  assert.equal(ctx.calls,1);
  }finally{db.close()}
 });
