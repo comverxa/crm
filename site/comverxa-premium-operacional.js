@@ -62,6 +62,42 @@ async function loadDashboard(){
  earnings.append(textEl("p","Receita comercial: "+brl(data.revenueCents)));
  if(data.earnings.totalCents!==null)earnings.append(textEl("p","Ganho previsto (operador): "+brl(data.earnings.totalCents)));
 }
+const leadStages={lead:"Lead",contacted:"Contatado",negotiation:"Negociação",proposal:"Proposta",won:"Venda",lost:"Perdido",on_hold:"Em espera"};
+async function loadLeads(){
+ const ddd=$("leadDddFilter").value.trim(),stage=$("leadStageFilter").value;
+ const params=new URLSearchParams();if(ddd)params.set("ddd",ddd);if(stage)params.set("stage",stage);
+ const [result,summary]=await Promise.all([
+  call("/api/commercial/leads?"+params.toString()),
+  call("/api/commercial/leads/summary")
+ ]);
+ const cards=$("leadMetrics");empty(cards);
+ card(cards,"Leads",n(summary.total),"Até 500 registros na apuração");
+ card(cards,"Quentes",n(summary.byTemperature.hot),"Prioridade comercial");
+ card(cards,"Follow-ups pendentes",n(summary.followupsDue),"Tarefas com data vencida ou hoje");
+ card(cards,"Conversão",n(summary.conversionPct)+"%","Vendas / (vendas + perdas)");
+ const tbody=$("leadTable");empty(tbody);
+ for(const lead of result.leads){
+  const tr=document.createElement("tr");
+  for(const value of [lead.name,lead.source+" / "+(lead.ddd||"—"),lead.temperature,
+   leadStages[lead.stage],lead.nextFollowup||"—"]){
+   tr.append(textEl("td",value));
+  }
+  const td=document.createElement("td");
+  const select=document.createElement("select");select.setAttribute("aria-label","Etapa do lead "+lead.name);
+  for(const [value,label] of Object.entries(leadStages)){
+   const option=document.createElement("option");option.value=value;option.textContent=label;
+   if(value===lead.stage)option.selected=true;
+   select.append(option);
+  }
+  select.dataset.id=lead.id;select.dataset.version=String(lead.version);
+  const save=textEl("button","Salvar etapa");save.className="btn";save.type="button";
+  save.dataset.action="stage";save.dataset.id=lead.id;
+  const activity=textEl("button","Contato");activity.className="btn";activity.type="button";
+  activity.dataset.action="activity";activity.dataset.id=lead.id;
+  td.append(select,save,activity);tr.append(td);tbody.append(tr);
+ }
+ if(!result.leads.length)row(tbody,["Nenhum lead para os filtros selecionados"]);
+}
 async function loadSales(){
  const d=await call("/api/commercial/sales"+contextMonth());
  const t=$("salesTable");empty(t);
@@ -139,6 +175,7 @@ async function refresh(){
  $("exportCsv").href="/api/commercial/report.csv"+base;
  if(currentView==="dashboard")return loadDashboard();
  if(currentView==="sales")return loadSales();
+ if(currentView==="leads")return loadLeads();
  if(currentView==="goals")return loadRules();
  if(currentView==="team")return loadTeam();
  if(currentView==="renewals")return loadRenewals();
@@ -159,11 +196,11 @@ function bindForm(id,endpoint,transform,after){
 async function init(){
  const me=await call("/api/auth/me");csrf=me.csrf;currentUser=me.user;
  $("period").value=period;
- $("saleSeller").value=currentUser.id;$("policySeller").value=currentUser.id;
+ $("saleSeller").value=currentUser.id;$("policySeller").value=currentUser.id;$("leadSeller").value=currentUser.id;
  if(currentUser.role==="operator"){
   document.querySelectorAll('#nav [data-view="team"],#nav [data-view="users"]').forEach(b=>b.hidden=true);
   $("rulesForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
-  $("saleSeller").readOnly=true;$("policySeller").readOnly=true;
+  $("saleSeller").readOnly=true;$("policySeller").readOnly=true;$("leadSeller").readOnly=true;
   $("printReport").hidden=false;
  }
  if(!["admin","master"].includes(currentUser.role)){$('#nav [data-view="users"]').hidden=true}
@@ -190,6 +227,34 @@ async function init(){
   });
  }
 
+ $("refreshLeads").addEventListener("click",()=>loadLeads().catch(e=>notify(e.message,true)));
+ $("leadTable").addEventListener("click",async event=>{
+  const button=event.target.closest("button[data-action]");if(!button)return;
+  button.disabled=true;
+  try{
+   const leadId=button.dataset.id;
+   if(button.dataset.action==="stage"){
+    const dropdown=[...button.parentElement.querySelectorAll("select")][0];
+    await call("/api/commercial/leads/"+encodeURIComponent(leadId),{
+     method:"POST",body:{expectedVersion:Number(dropdown.dataset.version),stage:dropdown.value}
+    });
+    notify("Etapa atualizada.");
+   }else if(button.dataset.action==="activity"){
+    const note=prompt("Observação do contato (não envia mensagem):");
+    if(!note?.trim())return;
+    await call("/api/commercial/leads/"+encodeURIComponent(leadId)+"/activities",{
+     method:"POST",body:{type:"note",note:note.trim()}
+    });
+    notify("Atividade registrada no histórico.");
+   }
+   await loadLeads();
+  }catch(e){notify(e.message,true)}finally{button.disabled=false}
+ });
+ bindForm("leadForm","/api/commercial/leads",v=>({
+  name:v.name,phone:v.phone,email:v.email,sellerId:v.sellerId,stage:v.stage,
+  source:v.source,uf:v.uf,temperature:v.temperature,nextFollowup:v.nextFollowup||null,
+  consentStatus:v.consentStatus
+ }),async()=>{$("leadForm").reset();$("leadSeller").value=currentUser.id;});
  bindForm("saleForm","/api/commercial/sales",v=>({id:v.id,sellerId:v.sellerId,soldAt:v.soldAt,status:v.status,premiumCents:cents(v.premium),activationCents:cents(v.activation),recurringCents:cents(v.recurring)}));
  bindForm("policyForm","/api/commercial/policies",v=>({id:v.id,sellerId:v.sellerId,startsOn:v.startsOn,endsOn:v.endsOn,productType:v.productType,status:v.status}));
  bindForm("rulesForm","/api/commercial/rules",v=>{
