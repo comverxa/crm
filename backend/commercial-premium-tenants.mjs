@@ -4,7 +4,8 @@
  */
 const ID=/^[a-zA-Z0-9_.:-]{1,100}$/;
 const NAME=/^[\p{L}\p{N}\s.,()&'-]{2,100}$/u;
-const PLANS=new Set(["starter","professional","business"]);
+import {COMVERXA_PRICING} from "./commercial-premium-pricing.mjs";
+const PLANS=new Set(Object.keys(COMVERXA_PRICING));
 function id(s){if(typeof s!=="string"||!ID.test(s))throw Error("Invalid tenant id");return s}
 function name(s){if(typeof s!=="string"||!NAME.test(s.trim()))throw Error("Invalid company name");return s.trim()}
 function dbStmt(db,sql){return typeof db.query==="function"?db.query(sql):db.prepare(sql)}
@@ -24,9 +25,13 @@ export function createTenantStore(db){
   ensureTenant,
   current(tenantId){id(tenantId);return normalize(dbStmt(db,"SELECT * FROM cvx_pilot_tenants WHERE id=?").get(tenantId))},
   list(){return dbStmt(db,"SELECT * FROM cvx_pilot_tenants ORDER BY created_at ASC LIMIT 501").all().map(normalize)},
-  create({tenantId,companyName,plan="starter",seatLimit=5}){
+  create({tenantId,companyName,plan="starter",seatLimit}={}){
    id(tenantId);name(companyName);
-   if(!PLANS.has(plan)||!Number.isSafeInteger(seatLimit)||seatLimit<1||seatLimit>500)throw Error("Invalid plan");
+   if(!PLANS.has(plan))throw Error("Invalid plan");
+   const includedSeats=COMVERXA_PRICING[plan].seats;
+   if(seatLimit===undefined)seatLimit=includedSeats;
+   if(!Number.isSafeInteger(seatLimit)||seatLimit<1||seatLimit>includedSeats)
+    throw Error("Seat limit exceeds the plan allowance");
    const now=new Date().toISOString();
    dbStmt(db,"INSERT INTO cvx_pilot_tenants(id,name,plan,status,seat_limit,billing_mode,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)")
     .run(tenantId,companyName.trim(),plan,"active",seatLimit,"sandbox",now,now);
