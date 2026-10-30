@@ -35,7 +35,12 @@ assert.match(appScriptResponse.headers.get("content-type")||"",/javascript/);
 const activeScript=await appScriptResponse.text();
 assert.match(activeScript,/function show\(view\)/,"Menu navigation function missing");
 assert.match(activeScript,/addEventListener\("click",\(\)=>show\(b\.dataset\.view\)\)/,"Menu click handlers missing");
-assert.doesNotMatch(activeScript,/await\s+loadUsers\(\)/,"User lookup must not block sidebar binding");
+const initStart=activeScript.indexOf("async function init(){");
+assert.ok(initStart>=0,"App initializer missing");
+const navBind=activeScript.indexOf('document.querySelectorAll("#nav [data-view]").forEach',initStart);
+assert.ok(navBind>initStart,"Menu handlers must be installed during initialization");
+assert.doesNotMatch(activeScript.slice(initStart,navBind),/await\s+loadUsers\(\)/,
+ "User lookup must not block sidebar binding");
 assert.match(activeScript,/Dashboard empresarial/,"Enterprise dashboard mode missing");
 assert.match(activeScript,/Dashboard individual/,"Individual dashboard mode missing");
 const internal=await get("/app",{redirect:"manual"});
