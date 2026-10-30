@@ -137,6 +137,7 @@ async function renderPremiumDashboard(data){
 
 async function loadDashboard(){
  const status=await call("/api/commercial/configuration-status");
+ $("cvxExport").disabled=!status.configured;
  if(!status.configured){
   const message=status.canConfigure
    ?"Metas e comissões ainda não foram configuradas. Abra Metas e Comissão para definir as regras da empresa."
@@ -159,6 +160,38 @@ async function loadDashboard(){
    button.addEventListener("click",()=>show("goals"));holder.append(button);
   }else{
    holder.append(textEl("p","Aguarde a configuração das regras comerciais pelo gestor da empresa."));
+  }
+  // CRM lead and channel activity remains real and useful before financial rules are set.
+  const kpis=$("cvxKpis"),funnel=$("cvxFunnel"),channels=$("cvxChannels"),insights=$("cvxInsights");
+  try{
+   const data=await call("/api/commercial/leads/summary");
+   cvxTile(kpis,"Leads cadastrados",n(data.total),"Visíveis para seu perfil","cyan");
+   cvxTile(kpis,"Follow-ups vencidos",n(data.followupsOverdue),"Contatos com retorno em atraso","gold");
+   cvxTile(kpis,"Leads quentes",n(data.byTemperature?.hot||0),"Classificação atual");
+   cvxTile(kpis,"Leads perdidos",n(data.byStage?.lost||0),"Histórico do funil");
+   const stages=[["lead","Lead"],["contacted","Contato"],["negotiation","Negociação"],["proposal","Proposta"],["won","Fechamento"],["lost","Perdas"]];
+   const maximum=Math.max(1,...Object.values(data.byStage||{}).map(Number).filter(Number.isFinite));
+   for(const [key,label] of stages)cvxBar(funnel,label,Number(data.byStage?.[key]||0),maximum);
+   funnel.append(textEl("p","Indicadores de oportunidades; metas e comissões ainda não foram configuradas."));
+   funnel.lastChild.className="cvx-chart-foot";
+   if(data.total>=data.limitedTo)insights.append(textEl("div","A análise considera até "+n(data.limitedTo)+" leads; utilize os filtros do CRM para consultar mais."));
+  }catch{
+   cvxMessage(funnel,"Não foi possível consultar o funil neste momento.");
+  }
+  try{
+   const data=await call("/api/wa/channels");
+   for(const channel of data.channels||[]){
+    const line=document.createElement("div");line.className="cvx-rank";
+    line.append(textEl("span",String(channel.slot||"")),textEl("span",channel.slot===1?"QR Code / Evolution":"Meta API"),textEl("strong",String(channel.state||"não configurado")));
+    channels.append(line);
+   }
+   if(!channels.children.length)cvxMessage(channels,"Nenhum canal conectado.");
+  }catch{
+   cvxMessage(channels,"Status dos canais indisponível.");
+  }
+  if(enterprise){
+   cvxMessage($("cvxRanking"),"O ranking de vendas será exibido após a configuração de metas.");
+   cvxMessage($("cvxFinance"),"Comissões e valores financeiros ainda não foram configurados.");
   }
   return;
  }
