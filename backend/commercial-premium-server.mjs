@@ -13,6 +13,7 @@ import {randomBytes,randomUUID,scryptSync,timingSafeEqual,createHash} from "node
 import {DatabaseSync} from "node:sqlite";
 import {createCommercialStore} from "./commercial-premium-store.mjs";
 import {createCommercialHttpHandler} from "./commercial-premium-http.mjs";
+import {createTenantStore} from "./commercial-premium-tenants.mjs";
 
 const secureHash=s=>createHash("sha256").update(s).digest("hex");
 const json=(status,body,headers={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff",...headers}});
@@ -33,7 +34,7 @@ export function createPremiumServer({
   htmlPath=new URL("../site/comverxa-premium-operacional.html",import.meta.url),
   jsPath=new URL("../site/comverxa-premium-operacional.js",import.meta.url),
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
-  now=()=>Date.now()
+  now=()=>Date.now(),enablePlatformMaster=false
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
@@ -46,13 +47,16 @@ export function createPremiumServer({
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_sessions (session_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES cvx_pilot_users(id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_expires ON cvx_pilot_sessions(expires_at)");
  const store=createCommercialStore(db);
+ const tenants=createTenantStore(db);
+ tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto");
  const stmt=sql=>db.prepare(sql);
  const email=bootstrapEmail.trim().toLowerCase();
  if(!stmt("SELECT id FROM cvx_pilot_users WHERE email=?").get(email)){
   const salt=randomBytes(16).toString("hex");
   stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active) VALUES (?,?,?,?,?,?,1)")
-   .run(randomUUID(),bootstrapTenant,email,"admin",salt,passwordHash(bootstrapPassword,salt));
+   .run(randomUUID(),bootstrapTenant,email,enablePlatformMaster?"master":"admin",salt,passwordHash(bootstrapPassword,salt));
  }
+ if(enablePlatformMaster)stmt("UPDATE cvx_pilot_users SET role='master' WHERE email=? AND tenant_id=? AND role='admin'").run(email,bootstrapTenant);
  let failMap=new Map();
  function rateLimit(key){
   const time=now(),old=failMap.get(key)||{n:0,until:0};if(old.until<time){old.n=0;old.until=time+900000}
@@ -63,7 +67,7 @@ export function createPremiumServer({
  const sessionFrom=req=>{
   const token=cookieValue(req.headers.get("cookie"));if(!token)return null;
   const row=stmt("SELECT s.csrf,s.expires_at,u.id,u.tenant_id,u.email,u.role,u.active,u.must_change_password FROM cvx_pilot_sessions s JOIN cvx_pilot_users u ON u.id=s.user_id WHERE s.session_hash=?").get(secureHash(token));
-  if(!row||row.active!==1||row.expires_at<=now())return null;
+  if(!row||row.active!==1||row.expires_at<=now()||!tenants.isEnabled(row.tenant_id))return null;
   return {tenantId:row.tenant_id,userId:row.id,role:row.role,email:row.email,csrf:row.csrf,mustChangePassword:row.must_change_password===1};
  };
  const csrfOk=(req,session)=>constantEquals(req.headers.get("x-csrf-token")||"",session.csrf);
@@ -144,8 +148,48 @@ export function createPremiumServer({
    const secure=cookieSecure?"; Secure":"";
    return json(200,{ok:true},{"set-cookie":"cvx_pilot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
   }
-  if((path.startsWith("/api/pilot/")||path.startsWith("/api/commercial/"))&&sessionFrom(req)?.mustChangePassword)
+  if((path.startsWith("/api/pilot/")||path.startsWith("/api/commercial/")||path.startsWith("/api/platform/"))&&sessionFrom(req)?.mustChangePassword)
    return json(403,{error:"Password change required"});
+  if(path==="/api/pilot/company"&&req.method==="GET"){
+   const s=sessionFrom(req);return s?json(200,{company:tenants.current(s.tenantId)}):json(401,{error:"Unauthorized"});
+  }
+  if(path==="/api/pilot/company"&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!["admin","master"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   let body;try{body=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid JSON"})}
+   try{return json(200,{company:tenants.setBrand(s.tenantId,body.companyName)})}
+   catch{return json(400,{error:"Invalid company name"})}
+  }
+  if(path==="/api/platform/companies"&&req.method==="GET"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(s.role!=="master"||!enablePlatformMaster)return json(403,{error:"Forbidden"});
+   return json(200,{companies:tenants.list().map(t=>({...t,seatsUsed:tenants.seatCount(t.id)}))});
+  }
+  if(path==="/api/platform/companies"&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(s.role!=="master"||!enablePlatformMaster||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   let body;try{body=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid JSON"})}
+   const tenantId=body?.tenantId,companyName=body?.companyName,adminEmail=String(body?.adminEmail||"").toLowerCase().trim(),adminPassword=body?.adminPassword;
+   if(!validEmail(adminEmail)||!validPass(adminPassword))return json(400,{error:"Invalid admin credentials"});
+   try{
+    db.exec("BEGIN IMMEDIATE");
+    const company=tenants.create({tenantId,companyName,plan:body?.plan,seatLimit:body?.seatLimit});
+    const salt=randomBytes(16).toString("hex");
+    stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active,must_change_password) VALUES(?,?,?,?,?,?,1,1)")
+     .run(randomUUID(),company.id,adminEmail,"admin",salt,passwordHash(adminPassword,salt));
+    db.exec("COMMIT");
+    return json(201,{company});
+   }catch(error){try{db.exec("ROLLBACK")}catch{}return json(409,{error:"Tenant or admin already registered"})}
+  }
+  if(path.startsWith("/api/platform/companies/")&&path.endsWith("/status")&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(s.role!=="master"||!enablePlatformMaster||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   const tenantId=decodeURIComponent(path.slice("/api/platform/companies/".length,-"/status".length));
+   if(tenantId===s.tenantId)return json(403,{error:"Cannot suspend platform tenant"});
+   let body;try{body=JSON.parse(await textBytes(req,1024))}catch{return json(400,{error:"Invalid JSON"})}
+   try{return json(200,{company:tenants.setStatus(tenantId,body.status)})}
+   catch{return json(400,{error:"Invalid status or tenant"})}
+  }
   if(path==="/api/pilot/users"&&req.method==="GET"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!["master","admin","manager"].includes(s.role))return json(403,{error:"Forbidden"});
@@ -159,6 +203,9 @@ export function createPremiumServer({
    let data;try{data=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid JSON"})}
    const email=String(data?.email||"").trim().toLowerCase(),pass=data?.password,role=data?.role;
    if(!validEmail(email)||!validPass(pass)||!["manager","operator"].includes(role))return json(400,{error:"Invalid user"});
+   const company=tenants.current(s.tenantId);
+   if(!company||company.status!=="active")return json(403,{error:"Tenant suspended"});
+   if(tenants.seatCount(s.tenantId)>=company.seatLimit)return json(409,{error:"Seat limit reached"});
    const salt=randomBytes(16).toString("hex"),uid=randomUUID();
    try{stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active) VALUES(?,?,?,?,?,?,1)")
     .run(uid,s.tenantId,email,role,salt,passwordHash(pass,salt))}catch{return json(409,{error:"Email already registered"})}
