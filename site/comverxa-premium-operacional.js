@@ -42,6 +42,99 @@ function show(view){
  refresh().catch(e=>notify(e.message,true));
 }
 function contextMonth(){const asOf=new Date().toISOString().slice(0,10);return "?month="+encodeURIComponent(period)+"&asOf="+asOf}
+
+function cvxTile(root,label,value,detail="",tone=""){
+ const el=document.createElement("div");el.className="cvx-tile "+tone;
+ const l=document.createElement("small");l.textContent=label;
+ const v=document.createElement("strong");v.textContent=value;
+ const d=document.createElement("span");d.textContent=detail;
+ el.append(l,v,d);root.append(el);
+}
+function cvxBar(root,label,count,max){
+ const el=document.createElement("div");el.className="cvx-barrow";
+ const name=textEl("span",label),track=document.createElement("div"),fill=document.createElement("div"),val=textEl("b",n(count));
+ track.className="cvx-track";fill.className="cvx-fill";
+ fill.style.width=Math.max(0,Math.min(100,(Number(count)||0)/Math.max(1,max)*100))+"%";
+ track.append(fill);el.append(name,track,val);root.append(el);
+}
+function cvxMessage(root,message){
+ root.replaceChildren(textEl("p",message));root.firstChild.className="cvx-empty";
+}
+async function renderPremiumDashboard(data){
+ if(!$("cvxKpis"))return;
+ const enterprise=["admin","master","manager"].includes(currentUser.role);
+ $("cvxEnterprise").hidden=!enterprise;
+ $("cvxHeading").textContent=enterprise?"Dashboard empresarial":"Dashboard individual";
+ $("cvxSubheading").textContent=enterprise?"Gestão da equipe, metas e resultados por competência.":"Suas vendas, metas, comissões e oportunidades.";
+ $("cvxModeLabel").textContent=enterprise?"Visão da empresa":"Minha carteira";
+ $("cvxFeedback").textContent="Dados do período: "+period+" · Atualizados a partir dos registros do Comercial.";
+ const k=$("cvxKpis");empty(k);
+ const sold=Number(data.counts?.sold||0),goal=Number(data.target?.nextMinSales??data.target?.achievedMinSales??0),remaining=Number(data.target?.remaining||0);
+ cvxTile(k,"Meta do período",n(goal)+" vendas","Faixa progressiva de remuneração");
+ cvxTile(k,"Realizado",n(sold)+" vendas","Vendas confirmadas","cyan");
+ cvxTile(k,"Faltam",n(remaining)+" vendas","Para atingir a próxima faixa");
+ cvxTile(k,"Atingimento",n(data.target?.completionPct||0)+"%","Da meta aplicável","gold");
+ cvxTile(k,"Receita comercial",brl(data.revenueCents),"Valores registrados");
+ cvxTile(k,"Comissões efetivas",brl(data.commissions?.effectiveCents),"Sujeitas às regras comerciais","cyan");
+ const pace=$("cvxPace");empty(pace);
+ cvxTile(pace,"Dias úteis restantes",n(data.workdays?.remaining??0),"Conforme calendário do CRM");
+ cvxTile(pace,"Média por dia",n(data.pace?.averageDaily??0),"Vendas por dia útil");
+ cvxTile(pace,"Projeção",n(data.pace?.projectedSales??0)+" vendas","Estimativa, não garantia");
+ cvxTile(pace,"Ritmo necessário",n(data.pace?.requiredDaily??0),"Vendas por dia útil","gold");
+ const chart=$("cvxGoalChart");empty(chart);
+ const bar=document.createElement("div");bar.className="cvx-goalbar";const fill=document.createElement("div");
+ fill.style.width=Math.min(100,Math.max(0,Number(data.target?.completionPct)||0))+"%";bar.append(fill);chart.append(bar);
+ chart.append(textEl("p",n(sold)+" vendas confirmadas · Próxima meta: "+n(goal)+" vendas."));
+ const line=textEl("p","Projeção no período: "+n(data.pace?.projectedSales??0)+" vendas. Dados sem histórico diário não são apresentados como série temporal.");
+ line.className="cvx-chart-foot";chart.append(line);
+ const funnel=$("cvxFunnel");empty(funnel);
+ try{
+  const d=await call("/api/commercial/leads/summary");
+  const stages=[["lead","Lead"],["contacted","Contato"],["negotiation","Negociação"],["proposal","Proposta"],["won","Fechamento"],["lost","Perdas"]];
+  const maximum=Math.max(1,...Object.values(d.byStage||{}).map(Number).filter(Number.isFinite));
+  for(const [key,label] of stages)cvxBar(funnel,label,Number(d.byStage?.[key]||0),maximum);
+  funnel.append(textEl("p","Etapas representam a posição atual dos leads, não necessariamente a conversão histórica."));
+  funnel.lastChild.className="cvx-chart-foot";
+ }catch{cvxMessage(funnel,"Funil indisponível para esta conta.");}
+ const channels=$("cvxChannels");empty(channels);
+ try{
+  const result=await call("/api/wa/channels");
+  for(const c of result.channels||[]){
+   const line=document.createElement("div");line.className="cvx-rank";
+   line.append(textEl("span",String(c.slot||"")),textEl("span",c.slot===1?"QR Code / Evolution":"Meta API"),textEl("strong",String(c.state||"não configurado")));
+   channels.append(line);
+  }
+  if(!channels.children.length)cvxMessage(channels,"Nenhum canal cadastrado.");
+ }catch{cvxMessage(channels,"Estado dos canais indisponível.");}
+ const insights=$("cvxInsights");empty(insights);insights.className="cvx-list";
+ const notices=[];
+ if(remaining>0)notices.push("Para a próxima meta faltam "+n(remaining)+" vendas.");
+ if(Number(data.pace?.requiredDaily)>Number(data.pace?.averageDaily))notices.push("O ritmo necessário está acima da média atual.");
+ if(Number(data.commissions?.retainedCents)>0)notices.push("Existem comissões retidas no total de "+brl(data.commissions.retainedCents)+".");
+ if(!notices.length)notices.push("Acompanhe o funil e o fechamento da competência.");
+ for(const notice of notices)insights.append(textEl("div",notice));
+ if(enterprise){
+  const rank=$("cvxRanking"),finance=$("cvxFinance");empty(rank);empty(finance);
+  try{
+   const team=await call("/api/commercial/team"+contextMonth());
+   const total=Number(team.totals?.sales||0),teamGoal=team.teamGoal?.targetSales;
+   const summary=document.createElement("p");summary.textContent="Vendas da equipe: "+n(total)+" · Meta coletiva: "+(teamGoal==null?"não definida":n(teamGoal));rank.append(summary);
+   for(const [index,seller] of (team.rows||[]).slice(0,12).entries()){
+    const line=document.createElement("div");line.className="cvx-rank";
+    line.append(textEl("span",String(index+1)),textEl("span",String(seller.sellerId||"Consultor")),textEl("strong",n(seller.sales)+" vendas"));
+    const track=document.createElement("div");track.className="cvx-track";const fill=document.createElement("div");fill.className="cvx-fill";
+    fill.style.width=Math.max(0,Math.min(100,(Number(seller.sales)||0)/Math.max(1,total)*100))+"%";
+    track.append(fill);line.append(track);rank.append(line);
+   }
+   if(!(team.rows||[]).length)rank.append(textEl("p","Sem produção registrada para a equipe neste período."));
+   const tiles=document.createElement("div");tiles.className="cvx-kpis";finance.append(tiles);
+   cvxTile(tiles,"Receita da equipe",brl(team.totals?.amountCents),"Valor contabilizado");
+   cvxTile(tiles,"Comissões efetivas",brl(team.totals?.effectiveCommissionCents),"Equipe");
+   cvxTile(tiles,"Comissões retidas",brl(team.totals?.retainedCommissionCents),"Acompanhar liberação","gold");
+  }catch{cvxMessage(rank,"Dados de equipe indisponíveis.");cvxMessage(finance,"Financeiro indisponível.");}
+ }
+}
+
 async function loadDashboard(){
  const data=await call("/api/commercial/summary"+contextMonth());
  const m=$("metrics");empty(m);
@@ -62,6 +155,7 @@ async function loadDashboard(){
  earnings.append(textEl("p","Receita comercial: "+brl(data.revenueCents)));
  if(data.earnings.totalCents!==null)earnings.append(textEl("p","Ganho previsto (operador): "+brl(data.earnings.totalCents)));
  await loadDashboardInsights();
+ await renderPremiumDashboard(data);
 }
 async function loadDashboardInsights(){
  const funnel=$("dashFunnel"),wa=$("dashWa");
@@ -323,6 +417,8 @@ function bindForm(id,endpoint,transform,after){
 }
 async function init(){
  const me=await call("/api/auth/me");csrf=me.csrf;currentUser=me.user;
+ $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
+ $("cvxExport").addEventListener("click",()=>{window.open("/api/commercial/report/print"+contextMonth(),"_blank","noopener,noreferrer")});
  $("period").value=period;
  $("saleSeller").value=currentUser.id;$("policySeller").value=currentUser.id;$("leadSeller").value=currentUser.id;
  if(currentUser.role==="operator"){
