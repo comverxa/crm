@@ -11,14 +11,50 @@ section{margin-bottom:24px}.error{color:#ff9ba4}.muted{color:var(--muted)}#mobil
 @media(max-width:1040px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
 @media(max-width:700px){.layout{display:block}aside{position:fixed;left:0;top:0;bottom:0;width:262px;z-index:9;transform:translateX(-110%);transition:.2s;box-shadow:15px 0 35px #0008}aside.open{transform:translateX(0)}.overlay.open{display:block;position:fixed;inset:0;background:#000a;z-index:8}#mobileMenu{display:block}main{padding:16px 13px 60px}.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:14px}header{align-items:start}.toolbar{justify-content:flex-end}.k-value{font-size:26px}}
 @media(max-width:420px){.form-grid{grid-template-columns:1fr}.grid{gap:9px}.k-value{font-size:23px}.k-label{font-size:10px}.toolbar input{max-width:130px}}
-</style><script src="/assets/commercial.js" type="module" defer></script></head>
+</style><link rel="stylesheet" href="/assets/commercial-theme.css"><script src="/assets/commercial.js" type="module" defer></script></head>
 <body><div class="overlay" id="overlay"></div><datalist id="sellerOptions"></datalist><div class="layout">
 <aside id="sidebar"><div class="brand">COM<span>VERXA</span><small>PREMIUM COMERCIAL</small></div>
-<nav id="nav"><button data-view="dashboard" class="active">◫ Visão Geral</button><button data-view="leads">♧ Leads e Funil</button><button data-view="sales">▣ Vendas</button><button data-view="goals">◎ Metas e Comissão</button><button data-view="team">♙ Equipe</button><button data-view="renewals">↻ Renovação</button><button data-view="users">♧ Usuários</button><button data-view="companies" hidden>▦ Empresas / ADM Master</button><button data-view="billing">▣ Assinaturas (teste)</button><button data-view="account">⚙ Minha conta</button></nav>
-<div class="foot">Ambiente piloto isolado. Credenciais próprias, sem WhatsApp nem cobrança real; banco e contas separados do CRM principal. Nenhuma alteração em clientes do COMVERXA em produção.</div></aside>
+<nav id="nav"><button data-view="dashboard" class="active">◫ Visão Geral</button><button data-view="whatsapp">◉ WhatsApp · 2 canais</button><button data-view="leads">♧ Leads e Funil</button><button data-view="sales">▣ Vendas</button><button data-view="goals">◎ Metas e Comissão</button><button data-view="team">♙ Equipe</button><button data-view="renewals">↻ Renovação</button><button data-view="users">♧ Usuários</button><button data-view="companies" hidden>▦ Empresas / ADM Master</button><button data-view="billing">▣ Assinaturas (teste)</button><button data-view="account">⚙ Minha conta</button></nav>
+<div class="foot">Dois canais WhatsApp em preparação. QR Evolution e Meta oficial dependem de conexão própria. CRM e cobrança principal preservados. Nenhuma alteração em clientes do COMVERXA em produção.</div></aside>
 <main><header><div class="toolbar"><button id="mobileMenu" class="btn">☰</button><strong>COMVERXA / Comercial</strong></div><div class="toolbar"><input type="month" id="period" aria-label="Competência"><button class="btn" id="logout">Sair</button></div></header>
-<div class="banner">PILOTO OPERACIONAL ISOLADO · Banco persistente e sessões autenticadas. Não é o CRM principal; WhatsApp e pagamentos reais permanecem indisponíveis neste módulo.</div>
+<div class="banner">AMBIENTE COMERCIAL ISOLADO · Dois canais WhatsApp por empresa: 1 QR Code (Evolution) + 1 API oficial (Meta). A disponibilidade depende de conexão validada; pagamentos reais seguem desativados.</div>
 <section id="dashboard" class="view active"><div class="eyebrow">RESULTADOS</div><h1>Seu negócio em tempo real.</h1><p class="subtitle">Vendas confirmadas, metas progressivas, comissões retidas e renovações.</p><div class="grid" id="metrics"></div><div class="two" style="margin-top:15px"><div class="card"><h2>Meta mensal</h2><div class="metric-bar"><div id="progress"></div></div><p id="progressText" class="note"></p><div id="pace" class="grid" style="grid-template-columns:repeat(2,1fr)"></div></div><div class="card"><h2>Receita e remuneração</h2><div id="earnings"></div><p class="note">Valores previstos e sujeitos à aprovação financeira.</p></div></div></section>
+<section id="whatsapp" class="view">
+<div class="eyebrow">COMVERXA CONNECT · OMNICHANNEL</div><h1>Uma central. Dois WhatsApps.</h1>
+<p class="subtitle">Conecte um número pelo QR Code e outro pela API oficial da Meta. As conversas ficam separadas por origem e empresa.</p>
+<div class="wa-hero">
+ <div><div class="wa-hero-kicker">CENTRAL DE CONEXÕES</div><h2>Atendimento em dois canais</h2><p>Uma operação unificada, com identificação da linha de origem, privacidade e status verificados pelo provedor.</p></div>
+ <button type="button" class="btn" id="waRefresh">↻ Atualizar conexões</button>
+</div>
+<p id="waGlobalStatus" class="note" role="status">Consultando canais...</p>
+<div class="wa-channel-grid">
+ <div class="card wa-card">
+  <div class="wa-card-head"><div class="wa-channel-icon">◉</div><div><div class="eyebrow">CANAL 01 · QR CODE</div><h2>WhatsApp conectado ao celular</h2></div></div>
+  <p class="note">Conexão via Evolution API (integração não oficial). Use Aparelhos conectados no WhatsApp do celular para escanear o código.</p>
+  <div class="wa-state-row"><span id="waQrState" class="wa-status">Não configurado</span><span id="waQrNumber" class="note"></span></div>
+  <div id="waQrPanel" class="wa-qr-panel" hidden><img id="waQrImage" alt="QR Code gerado pelo provedor para conectar seu WhatsApp" width="196" height="196"><div><strong>Escaneie pelo WhatsApp</strong><p class="note">No celular: Configurações → Aparelhos conectados → Conectar aparelho.</p></div></div>
+  <div class="wa-actions"><button class="btn primary" type="button" id="waQrConnect">Conectar pelo QR Code</button><button class="btn" type="button" id="waQrCheck">Verificar estado</button></div>
+  <p class="note" id="waQrInfo"></p>
+ </div>
+ <div class="card wa-card">
+  <div class="wa-card-head"><div class="wa-channel-icon meta">◎</div><div><div class="eyebrow">CANAL 02 · API OFICIAL</div><h2>WhatsApp Business · Meta</h2></div></div>
+  <p class="note">Integração oficial com o WhatsApp Business Platform. Valide o Phone Number ID e token de acesso pelo servidor, sem expor credenciais no navegador.</p>
+  <div class="wa-state-row"><span id="waMetaState" class="wa-status">Não configurado</span><span id="waMetaNumber" class="note"></span></div>
+  <form id="waMetaForm">
+   <label>Phone Number ID da Meta<input name="phoneNumberId" pattern="[0-9]{8,24}" inputmode="numeric" required placeholder="ID fornecido no Meta Developers"></label>
+   <label>Token de acesso oficial<input name="accessToken" type="password" required autocomplete="off" placeholder="Token protegido no servidor"></label>
+   <div class="wa-actions"><button class="btn primary" type="submit">Validar API oficial</button><button class="btn" id="waMetaWebhook" type="button">Configurar webhook</button></div>
+  </form>
+  <div id="waWebhookPanel" hidden class="wa-webhook-panel"><label>Endereço de webhook<input id="waWebhookUrl" readonly></label><label>Token de verificação<input id="waWebhookToken" readonly type="password"></label><button type="button" class="btn" id="waRevealWebhook">Mostrar token</button><p class="note">Informe esses dados apenas no painel seguro do Meta Developers. A configuração no Meta é necessária para receber mensagens.</p></div>
+  <p class="note" id="waMetaInfo"></p>
+ </div>
+</div>
+<div class="card wa-inbox">
+ <div class="wa-inbox-head"><div><div class="eyebrow">CAIXA DE ENTRADA POR CANAL</div><h2>Conversas sincronizadas</h2><p class="note">Somente eventos recebidos e verificados pelo servidor. Sem disparos automáticos.</p></div><div class="wa-actions"><select id="waInboxSlot" aria-label="Canal de conversas"><option value="1">WhatsApp 1 · QR</option><option value="2">WhatsApp 2 · Meta</option></select><button class="btn" type="button" id="waLoadInbox">Carregar</button></div></div>
+ <div class="scroll"><table><thead><tr><th>Origem</th><th>Contato</th><th>Tipo</th><th>Última mensagem</th><th>Data</th></tr></thead><tbody id="waInboxTable"><tr><td colspan="5">Selecione um canal e clique em Carregar.</td></tr></tbody></table></div>
+</div>
+<p class="note">QR Code e API oficial são tecnologias diferentes. Estar configurado não comprova envio, entrega ou sincronização contínua. A API oficial exige webhook e autorização correta; a Evolution depende de sessão ativa no celular.</p>
+</section>
 <section id="leads" class="view"><div class="eyebrow">CENTRAL DE OPORTUNIDADES</div><h1>Leads e Pipeline</h1><p class="subtitle">Cadastre, qualifique e acompanhe prospects. Funil: Lead → Contato → Negociação → Proposta → Venda.</p><div class="grid" id="leadMetrics"></div>
 <div class="card" style="margin-top:15px"><h2>Novo lead</h2><form id="leadForm"><div class="form-grid">
 <label>Nome do contato<input name="name" required maxlength="120" placeholder="Nome do interessado"></label>
