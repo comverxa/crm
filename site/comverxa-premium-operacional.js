@@ -90,6 +90,30 @@ async function loadTeam(){
  for(const s of data.rows)row(t,[s.sellerId,n(s.sales),n(s.remainingSales),n(s.projectedSales),brl(s.effectiveCommissionCents),brl(s.retainedCommissionCents)]);
  if(!data.rows.length)row(t,["Nenhum vendedor com vendas nesta competência"]);
 }
+async function loadCompanies(){
+ const data=await call("/api/platform/companies");
+ const metrics=$("companyMetrics");empty(metrics);
+ card(metrics,"Empresas",n(data.companies.length));
+ card(metrics,"Ativas",n(data.companies.filter(x=>x.status==="active").length));
+ card(metrics,"Suspensas",n(data.companies.filter(x=>x.status!=="active").length));
+ card(metrics,"Usuários ativos",n(data.companies.reduce((a,x)=>a+x.seatsUsed,0)));
+ const table=$("companyTable");empty(table);
+ for(const company of data.companies){
+  const tr=document.createElement("tr");
+  for(const value of [company.name,company.plan,company.seatsUsed+"/"+company.seatLimit,
+   company.billingMode==="sandbox"?"Simulação":"Verificar",company.status])
+   tr.append(textEl("td",value));
+  const td=document.createElement("td");
+  if(company.id!==currentTenantId){
+   const button=textEl("button",company.status==="active"?"Suspender":"Reativar");
+   button.type="button";button.className="btn";button.dataset.tenant=company.id;button.dataset.status=company.status==="active"?"suspended":"active";
+   td.append(button);
+  }else td.textContent="Conta da plataforma";
+  tr.append(td);table.append(tr);
+ }
+}
+let currentTenantId="";
+async function loadCompanyProfile(){const d=await call("/api/pilot/company");currentTenantId=d.company.id}
 async function loadRenewals(){
  const d=await call("/api/commercial/renewals?asOf="+new Date().toISOString().slice(0,10));
  const s=d.summary,m=$("renewalMetrics");empty(m);
@@ -118,6 +142,7 @@ async function refresh(){
  if(currentView==="goals")return loadRules();
  if(currentView==="team")return loadTeam();
  if(currentView==="renewals")return loadRenewals();
+ if(currentView==="companies")return loadCompanies();
  if(currentView==="users")return loadUsers();
 }
 function bindForm(id,endpoint,transform,after){
@@ -142,6 +167,7 @@ async function init(){
   $("printReport").hidden=false;
  }
  if(!["admin","master"].includes(currentUser.role)){$('#nav [data-view="users"]').hidden=true}
+ if(currentUser.role==="master"){$('#nav [data-view="companies"]').hidden=false}
  if(["admin","master","manager"].includes(currentUser.role))await loadUsers();
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
  $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("open")});
@@ -183,6 +209,21 @@ async function init(){
    e.currentTarget.reset();await loadUsers();
   }catch(error){notify(error.message,true)}finally{btn.disabled=false}
  });
+ if(currentUser.role==="master"){
+  bindForm("companyForm","/api/platform/companies",v=>({
+   tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),
+   adminEmail:v.adminEmail,adminPassword:v.adminPassword
+  }),()=>loadCompanies());
+  $("companyTable").addEventListener("click",async e=>{
+   const button=e.target.closest("button[data-tenant]");if(!button)return;
+   if(!confirm("Confirma "+(button.dataset.status==="suspended"?"suspensão":"reativação")+" desta empresa?"))return;
+   button.disabled=true;
+   try{await call("/api/platform/companies/"+encodeURIComponent(button.dataset.tenant)+"/status",
+    {method:"POST",body:{status:button.dataset.status}});
+    await loadCompanies();notify("Empresa atualizada.");
+   }catch(err){notify(err.message,true)}finally{button.disabled=false}
+  });
+ }
  $("passwordForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const v=Object.fromEntries(new FormData(e.currentTarget).entries());
@@ -197,6 +238,7 @@ async function init(){
   show("account");notify("Por segurança, altere a senha provisória antes de usar o sistema.");
   return;
  }
+ try{await loadCompanyProfile()}catch(e){notify("Não foi possível carregar o cadastro da empresa.",true)}
  try{await loadRules()}catch(e){if(e.message!=="Falha: 404")notify("Configure as regras da empresa em Metas e Comissão.",false)}
  try{await refresh()}catch(e){if(e.message.includes("Commission rules not configured")||e.message==="Verifique os campos e regras informadas"){notify("Configure suas metas em Metas e Comissão.",false);show("goals")}else notify(e.message,true)}
 }
