@@ -305,13 +305,14 @@ async function loadWhatsApp(){
   $("waQrNumber").textContent=qr.displayNumber||"Linha 01";
   $("waMetaNumber").textContent=official.displayNumber||"Linha 02";
   const active=items.filter(i=>["connected","verified"].includes(i.state)).length;
-  status.textContent="2 canais disponíveis · "+active+" verificado(s) pelo provedor · Sincronização depende dos webhooks e conexão ativa.";
-  if(!data.integrationAvailable)status.textContent="2 canais definidos. Os segredos de conexão do servidor ainda precisam ser configurados.";
-  $("waQrConnect").disabled=!waUserCanConfigure()||!data.integrationAvailable||qr.state==="provider_missing";
-  $("waMetaForm").querySelectorAll("input,button[type=submit]").forEach(el=>el.disabled=!waUserCanConfigure()||!data.integrationAvailable);
-  $("waMetaWebhook").disabled=!waUserCanConfigure()||!official.configured;
-  $("waQrInfo").textContent=qr.configured?"Use Atualizar para consultar a conexão. O QR Code só é exibido quando o provedor o disponibiliza.":"Uma única sessão QR por empresa.";
-  $("waMetaInfo").textContent=official.configured?"Número validado. A configuração do webhook da Meta é necessária para sincronização de mensagens.":"Conecte uma única conta oficial Meta por empresa.";
+  const qrReady=data.providerConfigured?.qr===true,metaReady=data.providerConfigured?.official===true;
+  status.textContent="2 canais definidos · "+active+" verificado(s) pelo provedor · Sincronização depende dos webhooks e conexão ativa.";
+  if(!qrReady||!metaReady)status.textContent+=" · Provedor(es) pendente(s): "+[!qrReady?"QR / Evolution":null,!metaReady?"Meta oficial":null].filter(Boolean).join(", ")+".";
+  $("waQrConnect").disabled=!waUserCanConfigure()||!qrReady||qr.state==="provider_missing";
+  $("waMetaForm").querySelectorAll("input,button[type=submit]").forEach(el=>el.disabled=!waUserCanConfigure()||!metaReady);
+  $("waMetaWebhook").disabled=!waUserCanConfigure()||!metaReady||!official.configured;
+  $("waQrInfo").textContent=!qrReady?"O administrador precisa configurar a URL e a chave da Evolution API no servidor.":qr.configured?"Use Atualizar para consultar a conexão. O QR Code só é exibido quando o provedor o disponibiliza.":"Uma única sessão QR por empresa.";
+  $("waMetaInfo").textContent=!metaReady?"A integração Meta está pendente no servidor. O administrador deve configurar CVX_WA_META_APP_SECRET no Railway, sem divulgar o segredo no chat ou navegador.":official.configured?"Número validado. A configuração do webhook da Meta é necessária para sincronização de mensagens.":"Conecte uma única conta oficial Meta por empresa.";
  }catch(error){status.textContent="Não foi possível consultar as conexões: "+error.message}
 }
 async function loadWaInbox(){
