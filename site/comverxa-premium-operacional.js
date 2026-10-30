@@ -170,6 +170,31 @@ async function loadOffsiteStatus(){
   el.textContent="Último backup restaurado e verificado: "+new Date(data.verification.verifiedAt).toLocaleString("pt-BR")+" · "+Math.round(data.verification.sizeBytes/1024)+" KB cifrados.";
  }catch(err){el.textContent="Falha ao consultar backup: "+err.message}
 }
+async function loadStripe(){
+ const status=$("stripeStatus"),plans=$("stripePlans"),tbody=$("stripeTable");
+ empty(plans);empty(tbody);
+ try{
+  const data=await call("/api/billing/stripe/status");
+  status.textContent=data.configured
+   ?"Stripe conectado em TESTE. O checkout e as assinaturas não geram cobrança real."
+   :"Stripe sem preços/segredos de homologação configurados. Nenhuma contratação pode ser iniciada.";
+  const names={starter:"Starter",professional:"Professional",business:"Business"};
+  for(const [plan,title] of Object.entries(names)){
+   const wrapper=document.createElement("div");wrapper.className="card";wrapper.style.padding="16px";
+   wrapper.append(textEl("h3",title));
+   const note=textEl("p","Preço e condições apresentados no Stripe Checkout após sua configuração.");note.className="note";wrapper.append(note);
+   const button=textEl("button","Contratar em modo de teste");button.className="btn primary";button.type="button";
+   button.dataset.stripePlan=plan;
+   button.disabled=!data.configured||!data.availablePlans.includes(plan)||!["master","admin"].includes(currentUser.role);
+   wrapper.append(button);plans.append(wrapper);
+  }
+  if(!data.subscriptions?.length){row(tbody,["Nenhuma assinatura de teste registrada"])}
+  for(const subscription of data.subscriptions){
+   row(tbody,[names[subscription.plan]||subscription.plan,subscription.status,
+    subscription.entitlement,subscription.updatedAt?new Date(subscription.updatedAt).toLocaleString("pt-BR"):"—"]);
+  }
+ }catch(err){status.textContent="Falha ao consultar a integração: "+err.message}
+}
 async function loadUsers(){
  const d=await call("/api/pilot/users");
  const tbody=$("usersTable"),options=$("sellerOptions");empty(tbody);empty(options);
@@ -189,6 +214,7 @@ async function refresh(){
  if(currentView==="team")return loadTeam();
  if(currentView==="renewals")return loadRenewals();
  if(currentView==="companies")return loadCompanies();
+ if(currentView==="billing")return loadStripe();
  if(currentView==="users"){await loadUsers();if(["admin","master"].includes(currentUser.role))await loadOffsiteStatus();return}
 }
 function bindForm(id,endpoint,transform,after){
@@ -215,12 +241,23 @@ async function init(){
  if(!["admin","master"].includes(currentUser.role)){$('#nav [data-view="users"]').hidden=true}
  if(!["admin","master"].includes(currentUser.role)){$("offsiteBackupPanel").hidden=true}
  if(currentUser.role==="master"){$('#nav [data-view="companies"]').hidden=false}
+ if(!["admin","master","manager"].includes(currentUser.role)){$('#nav [data-view="billing"]').hidden=true}
  if(["admin","master","manager"].includes(currentUser.role))await loadUsers();
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
  $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("open")});
  $("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("open")});
  $("period").addEventListener("change",()=>{period=$("period").value;refresh().catch(e=>notify(e.message,true))});
  $("logout").addEventListener("click",async()=>{try{await call("/api/auth/logout",{method:"POST",body:{}})}finally{location.assign("/login")}});
+ $("stripePlans").addEventListener("click",async event=>{
+  const button=event.target.closest("button[data-stripe-plan]");
+  if(!button||button.disabled)return;
+  button.disabled=true;
+  try{
+   const data=await call("/api/billing/stripe/checkout",{method:"POST",body:{plan:button.dataset.stripePlan}});
+   if(!data.testMode||!/^https:\/\/checkout\.stripe\.com\//.test(data.url))throw Error("Checkout de teste indisponível");
+   location.assign(data.url);
+  }catch(err){notify("Não foi possível abrir o Stripe: "+err.message,true);button.disabled=false}
+ });
  if(["admin","master"].includes(currentUser.role)){
   $("runOffsiteBackup").addEventListener("click",async()=>{
    const btn=$("runOffsiteBackup");btn.disabled=true;notify("Iniciando backup criptografado e verificação de restauração.");
