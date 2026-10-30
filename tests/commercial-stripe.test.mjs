@@ -61,6 +61,9 @@ test("Stripe signed events: only matched completed checkout + paid invoice grant
   let failed=evt("evt_invoice_fail001","invoice.payment_failed",{id:"in_fail_0001",customer,subscription:sub,status:"open"});
   const f=signature(failed);ctx.app.handleWebhook(f.bytes,f.signature,{clock:()=>timestamp});
   assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"pending");
+  const free=signature(evt("evt_invoice_free01","invoice.paid",{id:"in_free_00001",customer,subscription:sub,status:"paid",amount_paid:0}));
+  ctx.app.handleWebhook(free.bytes,free.signature,{clock:()=>timestamp});
+  assert.equal(ctx.app.status("company-A").subscriptions[0].entitlement,"pending");
   const paid=evt("evt_invoice_paid01","invoice.paid",{id:"in_paid_00001",customer,subscription:sub,status:"paid",amount_paid:3000});
   const p=signature(paid);ctx.app.handleWebhook(p.bytes,p.signature,{clock:()=>timestamp});
   subscription=ctx.app.status("company-A").subscriptions[0];
