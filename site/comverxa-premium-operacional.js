@@ -431,7 +431,9 @@ async function init(){
  if(!["admin","master"].includes(currentUser.role)){$("offsiteBackupPanel").hidden=true}
  if(currentUser.role==="master"){document.querySelectorAll('#nav [data-view="companies"]').forEach(el=>{el.hidden=false})}
  if(!["admin","master","manager"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="billing"]').forEach(el=>{el.hidden=true})}
- if(["admin","master","manager"].includes(currentUser.role))await loadUsers();
+ if(!me.mustChangePassword&&["admin","master","manager"].includes(currentUser.role)){
+  loadUsers().catch(e=>notify("Não foi possível carregar os usuários: "+e.message,true));
+ }
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
  $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("open")});
  $("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("open")});
