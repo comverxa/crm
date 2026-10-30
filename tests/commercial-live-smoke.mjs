@@ -33,4 +33,8 @@ const backup=await get("/api/pilot/backups/status");
 assert.equal(backup.status,401,"Anonymous backup status must not be returned");
 const stripeStatus=await get("/api/billing/stripe/status");
 assert.equal(stripeStatus.status,401,"Stripe subscription details must require authentication");
-console.log("COMVERXA_PUBLIC_SMOKE_OK: login, health, recovery, protected app backup and Stripe billing");
+for(const endpoint of ["/api/platform/companies","/api/commercial/leads","/api/commercial/summary?month=2026-10","/api/pilot/company"]){
+ const response=await get(endpoint);
+ assert.equal(response.status,401,"Anonymous access must be rejected on "+endpoint);
+}
+console.log("COMVERXA_PUBLIC_SMOKE_OK: login, health, recovery, protected app, billing, tenant and lead APIs");
