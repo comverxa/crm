@@ -7,6 +7,14 @@ import {createPremiumServer} from "./commercial-premium-server.mjs";
 const env=process.env;
 const port=Number(env.PORT||3000);
 if(!Number.isInteger(port)||port<1||port>65535)throw Error("Invalid PORT");
+const configured=env.CVX_OFFSITE_BACKUP_ENABLED==="1";
+const required=["CVX_S3_ENDPOINT","CVX_S3_BUCKET","CVX_S3_REGION","CVX_S3_ACCESS_KEY_ID","CVX_S3_SECRET_ACCESS_KEY","CVX_BACKUP_ENCRYPTION_KEY"];
+if(configured&&required.some(name=>!env[name]))throw Error("Incomplete offsite-backup configuration");
+const offsiteBackupConfig=configured?{
+ endpoint:env.CVX_S3_ENDPOINT,bucket:env.CVX_S3_BUCKET,region:env.CVX_S3_REGION,
+ accessKeyId:env.CVX_S3_ACCESS_KEY_ID,secretAccessKey:env.CVX_S3_SECRET_ACCESS_KEY,
+ encryptionKey:env.CVX_BACKUP_ENCRYPTION_KEY,urlStyle:env.CVX_S3_STYLE||"path"
+}:null;
 const app=createPremiumServer({
  dbPath:env.CVX_COM_DB_PATH,
  bootstrapEmail:env.CVX_COM_ADMIN_EMAIL,
