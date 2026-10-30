@@ -136,6 +136,32 @@ async function renderPremiumDashboard(data){
 }
 
 async function loadDashboard(){
+ const status=await call("/api/commercial/configuration-status");
+ if(!status.configured){
+  const message=status.canConfigure
+   ?"Metas e comissões ainda não foram configuradas. Abra Metas e Comissão para definir as regras da empresa."
+   :"As regras comerciais da sua empresa ainda não foram configuradas. Solicite a configuração ao gestor.";
+  const enterprise=["admin","master","manager"].includes(currentUser.role);
+  $("cvxHeading").textContent=enterprise?"Dashboard empresarial":"Dashboard individual";
+  $("cvxSubheading").textContent="Configuração comercial pendente";
+  $("cvxModeLabel").textContent=enterprise?"Visão da empresa":"Minha carteira";
+  $("cvxEnterprise").hidden=!enterprise;
+  $("cvxFeedback").textContent=message;
+  for(const id of ["metrics","pace","earnings","cvxKpis","cvxPace","cvxGoalChart","cvxFunnel","cvxRanking","cvxFinance","cvxChannels","cvxInsights"]){
+   const node=$(id);if(node)empty(node);
+  }
+  $("progress").style.width="0%";
+  $("progressText").textContent="Nenhuma meta cadastrada. Indicadores financeiros não serão calculados até a configuração.";
+  const holder=$("cvxGoalChart");
+  if(status.canConfigure){
+   const button=document.createElement("button");button.type="button";button.className="btn primary";
+   button.textContent="Configurar metas e comissões";
+   button.addEventListener("click",()=>show("goals"));holder.append(button);
+  }else{
+   holder.append(textEl("p","Aguarde a configuração das regras comerciais pelo gestor da empresa."));
+  }
+  return;
+ }
  const data=await call("/api/commercial/summary"+contextMonth());
  const m=$("metrics");empty(m);
  card(m,"Vendas",n(data.counts.sold),"Confirmadas na competência");
