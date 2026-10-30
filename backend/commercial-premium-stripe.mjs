@@ -154,6 +154,12 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},pric
     const row=stmt(db,"SELECT * FROM cvx_pilot_stripe_subscriptions WHERE subscription_id=? AND customer_id=?").get(subscriptionId,customerId);
     if(!row)throw Error("Stripe subscription mapping unavailable; retry webhook");
     if(type==="invoice.paid"&&object.status==="paid"&&Number.isSafeInteger(object.amount_paid)&&object.amount_paid>0&&isId(object.id,"in")){
+     const expectedPrice=prices[row.billing_cycle]?.[row.plan];
+     const listedPrices=(object.lines?.data||[]).flatMap(line=>[
+      objId(line?.price),line?.pricing?.price_details?.price
+     ]).filter(Boolean);
+     if(object.currency!=="brl"||!expectedPrice||!listedPrices.includes(expectedPrice))
+      throw Error("Stripe paid invoice currency or price mismatch");
      const isCanceled=row.status==="canceled"||row.entitlement==="canceled";
      if(!isCanceled)stmt(db,"UPDATE cvx_pilot_stripe_subscriptions SET status='active',entitlement='active',last_paid_invoice=?,updated_at=? WHERE subscription_id=?")
       .run(object.id,now(),subscriptionId);
