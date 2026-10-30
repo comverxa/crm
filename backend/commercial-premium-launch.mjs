@@ -35,7 +35,7 @@ const stripeAnnual={
 if(stripeRequested&&![...Object.values(stripePrices),...Object.values(stripeAnnual)].some(Boolean))throw Error("Stripe test plan prices missing");
 const stripeConfig=stripeRequested?{
  secretKey:env.CVX_STRIPE_TEST_SECRET_KEY,webhookSecret:env.CVX_STRIPE_TEST_WEBHOOK_SECRET,
- priceIds:stripePrices
+ priceIds:stripePrices,priceIdsAnnual:stripeAnnual
 }:null;
 const app=createPremiumServer({
  dbPath:env.CVX_COM_DB_PATH,
