@@ -16,6 +16,7 @@ import {createCommercialHttpHandler} from "./commercial-premium-http.mjs";
 import {createTenantStore} from "./commercial-premium-tenants.mjs";
 import {createLeadsStore} from "./commercial-premium-leads.mjs";
 import {createOffsiteBackup} from "./commercial-premium-offsite-backup.mjs";
+import {createStripeBilling} from "./commercial-premium-stripe.mjs";
 
 const secureHash=s=>createHash("sha256").update(s).digest("hex");
 const json=(status,body,headers={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff",...headers}});
@@ -39,7 +40,7 @@ export function createPremiumServer({
   recoveryJsPath=new URL("../site/comverxa-premium-recovery.js",import.meta.url),
   recoveryHtmlPath=new URL("../site/comverxa-premium-recovery.html",import.meta.url),
   now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,
-  publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null
+  publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null,stripeConfig=null
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
@@ -62,6 +63,7 @@ export function createPremiumServer({
  tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto");
  const stmt=sql=>db.prepare(sql);
  const offsite=offsiteBackupConfig?createOffsiteBackup({db,dbPath,config:offsiteBackupConfig}):null;
+ const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,...stripeConfig}):null;
  const scheduleHandles=[];
  const email=bootstrapEmail.trim().toLowerCase();
  if(!stmt("SELECT id FROM cvx_pilot_users WHERE email=?").get(email)){
@@ -211,6 +213,42 @@ export function createPremiumServer({
   }
   if((path.startsWith("/api/pilot/")||path.startsWith("/api/commercial/")||path.startsWith("/api/platform/"))&&sessionFrom(req)?.mustChangePassword)
    return json(403,{error:"Password change required"});
+  if(path==="/api/billing/stripe/webhook"&&req.method==="POST"){
+   if(!billing)return json(503,{error:"Stripe test integration unavailable"});
+   const length=Number(req.headers.get("content-length")||0);
+   if(!Number.isSafeInteger(length)||length>1024*1024)return json(413,{error:"Payload too large"});
+   let bytes;
+   try{bytes=Buffer.from(await req.arrayBuffer())}catch{return json(400,{error:"Invalid body"})}
+   if(bytes.length>1024*1024)return json(413,{error:"Payload too large"});
+   try{billing.handleWebhook(bytes,req.headers.get("stripe-signature"));return json(200,{received:true})}
+   catch(error){
+    const kind=String(error?.message||"");
+    if(kind.includes("signature")||kind.includes("event"))return json(400,{error:"Invalid Stripe webhook"});
+    console.warn("CVX_STRIPE_WEBHOOK_RETRY",JSON.stringify({kind:error?.name||"Error"}));
+    return json(503,{error:"Webhook not processed; provider should retry"});
+   }
+  }
+  if(path==="/api/billing/stripe/status"&&req.method==="GET"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!["master","admin","manager"].includes(s.role))return json(403,{error:"Forbidden"});
+   return json(200,billing?billing.status(s.tenantId):
+    {configured:false,testMode:true,availablePlans:[],subscriptions:[],billingMode:"test_only"});
+  }
+  if(path==="/api/billing/stripe/checkout"&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!["master","admin"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   if(s.mustChangePassword)return json(403,{error:"Password change required"});
+   if(!billing)return json(503,{error:"Stripe test integration unavailable"});
+   let data;try{data=JSON.parse(await textBytes(req,1024))}catch{return json(400,{error:"Invalid request"})}
+   if(!["starter","professional","business"].includes(data?.plan))return json(400,{error:"Invalid plan"});
+   try{
+    const company=tenants.current(s.tenantId);
+    if(!company||company.status!=="active")return json(403,{error:"Company disabled"});
+    // Lifetime seats are managed by the MAIN CRM. Do not auto-charge its platform-owned demo tenant.
+    if(s.role==="master"&&s.tenantId===bootstrapTenant)return json(403,{error:"Platform account cannot be billed"});
+    return json(200,await billing.checkout(s.tenantId,data.plan,s.email));
+   }catch(error){console.warn("CVX_TEST_CHECKOUT_ERROR",JSON.stringify({kind:error?.name||"Error"}));return json(503,{error:"Stripe test checkout unavailable"})}
+  }
   if(path==="/api/pilot/company"&&req.method==="GET"){
    const s=sessionFrom(req);return s?json(200,{company:tenants.current(s.tenantId)}):json(401,{error:"Unauthorized"});
   }
