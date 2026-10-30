@@ -81,21 +81,30 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},pric
    subscriptions:rows.map(x=>({subscriptionId:x.subscription_id,plan:x.plan,cycle:x.billing_cycle,status:x.status,
     entitlement:x.entitlement,updatedAt:x.updated_at})),billingMode:"test_only"};
  }
+ const checkoutsInFlight=new Set();
  async function checkout(tenantId,plan,email,cycle="monthly"){
   if(!/^[A-Za-z0-9_.:-]{1,100}$/.test(tenantId)||!PLAN_SET.has(plan)
    ||!["monthly","annual"].includes(cycle)||!prices[cycle][plan])throw Error("Invalid tenant, plan or cycle");
   const priceId=prices[cycle][plan];
+  if(checkoutsInFlight.has(tenantId))throw Error("Checkout already in progress");
+  const subscription=stmt(db,"SELECT subscription_id,status,entitlement FROM cvx_pilot_stripe_subscriptions WHERE tenant_id=? AND status NOT IN ('canceled','incomplete_expired','unpaid') ORDER BY updated_at DESC LIMIT 1").get(tenantId);
+  if(subscription&&subscription.entitlement!=="canceled")throw Error("Subscription already exists; use subscription management");
+  const existing=stmt(db,"SELECT plan,price_id,checkout_url,created_at FROM cvx_pilot_stripe_checkout WHERE tenant_id=? AND session_id IS NOT NULL AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(tenantId);
+  if(existing&&clock()-Date.parse(existing.created_at)<29*60*1000&&existing.price_id!==priceId)
+   throw Error("Another checkout is still open; finish or wait until expiry");
   if(typeof email!=="string"||!email.includes("@")||email.length>200)throw Error("Invalid email");
   // Never allow several open checkout URLs for a single tenant without a time-bound lock.
   // Reuse a valid recent session; Stripe itself also deduplicates the provider request.
   const latest=stmt(db,"SELECT * FROM cvx_pilot_stripe_checkout WHERE tenant_id=? AND plan=? AND price_id=? AND session_id IS NOT NULL AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1").get(tenantId,plan,priceId);
-  if(latest&&clock()-Date.parse(latest.created_at)<15*60*1000)return {url:latest.checkout_url,testMode:true,cycle};
+  if(latest&&clock()-Date.parse(latest.created_at)<29*60*1000)return {url:latest.checkout_url,testMode:true,cycle};
+  checkoutsInFlight.add(tenantId);
+  try{
   const intent=randomUUID(),createdAt=new Date(clock()).toISOString();
   stmt(db,"INSERT INTO cvx_pilot_stripe_checkout(intent_id,tenant_id,plan,price_id,billing_cycle,created_at) VALUES(?,?,?,?,?,?)")
    .run(intent,tenantId,plan,priceId,cycle,createdAt);
   try{
    const session=await postStripe("checkout/sessions",{
-    mode:"subscription",success_url:base.origin+"/app?checkout=return",
+    mode:"subscription",expires_at:Math.floor(clock()/1000)+1800,success_url:base.origin+"/app?checkout=return",
     cancel_url:base.origin+"/app?checkout=canceled",customer_email:email,
     client_reference_id:tenantId,"line_items[0][price]":priceId,"line_items[0][quantity]":"1",
     "metadata[tenant_id]":tenantId,"metadata[plan]":plan,"metadata[cycle]":cycle,"metadata[intent_id]":intent,
@@ -111,6 +120,7 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},pric
    // Leave the checkout intent for audit; a second request uses a new intent.
    throw error;
   }
+  }finally{checkoutsInFlight.delete(tenantId)}
  }
  function recordEvent(event){
   const object=event.data.object,type=event.type,id=event.id;
