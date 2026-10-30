@@ -239,7 +239,7 @@ export function createPremiumServer({
    finally{try{verify?.close()}catch{}try{if(existsSync(snapshot))unlinkSync(snapshot)}catch{}backupRunning=false}
   }
   if(path.startsWith("/api/commercial/")){
-    if(req.method==="POST"&&["/api/commercial/sales","/api/commercial/policies","/api/commercial/seller-plans","/api/commercial/leads"].includes(path)){
+    if(req.method==="POST"&&(["/api/commercial/sales","/api/commercial/policies","/api/commercial/seller-plans","/api/commercial/leads"].includes(path)||/^\/api\/commercial\/leads\/[^/]+$/.test(path))){
       const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
       const data=await req.clone().json().catch(()=>null);
       if(data&&typeof data.sellerId==="string"){
