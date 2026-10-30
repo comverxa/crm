@@ -161,6 +161,15 @@ async function loadRenewals(){
  for(const x of d.items)row(table,[x.id,x.sellerId,x.endsOn,n(x.daysUntil),x.band]);
  if(!d.items.length)row(table,["Nenhum contrato a renovar"]);
 }
+async function loadOffsiteStatus(){
+ const el=$("offsiteStatus");
+ try{
+  const data=await call("/api/pilot/backups/status");
+  if(!data.offsiteConfigured){el.textContent="Armazenamento externo não configurado.";return}
+  if(!data.verification){el.textContent="Armazenamento configurado. Nenhum backup validado ainda.";return}
+  el.textContent="Último backup restaurado e verificado: "+new Date(data.verification.verifiedAt).toLocaleString("pt-BR")+" · "+Math.round(data.verification.sizeBytes/1024)+" KB cifrados.";
+ }catch(err){el.textContent="Falha ao consultar backup: "+err.message}
+}
 async function loadUsers(){
  const d=await call("/api/pilot/users");
  const tbody=$("usersTable"),options=$("sellerOptions");empty(tbody);empty(options);
@@ -180,7 +189,7 @@ async function refresh(){
  if(currentView==="team")return loadTeam();
  if(currentView==="renewals")return loadRenewals();
  if(currentView==="companies")return loadCompanies();
- if(currentView==="users")return loadUsers();
+ if(currentView==="users"){await loadUsers();if(["admin","master"].includes(currentUser.role))await loadOffsiteStatus();return}
 }
 function bindForm(id,endpoint,transform,after){
  $(id).addEventListener("submit",async e=>{
@@ -204,6 +213,7 @@ async function init(){
   $("printReport").hidden=false;
  }
  if(!["admin","master"].includes(currentUser.role)){$('#nav [data-view="users"]').hidden=true}
+ if(!["admin","master"].includes(currentUser.role)){$("offsiteBackupPanel").hidden=true}
  if(currentUser.role==="master"){$('#nav [data-view="companies"]').hidden=false}
  if(["admin","master","manager"].includes(currentUser.role))await loadUsers();
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
@@ -212,6 +222,13 @@ async function init(){
  $("period").addEventListener("change",()=>{period=$("period").value;refresh().catch(e=>notify(e.message,true))});
  $("logout").addEventListener("click",async()=>{try{await call("/api/auth/logout",{method:"POST",body:{}})}finally{location.assign("/login")}});
  if(["admin","master"].includes(currentUser.role)){
+  $("runOffsiteBackup").addEventListener("click",async()=>{
+   const btn=$("runOffsiteBackup");btn.disabled=true;notify("Iniciando backup criptografado e verificação de restauração.");
+   try{const result=await call("/api/pilot/backups/offsite",{method:"POST",body:{}});
+    if(!result.verified)throw Error("Backup não confirmado");
+    await loadOffsiteStatus();notify("Backup externo verificado com sucesso.");
+   }catch(err){notify("Backup não confirmado: "+err.message,true)}finally{btn.disabled=false}
+  });
   $("pilotBackup").addEventListener("click",async()=>{
    const button=$("pilotBackup");button.disabled=true;
    try{
