@@ -148,6 +148,22 @@ async function init(){
  $("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("open")});
  $("period").addEventListener("change",()=>{period=$("period").value;refresh().catch(e=>notify(e.message,true))});
  $("logout").addEventListener("click",async()=>{try{await call("/api/auth/logout",{method:"POST",body:{}})}finally{location.assign("/login")}});
+ if(["admin","master"].includes(currentUser.role)){
+  $("pilotBackup").addEventListener("click",async()=>{
+   const button=$("pilotBackup");button.disabled=true;
+   try{
+    const resp=await fetch("/api/pilot/backup",{method:"POST",credentials:"same-origin",
+     headers:{"x-csrf-token":csrf,"x-cvx-backup-confirm":"EXPORTAR"},cache:"no-store"});
+    if(!resp.ok)throw Error("Backup não disponível ("+resp.status+").");
+    const blob=await resp.blob(),url=URL.createObjectURL(blob);
+    try{const a=document.createElement("a");a.href=url;a.download="comverxa-comercial-piloto-"+new Date().toISOString().slice(0,10)+".sqlite";
+      document.body.append(a);a.click();a.remove();
+    }finally{setTimeout(()=>URL.revokeObjectURL(url),1500)}
+    notify("Backup gerado; salve uma cópia fora do Railway.");
+   }catch(error){notify(error.message,true)}finally{button.disabled=false}
+  });
+ }
+
  bindForm("saleForm","/api/commercial/sales",v=>({id:v.id,sellerId:v.sellerId,soldAt:v.soldAt,status:v.status,premiumCents:cents(v.premium),activationCents:cents(v.activation),recurringCents:cents(v.recurring)}));
  bindForm("policyForm","/api/commercial/policies",v=>({id:v.id,sellerId:v.sellerId,startsOn:v.startsOn,endsOn:v.endsOn,productType:v.productType,status:v.status}));
  bindForm("rulesForm","/api/commercial/rules",v=>{
@@ -176,6 +192,11 @@ async function init(){
    location.assign("/login");
   }catch(error){notify("Não foi possível alterar a senha: "+error.message,true)}finally{b.disabled=false}
  });
+ if(me.mustChangePassword){
+  document.querySelectorAll("#nav button[data-view]:not([data-view=account])").forEach(b=>b.hidden=true);
+  show("account");notify("Por segurança, altere a senha provisória antes de usar o sistema.");
+  return;
+ }
  try{await loadRules()}catch(e){if(e.message!=="Falha: 404")notify("Configure as regras da empresa em Metas e Comissão.",false)}
  try{await refresh()}catch(e){if(e.message.includes("Commission rules not configured")||e.message==="Verifique os campos e regras informadas"){notify("Configure suas metas em Metas e Comissão.",false);show("goals")}else notify(e.message,true)}
 }
