@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {mkdtempSync,rmSync} from "node:fs";
+import {mkdtempSync,rmSync,writeFileSync} from "node:fs";
+import {DatabaseSync} from "node:sqlite";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createPremiumServer} from "../backend/commercial-premium-server.mjs";
@@ -11,6 +12,26 @@ function setup(){const folder=mkdtempSync(join(tmpdir(),"cvx-pilot-"));const app
  });return {folder,app}}
 async function start(app){await new Promise(resolve=>app.server.listen(0,"127.0.0.1",resolve));return "http://127.0.0.1:"+app.server.address().port}
 async function stop(folder,app){await app.close();rmSync(folder,{recursive:true,force:true})}
+
+async function unlock(base,cookie,email,oldPassword){
+ const fetchMe=async token=>await(await fetch(base+"/api/auth/me",{headers:{cookie:token}})).json();
+ let me=await fetchMe(cookie);
+ if(me.mustChangePassword){
+  const updated=oldPassword+"-rotated";
+  const r=await fetch(base+"/api/auth/password",{method:"POST",
+   headers:{"content-type":"application/json",cookie,"x-csrf-token":me.csrf},
+   body:JSON.stringify({oldPassword,newPassword:updated})});
+  assert.equal(r.status,200);
+  const next=await fetch(base+"/api/auth/login",{method:"POST",
+   headers:{"content-type":"application/json"},body:JSON.stringify({email,password:updated})});
+  assert.equal(next.status,200);
+  cookie=next.headers.get("set-cookie").split(";")[0];
+  me=await fetchMe(cookie);
+ }
+ assert.equal(me.mustChangePassword,false);
+ return {cookie,me};
+}
+
 test("pilot refuses weak bootstrap credentials and empty db path",()=>{
  assert.throws(()=>createPremiumServer({dbPath:"",bootstrapEmail:email,bootstrapPassword:password}),/CVX_COM_DB_PATH/);
  assert.throws(()=>createPremiumServer({dbPath:":memory:",bootstrapEmail:email,bootstrapPassword:"123"}),/Strong bootstrap/);
@@ -27,10 +48,13 @@ test("HTTP pilot login, secure session, CSRF, sales and logout end-to-end",async
  body:JSON.stringify({email,password:"bad-password"})});assert.equal(r.status,401);
  r=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},
  body:JSON.stringify({email,password})});assert.equal(r.status,200);
- const cookie=r.headers.get("set-cookie").split(";")[0];assert.match(r.headers.get("set-cookie"),/HttpOnly/);
+ let cookie=r.headers.get("set-cookie").split(";")[0];assert.match(r.headers.get("set-cookie"),/HttpOnly/);
  assert.match(r.headers.get("set-cookie"),/SameSite=Strict/);
  r=await fetch(base+"/api/auth/me",{headers:{cookie}});assert.equal(r.status,200);
- const me=await r.json(),csrf=me.csrf;assert.equal(me.user.role,"admin");assert.ok(csrf.length>=24);
+ let me=await r.json(),csrf=me.csrf;assert.equal(me.user.role,"admin");assert.ok(csrf.length>=24);
+ assert.equal(me.mustChangePassword,true);
+ assert.equal((await fetch(base+"/api/commercial/rules",{headers:{cookie}})).status,403);
+ ({cookie,me}=await unlock(base,cookie,email,password));csrf=me.csrf;
  r=await fetch(base+"/app",{headers:{cookie}});assert.equal(r.status,200);
  assert.match(await r.text(),/COMVERXA Premium Comercial/);
  const post=async(path,payload,token=csrf,extra={})=>fetch(base+path,{method:"POST",
@@ -81,8 +105,9 @@ test("pilot user creation stays within tenant and operator cannot approve commis
  const base=await start(app);
  const login=async(u,p)=>{const r=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:u,password:p})});return r};
  let r=await login(email,password);assert.equal(r.status,200);
- const adminCookie=r.headers.get("set-cookie").split(";")[0];
- const info=await (await fetch(base+"/api/auth/me",{headers:{cookie:adminCookie}})).json();
+ let adminCookie=r.headers.get("set-cookie").split(";")[0];
+ let rotated=await unlock(base,adminCookie,email,password);adminCookie=rotated.cookie;
+ const info=rotated.me;
  const save=async(route,body,cookie=adminCookie,csrf=info.csrf)=>fetch(base+route,{method:"POST",
  headers:{"content-type":"application/json",cookie,"x-csrf-token":csrf},body:JSON.stringify(body)});
  await save("/api/commercial/rules",{tiers:[{minSales:0,bonusCents:0},{minSales:2,bonusCents:1000}],salesRateBps:1000});
@@ -91,8 +116,9 @@ test("pilot user creation stays within tenant and operator cannot approve commis
  assert.equal(r.status,201);const uid=(await r.json()).id;
  r=await fetch(base+"/api/pilot/users",{headers:{cookie:adminCookie}});assert.equal(r.status,200);assert.ok((await r.json()).users.some(u=>u.id===uid));
  r=await login("operator@exemplo.test",userPassword);assert.equal(r.status,200);
- const operatorCookie=r.headers.get("set-cookie").split(";")[0];
- const op=await (await fetch(base+"/api/auth/me",{headers:{cookie:operatorCookie}})).json();
+ let operatorCookie=r.headers.get("set-cookie").split(";")[0];
+ rotated=await unlock(base,operatorCookie,"operator@exemplo.test",userPassword);operatorCookie=rotated.cookie;
+ const op=rotated.me;
  r=await save("/api/commercial/sales",{id:"ONE",sellerId:uid,soldAt:"2026-10-20",status:"sold",premiumCents:10000},operatorCookie,op.csrf);
  assert.equal(r.status,201);assert.equal((await r.json()).sale.commissionState,"retained");
  r=await save("/api/commercial/sales",{id:"ONE",sellerId:uid,soldAt:"2026-10-20",status:"sold",premiumCents:20000},operatorCookie,op.csrf);
@@ -106,5 +132,27 @@ test("pilot user creation stays within tenant and operator cannot approve commis
  assert.equal(r.status,201);
  r=await fetch(base+"/api/commercial/summary?month=2026-10&asOf=2026-10-29",{headers:{cookie:operatorCookie}});
  assert.equal((await r.json()).commissions.effectiveCents,1000);
+ }finally{await stop(folder,app)}
+});
+
+test("pilot backup requires admin, CSRF and confirmation; download restores as valid SQLite",async()=>{
+ const {folder,app}=setup();try{
+ const base=await start(app);
+ const first=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});
+ let {cookie,me}=await unlock(base,first.headers.get("set-cookie").split(";")[0],email,password);
+ const req=async(headers={})=>fetch(base+"/api/pilot/backup",{method:"POST",headers:{"cookie":cookie,"x-csrf-token":me.csrf,...headers}});
+ assert.equal((await req()).status,403);
+ assert.equal((await req({"x-cvx-backup-confirm":"EXPORTAR","x-csrf-token":"bad"})).status,403);
+ const backup=await req({"x-cvx-backup-confirm":"EXPORTAR"});
+ assert.equal(backup.status,200);
+ assert.match(backup.headers.get("content-disposition"),/attachment/);
+ const bytes=Buffer.from(await backup.arrayBuffer());
+ assert.ok(bytes.length>1000);
+ const file=join(folder,"restored.sqlite");
+ writeFileSync(file,bytes);
+ const restored=new DatabaseSync(file,{readOnly:true});
+ try{assert.equal(Object.values(restored.prepare("PRAGMA integrity_check").get())[0],"ok");
+ assert.equal(restored.prepare("SELECT COUNT(*) AS c FROM cvx_pilot_users").get().c,1);
+ }finally{restored.close()}
  }finally{await stop(folder,app)}
 });
