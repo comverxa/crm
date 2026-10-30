@@ -30,8 +30,8 @@ function constantEquals(a,b){
  const A=Buffer.from(String(a)),B=Buffer.from(String(b));return A.length===B.length&&timingSafeEqual(A,B);
 }
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const page=(title,main)=>'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'+escape(title)+'</title><style>body{background:#071225;color:#eef6ff;font:16px system-ui;margin:0;min-height:100vh;display:grid;place-items:center}main{max-width:440px;width:90vw;border:1px solid #284664;background:#10243c;border-radius:18px;padding:27px}h1{margin:5px 0}label{display:block;margin-top:18px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;margin-top:6px;border-radius:9px}input{background:#081930;color:#fff;border:1px solid #52708e}button{color:#061626;background:#52d1e8;border:0;font-weight:800;margin-top:20px}small,p{color:#a5bbd3;line-height:1.5}</style></head><body><main>'+main+'</main></body></html>';
-const loginPage=page("COMVERXA — Acesso Comercial",'<div style="color:#52d1e8;font-weight:800">COMVERXA PREMIUM</div><h1>Entrar no Comercial</h1><p>Ambiente piloto isolado do CRM principal.</p><form id="form"><label>E-mail<input autocomplete="username" type="email" name="email" required></label><label>Senha<input autocomplete="current-password" type="password" name="password" required></label><button type="submit">Acessar com segurança</button><p id="info" role="status"></p></form><a href="/forgot" style="color:#52d1e8">Esqueci minha senha</a><small>Sem cadastro público, pagamentos ou envios de WhatsApp neste ambiente.</small><script src="/assets/commercial-login.js" defer></script>');
+const page=(title,main)=>'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'+escape(title)+'</title><style>body{background:#071225;color:#eef6ff;font:16px system-ui;margin:0;min-height:100vh;display:grid;place-items:center}main{max-width:440px;width:90vw;border:1px solid #284664;background:#10243c;border-radius:18px;padding:27px}h1{margin:5px 0}label{display:block;margin-top:18px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;margin-top:6px;border-radius:9px}input{background:#081930;color:#fff;border:1px solid #52708e}button{color:#061626;background:#52d1e8;border:0;font-weight:800;margin-top:20px}small,p{color:#a5bbd3;line-height:1.5}</style><link rel="stylesheet" href="/assets/commercial-password.css"></head><body><main>'+main+'</main></body></html>';
+const loginPage=page("COMVERXA — Acesso Comercial",'<div style="color:#52d1e8;font-weight:800">COMVERXA PREMIUM</div><h1>Entrar no Comercial</h1><p>Ambiente piloto isolado do CRM principal.</p><form id="form"><label>E-mail<input autocomplete="username" type="email" name="email" required></label><label>Senha<input autocomplete="current-password" type="password" name="password" required></label><button type="submit">Acessar com segurança</button><p id="info" role="status"></p></form><a href="/forgot" style="color:#52d1e8">Esqueci minha senha</a><small>Sem cadastro público, pagamentos ou envios de WhatsApp neste ambiente.</small><script src="/assets/commercial-password.js" defer></script><script src="/assets/commercial-login.js" defer></script>');
 const cookieValue=s=>{const m=/(?:^|;\s*)cvx_pilot_session=([A-Za-z0-9_-]{32,100})(?:;|$)/.exec(s||"");return m?.[1]||null};
 
 export function createPremiumServer({
@@ -95,6 +95,8 @@ export function createPremiumServer({
  });
  const html=readFileSync(htmlPath,"utf-8");
  const themeCss=readFileSync(new URL("../site/comverxa-premium-theme.css",import.meta.url),"utf-8");
+ const passwordJs=readFileSync(new URL("../site/comverxa-premium-password.js",import.meta.url),"utf-8"),
+  passwordCss=readFileSync(new URL("../site/comverxa-premium-password.css",import.meta.url),"utf-8");
  const appJs=readFileSync(jsPath,"utf-8"),loginJs=readFileSync(loginJsPath,"utf-8"),
   recoveryJs=readFileSync(recoveryJsPath,"utf-8"),recoveryHtml=readFileSync(recoveryHtmlPath,"utf-8");
  if(!html.includes("COMVERXA")||html.length<500)throw Error("Invalid app page");
@@ -119,6 +121,8 @@ export function createPremiumServer({
   }
   if(path==="/healthz")return json(200,{status:"ok",service:"commercial-pilot"});
   if(path==="/assets/commercial-theme.css"&&req.method==="GET")return new Response(themeCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
+  if(path==="/assets/commercial-password.css"&&req.method==="GET")return new Response(passwordCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
+  if(path==="/assets/commercial-password.js"&&req.method==="GET")return new Response(passwordJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"||path==="/assets/commercial-recovery.js"))return new Response(path.endsWith("login.js")?loginJs:path.endsWith("recovery.js")?recoveryJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(path==="/")return Response.redirect(url.origin+(sessionFrom(req)?"/app":"/login"),303);
   if(path==="/login"&&req.method==="GET")return new Response(loginPage,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
