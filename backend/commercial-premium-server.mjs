@@ -114,6 +114,7 @@ export function createPremiumServer({
    const expected=user?user.passhash:passwordHash("invalidpassword000", "0".repeat(32));
    const supplied=passwordHash(pass,user?user.salt:"0".repeat(32));
    if(!constantEquals(expected,supplied))return json(401,{error:"Unauthorized"});
+   if(!tenants.isEnabled(user.tenant_id))return json(403,{error:"Company access suspended"});
    const token=randomBytes(32).toString("base64url"),csrf=randomBytes(24).toString("base64url");
    stmt("INSERT INTO cvx_pilot_sessions(session_hash,user_id,csrf,expires_at) VALUES(?,?,?,?)")
     .run(secureHash(token),user.id,csrf,now()+SESSION_SECONDS*1000);
