@@ -343,6 +343,12 @@ async function init(){
   }catch(error){notify(error.message,true)}finally{btn.disabled=false}
  });
  if(currentUser.role==="master"){
+  const companyForm=$("companyForm");
+  const companyPlan=companyForm.querySelector('select[name="plan"]');
+  const seatInput=companyForm.querySelector('input[name="seatLimit"]');
+  const seatsByPlan={starter:1,professional:3,business:8};
+  const syncSeats=()=>{seatInput.value=String(seatsByPlan[companyPlan.value]||1)};
+  companyPlan.addEventListener("change",syncSeats);syncSeats();
   bindForm("companyForm","/api/platform/companies",v=>({
    tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),
    adminEmail:v.adminEmail,adminPassword:v.adminPassword
