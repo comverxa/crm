@@ -24,6 +24,10 @@ for(const [path,expected] of [["/login","Entrar no Comercial"],["/forgot","Recup
  assert.match(res.headers.get("x-frame-options")||"",/deny/i);
  assert.ok((await res.text()).includes(expected),path+" title is missing");
 }
+const theme=await get("/assets/commercial-theme.css");
+assert.equal(theme.status,200,"Premium theme must be publicly served");
+assert.match(theme.headers.get("content-type")||"",/text\/css/);
+assert.match(await theme.text(),/wa-channel-grid/);
 const internal=await get("/app",{redirect:"manual"});
 assert.equal(internal.status,303,"Unauthenticated app must redirect");
 assert.match(internal.headers.get("location")||"",/\/login$/);
@@ -33,7 +37,7 @@ const backup=await get("/api/pilot/backups/status");
 assert.equal(backup.status,401,"Anonymous backup status must not be returned");
 const stripeStatus=await get("/api/billing/stripe/status");
 assert.equal(stripeStatus.status,401,"Stripe subscription details must require authentication");
-for(const endpoint of ["/api/platform/companies","/api/commercial/leads","/api/commercial/summary?month=2026-10","/api/pilot/company"]){
+for(const endpoint of ["/api/platform/companies","/api/commercial/leads","/api/commercial/summary?month=2026-10","/api/pilot/company","/api/wa/channels","/api/wa/inbox?slot=1"]){
  const response=await get(endpoint);
  assert.equal(response.status,401,"Anonymous access must be rejected on "+endpoint);
 }
