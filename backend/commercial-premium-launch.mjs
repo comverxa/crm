@@ -27,6 +27,11 @@ const stripePrices={
  professional:env.CVX_STRIPE_TEST_PRICE_PROFESSIONAL,
  business:env.CVX_STRIPE_TEST_PRICE_BUSINESS
 };
+const stripeAnnual={
+ starter:env.CVX_STRIPE_TEST_PRICE_STARTER_ANNUAL,
+ professional:env.CVX_STRIPE_TEST_PRICE_PROFESSIONAL_ANNUAL,
+ business:env.CVX_STRIPE_TEST_PRICE_BUSINESS_ANNUAL
+};
 if(stripeRequested&&!Object.values(stripePrices).some(Boolean))throw Error("Stripe test plan prices missing");
 const stripeConfig=stripeRequested?{
  secretKey:env.CVX_STRIPE_TEST_SECRET_KEY,webhookSecret:env.CVX_STRIPE_TEST_WEBHOOK_SECRET,
