@@ -13,7 +13,7 @@ function text(value,max,required=false){
  if(typeof value!=="string"){if(!required&&(value==null||value===""))return "";throw Error("Invalid text")}
  const v=value.trim();if(v.length>max||(required&&v.length<2))throw Error("Invalid text");return v;
 }
-function date(value){if(value==null||value==="")return null;if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value)||new Date(value+"T00:00:00Z").toISOString().slice(0,10)!==value)throw Error("Invalid date");return value}
+function date(value){if(value==null||value==="")return null;if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+"T00:00:00Z"))||new Date(value+"T00:00:00Z").toISOString().slice(0,10)!==value)throw Error("Invalid date");return value}
 function phone(value){
  if(!value)return "";const v=String(value).replace(/[^\d+]/g,"");
  if(!/^\+?[0-9]{10,15}$/.test(v))throw Error("Invalid phone");
