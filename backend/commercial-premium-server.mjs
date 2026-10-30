@@ -15,6 +15,7 @@ import {createCommercialStore} from "./commercial-premium-store.mjs";
 import {createCommercialHttpHandler} from "./commercial-premium-http.mjs";
 import {createTenantStore} from "./commercial-premium-tenants.mjs";
 import {createLeadsStore} from "./commercial-premium-leads.mjs";
+import {createOffsiteBackup} from "./commercial-premium-offsite-backup.mjs";
 
 const secureHash=s=>createHash("sha256").update(s).digest("hex");
 const json=(status,body,headers={})=>new Response(JSON.stringify(body),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff",...headers}});
@@ -35,7 +36,7 @@ export function createPremiumServer({
   htmlPath=new URL("../site/comverxa-premium-operacional.html",import.meta.url),
   jsPath=new URL("../site/comverxa-premium-operacional.js",import.meta.url),
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
-  now=()=>Date.now(),enablePlatformMaster=false
+  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
@@ -52,6 +53,8 @@ export function createPremiumServer({
  const tenants=createTenantStore(db);
  tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto");
  const stmt=sql=>db.prepare(sql);
+ const offsite=offsiteBackupConfig?createOffsiteBackup({db,dbPath,config:offsiteBackupConfig}):null;
+ const scheduleHandles=[];
  const email=bootstrapEmail.trim().toLowerCase();
  if(!stmt("SELECT id FROM cvx_pilot_users WHERE email=?").get(email)){
   const salt=randomBytes(16).toString("hex");
@@ -214,6 +217,27 @@ export function createPremiumServer({
     .run(uid,s.tenantId,email,role,salt,passwordHash(pass,salt))}catch{return json(409,{error:"Email already registered"})}
    return json(201,{id:uid,role});
   }
+  if(path==="/api/pilot/backups/status"&&req.method==="GET"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!["admin","master"].includes(s.role))return json(403,{error:"Forbidden"});
+   const last=offsite?.last()||null;
+   return json(200,{offsiteConfigured:!!offsite,verification:last?{
+     createdAt:last.created_at,verifiedAt:last.verified_at,sizeBytes:last.size_bytes,verified:true
+   }:null,scheduled:!!offsite&&backupSchedule,running:offsite?.running||false});
+  }
+  if(path==="/api/pilot/backups/offsite"&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!["admin","master"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   if(!offsite)return json(503,{error:"Offsite backup not configured"});
+   try{
+    const data=await offsite.run();
+    return json(200,data);
+   }catch(error){
+    if(String(error?.message||"").includes("already running"))return json(429,{error:"Backup already running"});
+    console.warn("CVX_OFFSITE_BACKUP_FAILED",{reason:String(error?.name||"Error")});
+    return json(503,{error:"Offsite backup verification failed"});
+   }
+  }
   if(path==="/api/pilot/backup"&&req.method==="POST"){
    const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
    if(!["admin","master"].includes(session.role))return json(403,{error:"Forbidden"});
@@ -266,5 +290,20 @@ export function createPremiumServer({
    else res.end(Buffer.from(await result.arrayBuffer()));
   }catch(error){res.writeHead(500,{"content-type":"application/json","cache-control":"no-store"});res.end(JSON.stringify({error:"Internal error"}))}
  });
- return {server,db,store,handler,close:async()=>{await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));db.close()}};
+ if(offsite&&backupSchedule){
+  const runScheduled=async()=>{
+   try{
+    const last=offsite.last(),age=last?Date.now()-Date.parse(last.verified_at):Infinity;
+    if(age<20*3600*1000)return;
+    const result=await offsite.run();
+    console.info("CVX_OFFSITE_BACKUP_VERIFIED",JSON.stringify({verified:result.verified,createdAt:result.createdAt,sizeBytes:result.sizeBytes}));
+   }catch(error){
+    console.warn("CVX_OFFSITE_BACKUP_FAILED",JSON.stringify({kind:error?.name||"Error"}));
+   }
+  };
+  const initial=setTimeout(()=>{void runScheduled()},30_000);initial.unref();scheduleHandles.push(initial);
+  const interval=setInterval(()=>{void runScheduled()},60*60*1000);interval.unref();scheduleHandles.push(interval);
+ }
+ return {server,db,store,handler,close:async()=>{for(const h of scheduleHandles)clearTimeout(h);
+  await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));db.close()}};
 }
