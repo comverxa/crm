@@ -176,6 +176,10 @@ test("SaaS master onboards two isolated companies with seat quota and suspension
   assert.equal((await r.json()).company.billingMode,"sandbox");
   r=await fetch(base+"/api/platform/companies",{headers:{cookie:master.cookie}});
   assert.equal(r.status,200);assert.equal((await r.json()).companies.length,2);
+  r=await post("/api/platform/companies",{...company,tenantId:"company-over",plan:"starter",seatLimit:2,adminEmail:"admin-over@exemplo.test"});
+  assert.equal(r.status,409);
+  r=await post("/api/platform/companies",{...company,tenantId:"company-starter",plan:"starter",seatLimit:1,adminEmail:"admin-starter@exemplo.test"});
+  assert.equal(r.status,201);assert.equal((await r.json()).company.seatLimit,1);
   const loginB=await login(company.adminEmail,company.adminPassword);
   assert.equal(loginB.status,200);
   const adminB=await unlock(base,loginB.headers.get("set-cookie").split(";")[0],company.adminEmail,company.adminPassword);
