@@ -26,7 +26,8 @@ const app=createPremiumServer({
  bootstrapTenant:env.CVX_COM_TENANT||"pilot-empresa",
  enablePlatformMaster:env.CVX_COM_ENABLE_MASTER==="1",
  cookieSecure:env.CVX_COM_COOKIE_INSECURE_LOCAL_ONLY!=="1",
- offsiteBackupConfig,backupSchedule:configured
+ offsiteBackupConfig,backupSchedule:configured,
+ publicOrigin:env.CVX_COM_PUBLIC_ORIGIN||"https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail
 });
 app.server.listen(port,"0.0.0.0",()=>console.log("COMVERXA Premium isolated pilot listening on PORT",port));
 for(const signal of ["SIGINT","SIGTERM"])process.on(signal,()=>app.server.close(()=>{app.db.close();process.exit(0)}));
