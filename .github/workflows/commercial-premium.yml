@@ -9,6 +9,7 @@ on:
       - 'tests/commercial-premium-leads.test.mjs'
       - 'tests/commercial-premium-pilot.test.mjs'
       - 'tests/commercial-offsite-backup.test.mjs'
+      - 'tests/commercial-recovery.test.mjs'
       - 'site/comverxa-premium-operacional*'
       - 'tests/commercial-preview.test.mjs'
       - 'site/comverxa-premium-comercial.html'
@@ -21,6 +22,7 @@ on:
       - 'tests/commercial-premium-leads.test.mjs'
       - 'tests/commercial-premium-pilot.test.mjs'
       - 'tests/commercial-offsite-backup.test.mjs'
+      - 'tests/commercial-recovery.test.mjs'
       - 'site/comverxa-premium-operacional*'
       - 'tests/commercial-preview.test.mjs'
       - 'site/comverxa-premium-comercial.html'
@@ -53,4 +55,4 @@ jobs:
           node --check site/comverxa-premium-operacional.js
           node --check site/comverxa-premium-login.js
       - name: Testes integrados sem dados reais
-        run: node --test tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-premium-leads.test.mjs tests/commercial-premium-pilot.test.mjs tests/commercial-offsite-backup.test.mjs tests/commercial-preview.test.mjs
+        run: node --test tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-premium-leads.test.mjs tests/commercial-premium-pilot.test.mjs tests/commercial-offsite-backup.test.mjs tests/commercial-recovery.test.mjs tests/commercial-preview.test.mjs
