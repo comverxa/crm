@@ -1,6 +1,6 @@
 # COMVERXA — Stripe Billing (homologação sem cobrança real)
 
-**Situação de 30/10/2026:** checkout e webhook implementados no módulo Comercial isolado e publicados com a flag de cobrança desligada. A conta Stripe conectada está em TESTE, sem preços cadastrados. Não implica que o sistema esteja pronto para cobrar clientes.
+**Situação de 30/10/2026:** checkout e webhook implementados no módulo Comercial isolado com cobrança desligada. A conta Stripe conectada está em TESTE e possui seis preços ativos, conforme tabela abaixo. Não implica que o sistema esteja pronto para cobrar clientes.
 
 ## Arquitetura
 - Checkout Stripe Hosted (somente `sk_test_*`) para Starter, Professional e Business.
@@ -42,3 +42,26 @@ Não ativar o flag sem as credenciais e ao menos um Price test válido. O códig
 - PR em revisão: https://github.com/comverxa/crm/pull/32
 - Suíte de testes 37/37: https://github.com/comverxa/crm/actions/runs/40986801329
 - Serviço piloto com deploy SUCCESS no Railway: commit `a1e17c67a856a685c94fc887ec6eaf91ec7f01af`.
+
+
+## Valores ativados na conta Stripe de TESTES em 30/10/2026
+
+Os produtos e seis preços seguintes foram criados e conferidos em Stripe *livemode=false*. **Preços ativos no catálogo não significam cobrança real habilitada.**
+
+| Plano | Usuários incluídos (proposta) | Mensal | Anual | ID preço mensal | ID preço anual |
+| --- | ---: | ---: | ---: | --- | --- |
+| Starter | 1 | R$ 99,90 | R$ 999,00 | price_1UW4wVEBs3yJGSycydW3yBB6 | price_1UW4x2EBs3yJGSyc1WHWqNr5 |
+| Professional | 3 | R$ 219,90 | R$ 2.199,00 | price_1UW4wgEBs3yJGSycXlqPNUDu | price_1UW4x4EBs3yJGSycj6riaNsz |
+| Business | 8 | R$ 399,90 | R$ 3.999,00 | price_1UW4wiEBs3yJGSyctYKdj79j | price_1UW4x6EBs3yJGSycbNwYgY6u |
+
+Os IDs de preços não são segredos. Foram gravados no Railway com prefixo \`CVX_STRIPE_TEST_PRICE_\` (seis variáveis, inclusive sufixo \`_ANNUAL\`), sem habilitar a flag \`CVX_STRIPE_TEST_ENABLED\`. O painel exibe mensal/anual, mas o Checkout permanece desabilitado por falta de chave secreta de teste e segredo do webhook.
+
+Testes automatizados **39/39 aprovados**. Deploy isolado do serviço Comercial **SUCCESS**, código \`ecf22f03b389c340e1825a82fbd543dece69e72c\`. Não foi realizado pagamento real.
+
+Para liberar checkout em modo de TESTE, ainda é preciso configurar:
+- \`CVX_STRIPE_TEST_SECRET_KEY\` protegida e associada à conta do catálogo;
+- \`CVX_STRIPE_TEST_WEBHOOK_SECRET\` de endpoint TEST com eventos de assinatura;
+- \`CVX_STRIPE_TEST_ENABLED=1\` somente após validar segredos e preços e executar um pagamento com cartão de teste.
+
+Pagamentos LIVE dependem de conta Stripe com acesso de produção, dados bancários, verificação, impostos, direitos do consumidor, contrato, assinatura de webhooks LIVE, controle real de entitlement e homologação do CRM principal. O código atual recusa \`sk_live_*\` por design.
+
