@@ -15,6 +15,8 @@ COPY backend/commercial-premium-launch.mjs backend/
 COPY site/comverxa-premium-operacional.html site/
 COPY site/comverxa-premium-operacional.js site/
 COPY site/comverxa-premium-login.js site/
+COPY site/comverxa-premium-recovery.js site/
+COPY site/comverxa-premium-recovery.html site/
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
