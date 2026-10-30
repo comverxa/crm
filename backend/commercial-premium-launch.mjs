@@ -4,6 +4,7 @@
  * Run behind HTTPS; do not point at the existing Railway production volume.
  */
 import {createPremiumServer} from "./commercial-premium-server.mjs";
+import {createRecoveryMailer} from "./commercial-premium-mail.mjs";
 const env=process.env;
 const port=Number(env.PORT||3000);
 if(!Number.isInteger(port)||port<1||port>65535)throw Error("Invalid PORT");
