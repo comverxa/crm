@@ -16,6 +16,9 @@ const offsiteBackupConfig=configured?{
  accessKeyId:env.CVX_S3_ACCESS_KEY_ID,secretAccessKey:env.CVX_S3_SECRET_ACCESS_KEY,
  encryptionKey:env.CVX_BACKUP_ENCRYPTION_KEY,urlStyle:env.CVX_S3_STYLE||"path"
 }:null;
+const sendRecoveryEmail=env.CVX_COM_RESEND_API_KEY&&env.CVX_COM_EMAIL_FROM?createRecoveryMailer({
+ apiKey:env.CVX_COM_RESEND_API_KEY,from:env.CVX_COM_EMAIL_FROM
+}):null;
 const app=createPremiumServer({
  dbPath:env.CVX_COM_DB_PATH,
  bootstrapEmail:env.CVX_COM_ADMIN_EMAIL,
