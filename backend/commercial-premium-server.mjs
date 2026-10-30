@@ -118,6 +118,7 @@ export function createPremiumServer({
    if(!origin&&!["same-origin","none"].includes(req.headers.get("sec-fetch-site")||"same-origin"))return json(403,{error:"Forbidden"});
   }
   if(path==="/healthz")return json(200,{status:"ok",service:"commercial-pilot"});
+  if(path==="/assets/commercial-theme.css"&&req.method==="GET")return new Response(themeCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
   if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"||path==="/assets/commercial-recovery.js"))return new Response(path.endsWith("login.js")?loginJs:path.endsWith("recovery.js")?recoveryJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(path==="/")return Response.redirect(url.origin+(sessionFrom(req)?"/app":"/login"),303);
   if(path==="/login"&&req.method==="GET")return new Response(loginPage,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
