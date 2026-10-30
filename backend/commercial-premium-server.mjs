@@ -6,7 +6,9 @@
  * All business routes need server-owned sessions. No default passwords.
  */
 import http from "node:http";
-import {readFileSync} from "node:fs";
+import {readFileSync,statSync,unlinkSync,existsSync} from "node:fs";
+import {join} from "node:path";
+import {tmpdir} from "node:os";
 import {randomBytes,randomUUID,scryptSync,timingSafeEqual,createHash} from "node:crypto";
 import {DatabaseSync} from "node:sqlite";
 import {createCommercialStore} from "./commercial-premium-store.mjs";
@@ -38,7 +40,9 @@ export function createPremiumServer({
  if(typeof bootstrapTenant!=="string"||!/^[a-zA-Z0-9_.:-]{1,100}$/.test(bootstrapTenant))throw Error("Invalid tenant");
  const db=new DatabaseSync(dbPath);
  db.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON");
- db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_users (id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,email TEXT UNIQUE NOT NULL,role TEXT NOT NULL,salt TEXT NOT NULL,passhash TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1)");
+ db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_users (id TEXT PRIMARY KEY,tenant_id TEXT NOT NULL,email TEXT UNIQUE NOT NULL,role TEXT NOT NULL,salt TEXT NOT NULL,passhash TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,must_change_password INTEGER NOT NULL DEFAULT 1)");
+ if(!db.prepare("PRAGMA table_info(cvx_pilot_users)").all().some(x=>x.name==="must_change_password"))
+  db.exec("ALTER TABLE cvx_pilot_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_sessions (session_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,csrf TEXT NOT NULL,expires_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES cvx_pilot_users(id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_expires ON cvx_pilot_sessions(expires_at)");
  const store=createCommercialStore(db);
@@ -55,11 +59,12 @@ export function createPremiumServer({
   if(failMap.size>10000)failMap=new Map();
   if(old.n>=8)return false;old.n++;failMap.set(key,old);return true;
  }
+ let backupRunning=false;
  const sessionFrom=req=>{
   const token=cookieValue(req.headers.get("cookie"));if(!token)return null;
-  const row=stmt("SELECT s.csrf,s.expires_at,u.id,u.tenant_id,u.email,u.role,u.active FROM cvx_pilot_sessions s JOIN cvx_pilot_users u ON u.id=s.user_id WHERE s.session_hash=?").get(secureHash(token));
+  const row=stmt("SELECT s.csrf,s.expires_at,u.id,u.tenant_id,u.email,u.role,u.active,u.must_change_password FROM cvx_pilot_sessions s JOIN cvx_pilot_users u ON u.id=s.user_id WHERE s.session_hash=?").get(secureHash(token));
   if(!row||row.active!==1||row.expires_at<=now())return null;
-  return {tenantId:row.tenant_id,userId:row.id,role:row.role,email:row.email,csrf:row.csrf};
+  return {tenantId:row.tenant_id,userId:row.id,role:row.role,email:row.email,csrf:row.csrf,mustChangePassword:row.must_change_password===1};
  };
  const csrfOk=(req,session)=>constantEquals(req.headers.get("x-csrf-token")||"",session.csrf);
  const commercial=createCommercialHttpHandler({
@@ -112,7 +117,7 @@ export function createPremiumServer({
    return json(200,{ok:true},{ "set-cookie":"cvx_pilot_session="+token+"; HttpOnly; SameSite=Strict; Path=/; Max-Age="+SESSION_SECONDS+secure});
   }
   if(path==="/api/auth/me"&&req.method==="GET"){
-   const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role},csrf:s.csrf}):json(401,{error:"Unauthorized"});
+   const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role},csrf:s.csrf,mustChangePassword:s.mustChangePassword}):json(401,{error:"Unauthorized"});
   }
   if(path==="/api/auth/password"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
@@ -125,7 +130,7 @@ export function createPremiumServer({
     return json(403,{error:"Forbidden"});
    const salt=randomBytes(16).toString("hex"),hash=passwordHash(data.newPassword,salt);
    db.exec("BEGIN IMMEDIATE");try{
-    stmt("UPDATE cvx_pilot_users SET salt=?,passhash=? WHERE id=?").run(salt,hash,s.userId);
+    stmt("UPDATE cvx_pilot_users SET salt=?,passhash=?,must_change_password=0 WHERE id=?").run(salt,hash,s.userId);
     stmt("DELETE FROM cvx_pilot_sessions WHERE user_id=?").run(s.userId);
     db.exec("COMMIT");
    }catch(error){db.exec("ROLLBACK");throw error}
@@ -139,6 +144,8 @@ export function createPremiumServer({
    const secure=cookieSecure?"; Secure":"";
    return json(200,{ok:true},{"set-cookie":"cvx_pilot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
   }
+  if((path.startsWith("/api/pilot/")||path.startsWith("/api/commercial/"))&&sessionFrom(req)?.mustChangePassword)
+   return json(403,{error:"Password change required"});
   if(path==="/api/pilot/users"&&req.method==="GET"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!["master","admin","manager"].includes(s.role))return json(403,{error:"Forbidden"});
@@ -157,7 +164,41 @@ export function createPremiumServer({
     .run(uid,s.tenantId,email,role,salt,passwordHash(pass,salt))}catch{return json(409,{error:"Email already registered"})}
    return json(201,{id:uid,role});
   }
-  if(path.startsWith("/api/commercial/"))return await commercial(req);
+  if(path==="/api/pilot/backup"&&req.method==="POST"){
+   const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
+   if(!["admin","master"].includes(session.role))return json(403,{error:"Forbidden"});
+   if(!csrfOk(req,session)||req.headers.get("x-cvx-backup-confirm")!=="EXPORTAR")
+    return json(403,{error:"Forbidden"});
+   if(backupRunning)return json(429,{error:"Backup already running"});
+   const snapshot=join(tmpdir(),"cvx-pilot-"+randomBytes(16).toString("hex")+".sqlite");
+   backupRunning=true;let verify;
+   try{
+    if(statSync(dbPath).size>64*1024*1024)return json(413,{error:"Database too large for direct export"});
+    db.prepare("VACUUM INTO ?").run(snapshot);
+    verify=new DatabaseSync(snapshot,{readOnly:true});
+    const check=verify.prepare("PRAGMA integrity_check").get();
+    if(!check||!Object.values(check).includes("ok"))throw Error("Backup integrity failed");
+    verify.close();verify=null;
+    if(statSync(snapshot).size>64*1024*1024)return json(413,{error:"Backup too large for direct export"});
+    const bytes=readFileSync(snapshot);
+    return new Response(bytes,{status:200,headers:{
+      "content-type":"application/x-sqlite3",
+      "content-disposition":'attachment; filename="comverxa-comercial-piloto.sqlite"',
+      "cache-control":"private, no-store","x-content-type-options":"nosniff"}});
+   }catch{return json(503,{error:"Unable to generate verified backup"})}
+   finally{try{verify?.close()}catch{}try{if(existsSync(snapshot))unlinkSync(snapshot)}catch{}backupRunning=false}
+  }
+  if(path.startsWith("/api/commercial/")){
+    if(req.method==="POST"&&["/api/commercial/sales","/api/commercial/policies","/api/commercial/seller-plans"].includes(path)){
+      const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+      const data=await req.clone().json().catch(()=>null);
+      if(data&&typeof data.sellerId==="string"){
+       const seller=stmt("SELECT 1 FROM cvx_pilot_users WHERE id=? AND tenant_id=? AND active=1").get(data.sellerId,s.tenantId);
+       if(!seller)return json(404,{error:"Not found"});
+      }
+    }
+    return await commercial(req);
+  }
   return json(404,{error:"Not found"});
  }
  const server=http.createServer(async(req,res)=>{
