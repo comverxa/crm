@@ -331,10 +331,10 @@ async function init(){
   $("saleSeller").readOnly=true;$("policySeller").readOnly=true;$("leadSeller").readOnly=true;
   $("printReport").hidden=false;
  }
- if(!["admin","master"].includes(currentUser.role)){$('#nav [data-view="users"]').hidden=true}
+ if(!["admin","master"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="users"]').forEach(el=>{el.hidden=true})}
  if(!["admin","master"].includes(currentUser.role)){$("offsiteBackupPanel").hidden=true}
- if(currentUser.role==="master"){$('#nav [data-view="companies"]').hidden=false}
- if(!["admin","master","manager"].includes(currentUser.role)){$('#nav [data-view="billing"]').hidden=true}
+ if(currentUser.role==="master"){document.querySelectorAll('#nav [data-view="companies"]').forEach(el=>{el.hidden=false})}
+ if(!["admin","master","manager"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="billing"]').forEach(el=>{el.hidden=true})}
  if(["admin","master","manager"].includes(currentUser.role))await loadUsers();
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
  $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("open")});
