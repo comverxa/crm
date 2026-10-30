@@ -19,6 +19,19 @@ const offsiteBackupConfig=configured?{
 const sendRecoveryEmail=env.CVX_COM_RESEND_API_KEY&&env.CVX_COM_EMAIL_FROM?createRecoveryMailer({
  apiKey:env.CVX_COM_RESEND_API_KEY,from:env.CVX_COM_EMAIL_FROM
 }):null;
+const stripeRequested=env.CVX_STRIPE_TEST_ENABLED==="1";
+const stripeNames=["CVX_STRIPE_TEST_SECRET_KEY","CVX_STRIPE_TEST_WEBHOOK_SECRET"];
+if(stripeRequested&&stripeNames.some(key=>!env[key]))throw Error("Stripe TEST configuration missing");
+const stripePrices={
+ starter:env.CVX_STRIPE_TEST_PRICE_STARTER,
+ professional:env.CVX_STRIPE_TEST_PRICE_PROFESSIONAL,
+ business:env.CVX_STRIPE_TEST_PRICE_BUSINESS
+};
+if(stripeRequested&&!Object.values(stripePrices).some(Boolean))throw Error("Stripe test plan prices missing");
+const stripeConfig=stripeRequested?{
+ secretKey:env.CVX_STRIPE_TEST_SECRET_KEY,webhookSecret:env.CVX_STRIPE_TEST_WEBHOOK_SECRET,
+ priceIds:stripePrices
+}:null;
 const app=createPremiumServer({
  dbPath:env.CVX_COM_DB_PATH,
  bootstrapEmail:env.CVX_COM_ADMIN_EMAIL,
