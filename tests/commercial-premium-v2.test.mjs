@@ -110,3 +110,23 @@ test("HTTP reports return role-filtered data, proper security headers and no cro
 test("invalid team goal is rejected before persisting",()=>{
  const db=new DatabaseSync(":memory:");try{const store=createCommercialStore(db);assert.throws(()=>store.saveRules(manager,{...basic,teamTargetSales:-3}),/Invalid team goal/);assert.equal(store.getRules(manager),null)}finally{db.close()}
 });
+
+test("dashboard configuration status is scoped, read-only and respects role",async()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const store=createCommercialStore(db);
+  let who=manager;
+  const app=createCommercialHttpHandler({store,enabled:true,getSession:async()=>who,verifyCsrf:async()=>true});
+  const get=()=>app(new Request("https://crm.test/api/commercial/configuration-status"));
+  let response=await get();assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{configured:false,canConfigure:true});
+  assert.equal(store.getRules(manager),null,"readiness must not write defaults");
+  who=operator;
+  response=await get();assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{configured:false,canConfigure:false});
+  store.saveRules(manager,basic);
+  response=await get();assert.deepEqual(await response.json(),{configured:true,canConfigure:false});
+  who=other;
+  response=await get();assert.deepEqual(await response.json(),{configured:false,canConfigure:true});
+ }finally{db.close()}
+});
