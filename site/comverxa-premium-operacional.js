@@ -61,6 +61,35 @@ async function loadDashboard(){
  earnings.append(textEl("p","Comissão retida: "+brl(data.commissions.retainedCents)));
  earnings.append(textEl("p","Receita comercial: "+brl(data.revenueCents)));
  if(data.earnings.totalCents!==null)earnings.append(textEl("p","Ganho previsto (operador): "+brl(data.earnings.totalCents)));
+ await loadDashboardInsights();
+}
+async function loadDashboardInsights(){
+ const funnel=$("dashFunnel"),wa=$("dashWa");
+ if(!funnel||!wa)return;
+ empty(funnel);empty(wa);
+ try{
+  const d=await call("/api/commercial/leads/summary");
+  const stages=[["lead","Leads"],["contacted","Contato"],["negotiation","Negociação"],["proposal","Proposta"],["won","Vendas"],["lost","Perdas"]];
+  const max=Math.max(1,...Object.values(d.byStage||{}));
+  for(const [key,title] of stages){
+   const item=document.createElement("div");item.className="dash-funnel-item";
+   const label=document.createElement("span");label.textContent=title;
+   const track=document.createElement("div");track.className="dash-funnel-track";
+   const fill=document.createElement("div");fill.style.width=Math.round((d.byStage[key]||0)/max*100)+"%";
+   track.append(fill);const number=textEl("strong",n(d.byStage[key]||0));
+   item.append(label,track,number);funnel.append(item);
+  }
+ }catch{funnel.append(textEl("p","Configure o funil para visualizar resultados."))}
+ try{
+  const d=await call("/api/wa/channels");
+  for(const channel of d.channels||[]){
+   const item=document.createElement("div");item.className="dash-wa-item";
+   const title=textEl("span",channel.slot===1?"WhatsApp 1 · QR":"WhatsApp 2 · Meta");
+   const state=textEl("strong",(waStates[channel.state]||waStates.unknown)[0]);
+   state.dataset.kind=(waStates[channel.state]||waStates.unknown)[1];
+   item.append(title,state);wa.append(item);
+  }
+ }catch{wa.append(textEl("p","Não foi possível consultar os canais."))}
 }
 const leadStages={lead:"Lead",contacted:"Contatado",negotiation:"Negociação",proposal:"Proposta",won:"Venda",lost:"Perdido",on_hold:"Em espera"};
 async function loadLeads(){
@@ -345,6 +374,7 @@ async function init(){
   });
  }
 
+ $("dashOpenWa").addEventListener("click",()=>show("whatsapp"));
  $("waRefresh").addEventListener("click",()=>loadWhatsApp());
  $("waQrCheck").addEventListener("click",()=>loadWhatsApp());
  $("waLoadInbox").addEventListener("click",()=>loadWaInbox());
