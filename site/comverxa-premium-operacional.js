@@ -171,29 +171,43 @@ async function loadOffsiteStatus(){
  }catch(err){el.textContent="Falha ao consultar backup: "+err.message}
 }
 async function loadStripe(){
- const status=$("stripeStatus"),plans=$("stripePlans"),tbody=$("stripeTable");
- empty(plans);empty(tbody);
+ const status=$("stripeStatus"),plans=$("stripePlans"),tbody=$("stripeTable");empty(plans);empty(tbody);
  try{
   const data=await call("/api/billing/stripe/status");
-  status.textContent=data.configured
-   ?"Stripe conectado em TESTE. O checkout e as assinaturas não geram cobrança real."
-   :"Stripe sem preços/segredos de homologação configurados. Nenhuma contratação pode ser iniciada.";
+  const catalog=data.catalog||{};
+  status.textContent=data.checkoutEnabled
+   ?"Stripe em modo TESTE. Os links a seguir simulam uma assinatura, sem movimentar dinheiro real."
+   :"Tabela comercial cadastrada no Stripe TESTE. Checkout indisponível enquanto as credenciais e o webhook não forem homologados.";
   const names={starter:"Starter",professional:"Professional",business:"Business"};
   for(const [plan,title] of Object.entries(names)){
+   const price=catalog[plan];
    const wrapper=document.createElement("div");wrapper.className="card";wrapper.style.padding="16px";
    wrapper.append(textEl("h3",title));
-   const note=textEl("p","Preço e condições apresentados no Stripe Checkout após sua configuração.");note.className="note";wrapper.append(note);
-   const button=textEl("button","Contratar em modo de teste");button.className="btn primary";button.type="button";
-   button.dataset.stripePlan=plan;
-   button.disabled=!data.configured||!data.availablePlans.includes(plan)||!["master","admin"].includes(currentUser.role);
-   wrapper.append(button);plans.append(wrapper);
+   if(price){
+    const priceLabel=textEl("p",brl(price.monthlyCents)+" / mês");priceLabel.className="k-value";priceLabel.style.fontSize="22px";
+    const annual=textEl("p",brl(price.annualCents)+" / ano · economia de "+brl(price.annualSavingsCents));
+    annual.className="note";
+    const seats=textEl("p","Inclui "+price.seats+(price.seats===1?" usuário":" usuários")+" no plano.");seats.className="note";
+    wrapper.append(priceLabel,annual,seats);
+   }
+   const cycles=[["monthly","Mensal"],["annual","Anual"]];
+   for(const [cycle,label] of cycles){
+    const button=textEl("button","Contratar "+label+" (teste)");button.className="btn";button.type="button";
+    button.dataset.stripePlan=plan;button.dataset.stripeCycle=cycle;
+    button.style.marginTop="7px";button.style.width="100%";
+    button.disabled=!data.checkoutEnabled||!(data.availableCycles?.[plan]||[]).includes(cycle)
+       ||currentUser.role==="operator"||currentUser.role==="manager"||currentUser.role==="master";
+    wrapper.append(button);
+   }
+   plans.append(wrapper);
   }
   if(!data.subscriptions?.length){row(tbody,["Nenhuma assinatura de teste registrada"])}
   for(const subscription of data.subscriptions){
-   row(tbody,[names[subscription.plan]||subscription.plan,subscription.status,
+   row(tbody,[names[subscription.plan]||subscription.plan,
+    (subscription.cycle==="annual"?"Anual":"Mensal")+" · "+subscription.status,
     subscription.entitlement,subscription.updatedAt?new Date(subscription.updatedAt).toLocaleString("pt-BR"):"—"]);
   }
- }catch(err){status.textContent="Falha ao consultar a integração: "+err.message}
+ }catch(err){status.textContent="Falha ao consultar tabela de planos: "+err.message}
 }
 async function loadUsers(){
  const d=await call("/api/pilot/users");
@@ -253,7 +267,7 @@ async function init(){
   if(!button||button.disabled)return;
   button.disabled=true;
   try{
-   const data=await call("/api/billing/stripe/checkout",{method:"POST",body:{plan:button.dataset.stripePlan}});
+   const data=await call("/api/billing/stripe/checkout",{method:"POST",body:{plan:button.dataset.stripePlan,cycle:button.dataset.stripeCycle||"monthly"}});
    if(!data.testMode||!/^https:\/\/checkout\.stripe\.com\//.test(data.url))throw Error("Checkout de teste indisponível");
    location.assign(data.url);
   }catch(err){notify("Não foi possível abrir o Stripe: "+err.message,true);button.disabled=false}
