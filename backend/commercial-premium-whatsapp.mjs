@@ -42,7 +42,7 @@ export function createCommercialWhatsApp({db,publicOrigin,credentialKey,evolutio
   if(!validateId(tenant)||![1,2].includes(slot))throw Error("Invalid tenant or channel");
   return stmt("SELECT * FROM cvx_com_wa_channels WHERE tenant_id=? AND slot=?").get(tenant,slot)||null;
  }
- const isManager=session=>["master","admin","manager"].includes(session?.role);
+ const isManager=session=>["master","admin","director","manager"].includes(session?.role);
  const scope=session=>{if(!validateId(session?.tenantId)||!session?.userId)throw Error("Unauthorized");return session.tenantId};
  const safeState=(channel,extra={})=>({
   slot:channel.slot,mode:channel.mode,label:channel.label,configured:!!extra.configured,
