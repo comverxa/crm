@@ -15,12 +15,18 @@ export function createTenantStore(db){
   db.exec("ALTER TABLE cvx_pilot_tenants ADD COLUMN product_mode TEXT NOT NULL DEFAULT 'enterprise'");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_tenants_status ON cvx_pilot_tenants(status)");
  function normalize(row){return row?{id:row.id,name:row.name,plan:row.plan,status:row.status,seatLimit:row.seat_limit,billingMode:row.billing_mode,productMode:row.product_mode||"enterprise",createdAt:row.created_at}:null}
- function ensureTenant(tenantId,displayName){
-  id(tenantId);const existing=dbStmt(db,"SELECT * FROM cvx_pilot_tenants WHERE id=?").get(tenantId);
-  if(existing)return normalize(existing);
-  const now=new Date().toISOString();
-  dbStmt(db,"INSERT INTO cvx_pilot_tenants(id,name,plan,status,seat_limit,billing_mode,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)")
-   .run(tenantId,name(displayName),"business","active",20,"sandbox",now,now);
+ function ensureTenant(tenantId,displayName,productMode=null){
+  id(tenantId);
+  if(productMode!==null&&!["individual","enterprise"].includes(productMode))throw Error("Invalid product mode");
+  const existing=dbStmt(db,"SELECT * FROM cvx_pilot_tenants WHERE id=?").get(tenantId);
+  if(existing){
+   if(productMode!==null&&(existing.product_mode||"enterprise")!==productMode)
+    throw Error("Product mode mismatch: refusing to reuse an existing CRM database");
+   return normalize(existing);
+  }
+  const now=new Date().toISOString(),mode=productMode||"enterprise";
+  dbStmt(db,"INSERT INTO cvx_pilot_tenants(id,name,plan,status,seat_limit,billing_mode,product_mode,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)")
+   .run(tenantId,name(displayName),mode==="individual"?"starter":"business","active",mode==="individual"?1:20,"sandbox",mode,now,now);
   return normalize(dbStmt(db,"SELECT * FROM cvx_pilot_tenants WHERE id=?").get(tenantId));
  }
  return {
