@@ -32,7 +32,26 @@ function constantEquals(a,b){
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const page=(title,main)=>'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>'+escape(title)+'</title><style>body{background:#071225;color:#eef6ff;font:16px system-ui;margin:0;min-height:100vh;display:grid;place-items:center}main{max-width:440px;width:90vw;border:1px solid #284664;background:#10243c;border-radius:18px;padding:27px}h1{margin:5px 0}label{display:block;margin-top:18px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:12px;margin-top:6px;border-radius:9px}input{background:#081930;color:#fff;border:1px solid #52708e}button{color:#061626;background:#52d1e8;border:0;font-weight:800;margin-top:20px}small,p{color:#a5bbd3;line-height:1.5}</style><link rel="stylesheet" href="/assets/commercial-password.css"></head><body><main>'+main+'</main></body></html>';
 const loginPage=page("COMVERXA — Acesso Comercial",'<div style="color:#52d1e8;font-weight:800">COMVERXA PREMIUM</div><h1>Entrar no Comercial</h1><p>Este módulo tem senha própria, diferente do CRM principal.</p><form id="form"><label>E-mail<input autocomplete="username" type="email" name="email" required></label><label>Senha<input autocomplete="current-password" type="password" name="password" required></label><p style="font-size:13px;margin:9px 0 3px">Redefiniu sua senha? Digite a <strong style="color:#e3ffff">nova senha</strong> e ignore o preenchimento automático do celular.</p><button type="submit">Acessar com segurança</button><p id="info" role="status" aria-live="polite"></p></form><p style="margin:18px 0 10px"><a href="/forgot" style="color:#52d1e8;font-weight:700">Esqueci minha senha</a></p><p style="font-size:13px;color:#91abc2">Não utiliza automaticamente a senha do CRM principal. Sem cadastro público neste ambiente.</p><script src="/assets/commercial-password.js" defer></script><script src="/assets/commercial-login.js" defer></script>');
-const cookieValue=s=>{const m=/(?:^|;\s*)cvx_pilot_session=([A-Za-z0-9_-]{32,100})(?:;|$)/.exec(s||"");return m?.[1]||null};
+// Each product has a different, HttpOnly session cookie. Legacy access is enterprise-only.
+const portalFromPath=path=>/^\/(?:api\/)?profissional(?:\/|$)/.test(path)?"individual":
+ /^\/(?:api\/)?empresa(?:\/|$)/.test(path)?"enterprise":null;
+const cookieName=mode=>mode==="individual"?"cvx_professional_session":mode==="enterprise"?"cvx_enterprise_session":"cvx_pilot_session";
+const cookieValue=(header,name="cvx_pilot_session")=>{
+ const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,"\\const cookieValue=s=>{const m=/(?:^|;\s*)cvx_pilot_session=([A-Za-z0-9_-]{32,100})(?:;|$)/.exec(s||"");return m?.[1]||null};");
+ const m=new RegExp("(?:^|;\\s*)"+escaped+"=([A-Za-z0-9_-]{32,100})(?:;|$)").exec(header||"");
+ return m?.[1]||null;
+};
+const professionalLoginPage=loginPage.replace("COMVERXA — Acesso Comercial","COMVERXA Professional | Acesso exclusivo")
+ .replace("COMVERXA PREMIUM","COMVERXA PROFESSIONAL")
+ .replace("Entrar no Comercial","Login do executivo e corretor")
+ .replace("Este módulo tem senha própria, diferente do CRM principal.","CRM individual, com carteira, vendas e comissões exclusivas. Acesso diferente do CRM empresarial.")
+ .replace('href="/forgot"','href="/profissional/forgot"');
+const enterpriseLoginPage=loginPage.replace("COMVERXA — Acesso Comercial","COMVERXA Enterprise | Acesso corporativo")
+ .replace("COMVERXA PREMIUM","COMVERXA ENTERPRISE")
+ .replace("Entrar no Comercial","Login da empresa")
+ .replace("Este módulo tem senha própria, diferente do CRM principal.","Acesso corporativo para diretores, gerentes, supervisores, administradores e suas equipes.")
+ .replace('href="/forgot"','href="/empresa/forgot"');
+
 
 export function createPremiumServer({
   dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,
@@ -89,10 +108,14 @@ export function createPremiumServer({
  }
  let backupRunning=false;
  const sessionFrom=req=>{
-  const token=cookieValue(req.headers.get("cookie"));if(!token)return null;
+  const portal=portalFromPath(new URL(req.url).pathname);
+  const token=cookieValue(req.headers.get("cookie"),cookieName(portal));if(!token)return null;
   const row=stmt("SELECT s.csrf,s.expires_at,u.id,u.tenant_id,u.email,u.role,u.active,u.must_change_password,u.professional_type FROM cvx_pilot_sessions s JOIN cvx_pilot_users u ON u.id=s.user_id WHERE s.session_hash=?").get(secureHash(token));
   if(!row||row.active!==1||row.expires_at<=now()||!tenants.isEnabled(row.tenant_id))return null;
   const tenant=tenants.current(row.tenant_id);
+  if(portal&&tenant?.productMode!==portal)return null;
+  // Old single-login sessions cannot enter the new individual CRM.
+  if(!portal&&tenant?.productMode==="individual")return null;
   const teamSellerIds=row.role==="supervisor"?
    stmt("SELECT id FROM cvx_pilot_users WHERE tenant_id=? AND supervisor_id=? AND active=1").all(row.tenant_id,row.id).map(u=>u.id):[];
   return {tenantId:row.tenant_id,userId:row.id,role:row.role,email:row.email,
@@ -122,7 +145,10 @@ export function createPremiumServer({
  };
  async function handler(req,ip="unknown"){
   let url;try{url=new URL(req.url)}catch{return json(400,{error:"Invalid URL"})}
-  const path=url.pathname;
+  const rawPath=url.pathname;
+  const portal=portalFromPath(rawPath);
+  const path=rawPath.startsWith("/api/profissional/")?"/api/"+rawPath.slice("/api/profissional/".length):
+   rawPath.startsWith("/api/empresa/")?"/api/"+rawPath.slice("/api/empresa/".length):rawPath;
   // Explicitly refuse cross-origin writes, not only CSRF.
   const fromProvider=(path.startsWith("/api/wa/qr/webhook/")||/^\/api\/wa\/meta\/[^/]+\/webhook$/.test(path)||path==="/api/billing/stripe/webhook");
   if(req.method!=="GET"&&req.method!=="HEAD"&&!fromProvider){
@@ -135,11 +161,21 @@ export function createPremiumServer({
   if(path==="/assets/commercial-password.css"&&req.method==="GET")return new Response(passwordCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
   if(path==="/assets/commercial-password.js"&&req.method==="GET")return new Response(passwordJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"||path==="/assets/commercial-recovery.js"))return new Response(path.endsWith("login.js")?loginJs:path.endsWith("recovery.js")?recoveryJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
-  if(path==="/")return Response.redirect(url.origin+(sessionFrom(req)?"/app":"/login"),303);
+  if(path==="/"){
+   const selector=page("COMVERXA | Escolha o CRM",'<div style="color:#52d1e8;font-weight:800">COMVERXA</div><h1>Escolha seu CRM</h1><p>Dois produtos independentes, cada um com seu login e suas próprias informações.</p><a href="/profissional/login" style="color:#52d1e8;display:block;margin:20px 0">Professional — Executivo e corretor</a><a href="/empresa/login" style="color:#52d1e8;display:block;margin:20px 0">Enterprise — Empresa, direção e gestão</a>');
+   return new Response(selector,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
+  }
+  if(req.method==="GET"&&(rawPath==="/profissional/login"||rawPath==="/empresa/login"))
+   return new Response(portal==="individual"?professionalLoginPage:enterpriseLoginPage,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
   if(path==="/login"&&req.method==="GET")return new Response(loginPage,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
-  if((path==="/forgot"||path==="/reset")&&req.method==="GET")return new Response(recoveryHtml,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
-  if(path==="/app"&&req.method==="GET"){
-   if(!sessionFrom(req))return Response.redirect(url.origin+"/login",303);
+  if((path==="/forgot"||path==="/reset"||/^\/(profissional|empresa)\/(forgot|reset)$/.test(rawPath))&&req.method==="GET"){
+   const material=portal?recoveryHtml.replace('href="/login"','href="/'+(portal==="individual"?"profissional":"empresa")+'/login"')
+    .replace("COMVERXA PREMIUM COMERCIAL",portal==="individual"?"COMVERXA PROFESSIONAL":"COMVERXA ENTERPRISE"):recoveryHtml;
+   return new Response(material,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
+  }
+  if((path==="/app"||rawPath==="/profissional/app"||rawPath==="/empresa/app")&&req.method==="GET"){
+   const loginPath=portal==null?"/login":portal==="individual"?"/profissional/login":"/empresa/login";
+   if(!sessionFrom(req))return Response.redirect(url.origin+loginPath,303);
    return new Response(html,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
   }
   if(path==="/api/auth/forgot"&&req.method==="POST"){
@@ -151,13 +187,16 @@ export function createPremiumServer({
    if(!rateLimit("forgot:"+ip+"|"+candidate))return neutral;
    const user=stmt("SELECT id,tenant_id,email FROM cvx_pilot_users WHERE email=? AND active=1").get(candidate);
    if(!user||!tenants.isEnabled(user.tenant_id))return neutral;
+   if(portal&&tenants.current(user.tenant_id)?.productMode!==portal)return neutral;
+   if(!portal&&tenants.current(user.tenant_id)?.productMode==="individual")return neutral;
    const token=randomBytes(32).toString("base64url"),tokenHash=secureHash(token),expires=now()+15*60*1000;
    try{
     db.exec("BEGIN IMMEDIATE");
     stmt("DELETE FROM cvx_pilot_recovery WHERE user_id=?").run(user.id);
     stmt("INSERT INTO cvx_pilot_recovery(token_hash,user_id,expires_at,created_at) VALUES(?,?,?,?)").run(tokenHash,user.id,expires,now());
     db.exec("COMMIT");
-    const resetUrl=new URL("/reset",publicOrigin);resetUrl.searchParams.set("token",token);
+    const root=portal==="individual"?"/profissional":portal==="enterprise"?"/empresa":"";
+    const resetUrl=new URL(root+"/reset",publicOrigin);resetUrl.searchParams.set("token",token);
     await sendRecoveryEmail({to:user.email,resetUrl:resetUrl.href});
    }catch(error){
     try{db.exec("ROLLBACK")}catch{}
@@ -174,7 +213,9 @@ export function createPremiumServer({
    if(!rateLimit("reset:"+ip))return json(429,{error:"Too many attempts"});
    const hash=secureHash(token);
    const row=stmt("SELECT r.user_id,r.expires_at,r.used_at,u.active,u.tenant_id FROM cvx_pilot_recovery r JOIN cvx_pilot_users u ON u.id=r.user_id WHERE r.token_hash=?").get(hash);
-   if(!row||row.used_at!==null||row.expires_at<=now()||row.active!==1||!tenants.isEnabled(row.tenant_id))
+   if(!row||row.used_at!==null||row.expires_at<=now()||row.active!==1||!tenants.isEnabled(row.tenant_id)||
+     portal&&tenants.current(row.tenant_id)?.productMode!==portal||
+     !portal&&tenants.current(row.tenant_id)?.productMode==="individual")
     return json(400,{error:"Invalid or expired token"});
    const salt=randomBytes(16).toString("hex"),passhash=passwordHash(newPassword,salt);
    try{
@@ -198,11 +239,13 @@ export function createPremiumServer({
    const supplied=passwordHash(pass,user?user.salt:"0".repeat(32));
    if(!constantEquals(expected,supplied))return json(401,{error:"Unauthorized"});
    if(!tenants.isEnabled(user.tenant_id))return json(403,{error:"Company access suspended"});
+   if(portal&&tenants.current(user.tenant_id)?.productMode!==portal)return json(403,{error:"Wrong CRM portal"});
+   if(!portal&&tenants.current(user.tenant_id)?.productMode==="individual")return json(403,{error:"Use Professional login"});
    const token=randomBytes(32).toString("base64url"),csrf=randomBytes(24).toString("base64url");
    stmt("INSERT INTO cvx_pilot_sessions(session_hash,user_id,csrf,expires_at) VALUES(?,?,?,?)")
     .run(secureHash(token),user.id,csrf,now()+SESSION_SECONDS*1000);
    const secure=cookieSecure?"; Secure":"";
-   return json(200,{ok:true},{ "set-cookie":"cvx_pilot_session="+token+"; HttpOnly; SameSite=Strict; Path=/; Max-Age="+SESSION_SECONDS+secure});
+   return json(200,{ok:true},{ "set-cookie":cookieName(portal)+"="+token+"; HttpOnly; SameSite=Strict; Path=/; Max-Age="+SESSION_SECONDS+secure});
   }
   if(path==="/api/auth/me"&&req.method==="GET"){
    const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role,productMode:s.productMode,professionalType:s.professionalType},csrf:s.csrf,mustChangePassword:s.mustChangePassword}):json(401,{error:"Unauthorized"});
@@ -233,14 +276,14 @@ export function createPremiumServer({
     db.exec("COMMIT");
    }catch(error){db.exec("ROLLBACK");throw error}
    const secure=cookieSecure?"; Secure":"";
-   return json(200,{ok:true,reloginRequired:true},{"set-cookie":"cvx_pilot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
+   return json(200,{ok:true,reloginRequired:true},{"set-cookie":cookieName(portal)+"=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
   }
   if(path==="/api/auth/logout"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
-   const token=cookieValue(req.headers.get("cookie"));stmt("DELETE FROM cvx_pilot_sessions WHERE session_hash=?").run(secureHash(token));
+   const token=cookieValue(req.headers.get("cookie"),cookieName(portal));stmt("DELETE FROM cvx_pilot_sessions WHERE session_hash=?").run(secureHash(token));
    const secure=cookieSecure?"; Secure":"";
-   return json(200,{ok:true},{"set-cookie":"cvx_pilot_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
+   return json(200,{ok:true},{"set-cookie":cookieName(portal)+"=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"+secure});
   }
   if((path.startsWith("/api/pilot/")||path.startsWith("/api/commercial/")||path.startsWith("/api/platform/"))&&sessionFrom(req)?.mustChangePassword)
    return json(403,{error:"Password change required"});
@@ -499,6 +542,7 @@ export function createPremiumServer({
        if(!seller)return json(404,{error:"Not found"});
       }
     }
+    // Commercial adapter accepts the same product-prefixed URL and resolves its own scope.
     return await commercial(req);
   }
   return json(404,{error:"Not found"});
