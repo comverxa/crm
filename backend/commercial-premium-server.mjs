@@ -59,6 +59,12 @@ export function createPremiumServer({
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_expires ON cvx_pilot_sessions(expires_at)");
  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_recovery (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL,used_at INTEGER,created_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES cvx_pilot_users(id))");
  db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_recovery_user ON cvx_pilot_recovery(user_id,expires_at)");
+ // Additive migrations; preserve all existing accounts, sales and sessions.
+ for(const [column,definition] of [["supervisor_id","TEXT"],["professional_type","TEXT NOT NULL DEFAULT 'broker'"]]){
+  if(!db.prepare("PRAGMA table_info(cvx_pilot_users)").all().some(c=>c.name===column))
+   db.exec("ALTER TABLE cvx_pilot_users ADD COLUMN "+column+" "+definition);
+ }
+ db.exec("CREATE INDEX IF NOT EXISTS cvx_pilot_supervision ON cvx_pilot_users(tenant_id,supervisor_id,active)");
  const store=createCommercialStore(db);
  const leads=createLeadsStore(db);
  const tenants=createTenantStore(db);
@@ -84,9 +90,14 @@ export function createPremiumServer({
  let backupRunning=false;
  const sessionFrom=req=>{
   const token=cookieValue(req.headers.get("cookie"));if(!token)return null;
-  const row=stmt("SELECT s.csrf,s.expires_at,u.id,u.tenant_id,u.email,u.role,u.active,u.must_change_password FROM cvx_pilot_sessions s JOIN cvx_pilot_users u ON u.id=s.user_id WHERE s.session_hash=?").get(secureHash(token));
+  const row=stmt("SELECT s.csrf,s.expires_at,u.id,u.tenant_id,u.email,u.role,u.active,u.must_change_password,u.professional_type FROM cvx_pilot_sessions s JOIN cvx_pilot_users u ON u.id=s.user_id WHERE s.session_hash=?").get(secureHash(token));
   if(!row||row.active!==1||row.expires_at<=now()||!tenants.isEnabled(row.tenant_id))return null;
-  return {tenantId:row.tenant_id,userId:row.id,role:row.role,email:row.email,csrf:row.csrf,mustChangePassword:row.must_change_password===1};
+  const tenant=tenants.current(row.tenant_id);
+  const teamSellerIds=row.role==="supervisor"?
+   stmt("SELECT id FROM cvx_pilot_users WHERE tenant_id=? AND supervisor_id=? AND active=1").all(row.tenant_id,row.id).map(u=>u.id):[];
+  return {tenantId:row.tenant_id,userId:row.id,role:row.role,email:row.email,
+   productMode:tenant?.productMode||"enterprise",professionalType:row.professional_type||"broker",
+   teamSellerIds,csrf:row.csrf,mustChangePassword:row.must_change_password===1};
  };
  const csrfOk=(req,session)=>constantEquals(req.headers.get("x-csrf-token")||"",session.csrf);
  const commercial=createCommercialHttpHandler({
@@ -194,7 +205,7 @@ export function createPremiumServer({
    return json(200,{ok:true},{ "set-cookie":"cvx_pilot_session="+token+"; HttpOnly; SameSite=Strict; Path=/; Max-Age="+SESSION_SECONDS+secure});
   }
   if(path==="/api/auth/me"&&req.method==="GET"){
-   const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role},csrf:s.csrf,mustChangePassword:s.mustChangePassword}):json(401,{error:"Unauthorized"});
+   const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role,productMode:s.productMode,professionalType:s.professionalType},csrf:s.csrf,mustChangePassword:s.mustChangePassword}):json(401,{error:"Unauthorized"});
   }
   if(path==="/api/auth/password"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
@@ -276,7 +287,7 @@ export function createPremiumServer({
     return json(200,{slot,messages:wa.inbox(ss,slot)});
    }
    if(["/api/wa/qr/register","/api/wa/qr/connect","/api/wa/official/register"].includes(path)&&req.method==="POST"){
-    if(!["master","admin","manager"].includes(ss.role)||!csrfOk(req,ss))return json(403,{error:"Forbidden"});
+    if(!["master","admin","director","manager"].includes(ss.role)||!csrfOk(req,ss))return json(403,{error:"Forbidden"});
     try{
      if(path==="/api/wa/qr/register")return json(200,await wa.registerQr(ss));
      if(path==="/api/wa/qr/connect")return json(200,await wa.qrCode(ss));
@@ -291,7 +302,7 @@ export function createPremiumServer({
     }
    }
    if(path==="/api/wa/official/webhook-setup"&&req.method==="GET"){
-    if(!["master","admin","manager"].includes(ss.role))return json(403,{error:"Forbidden"});
+    if(!["master","admin","director","manager"].includes(ss.role))return json(403,{error:"Forbidden"});
     try{return json(200,wa.webhookDetails(ss))}
     catch{return json(404,{error:"Official channel not configured"})}
    }
@@ -338,7 +349,7 @@ export function createPremiumServer({
   }
   if(path==="/api/pilot/company"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!["admin","master"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   if(!["admin","master","director"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
    let body;try{body=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid JSON"})}
    try{return json(200,{company:tenants.setBrand(s.tenantId,body.companyName)})}
    catch{return json(400,{error:"Invalid company name"})}
@@ -356,7 +367,7 @@ export function createPremiumServer({
    if(!validEmail(adminEmail)||!validPass(adminPassword))return json(400,{error:"Invalid admin credentials"});
    try{
     db.exec("BEGIN IMMEDIATE");
-    const company=tenants.create({tenantId,companyName,plan:body?.plan,seatLimit:body?.seatLimit});
+    const company=tenants.create({tenantId,companyName,plan:body?.plan,seatLimit:body?.seatLimit,productMode:body?.productMode||"enterprise"});
     const salt=randomBytes(16).toString("hex");
     stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active,must_change_password) VALUES(?,?,?,?,?,?,1,1)")
      .run(randomUUID(),company.id,adminEmail,"admin",salt,passwordHash(adminPassword,salt));
@@ -375,28 +386,49 @@ export function createPremiumServer({
   }
   if(path==="/api/pilot/users"&&req.method==="GET"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!["master","admin","manager"].includes(s.role))return json(403,{error:"Forbidden"});
-   const users=stmt("SELECT id,email,role,active FROM cvx_pilot_users WHERE tenant_id=? ORDER BY role,email LIMIT 300").all(s.tenantId);
+   if(s.productMode==="individual"||!["master","admin","director","manager","supervisor"].includes(s.role))
+    return json(403,{error:"Forbidden"});
+   const sql=s.role==="supervisor"
+    ?"SELECT id,email,role,active,supervisor_id,professional_type FROM cvx_pilot_users WHERE tenant_id=? AND (supervisor_id=? OR id=?) ORDER BY role,email LIMIT 300"
+    :"SELECT id,email,role,active,supervisor_id,professional_type FROM cvx_pilot_users WHERE tenant_id=? ORDER BY role,email LIMIT 300";
+   const rows=stmt(sql).all(...(s.role==="supervisor"?[s.tenantId,s.userId,s.userId]:[s.tenantId]));
+   const users=rows.map(u=>({id:u.id,email:u.email,role:u.role,active:u.active,supervisorId:u.supervisor_id,professionalType:u.professional_type}));
    return json(200,{users});
   }
   if(path==="/api/pilot/users"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!["admin","master"].includes(s.role))return json(403,{error:"Forbidden"});
+   if(s.productMode==="individual"||!["admin","master","director"].includes(s.role))return json(403,{error:"Forbidden"});
    if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
    let data;try{data=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid JSON"})}
    const email=String(data?.email||"").trim().toLowerCase(),pass=data?.password,role=data?.role;
-   if(!validEmail(email)||!validPass(pass)||!["manager","operator"].includes(role))return json(400,{error:"Invalid user"});
+   if(!validEmail(email)||!validPass(pass)||!["manager","director","supervisor","operator"].includes(role))return json(400,{error:"Invalid user"});
+   const supervisorId=data?.supervisorId||null,professionalType=data?.professionalType||"broker";
+   if(!["broker","executive"].includes(professionalType))return json(400,{error:"Invalid professional type"});
+   if(supervisorId&&(role!=="operator"||!stmt("SELECT 1 FROM cvx_pilot_users WHERE id=? AND tenant_id=? AND role='supervisor' AND active=1").get(supervisorId,s.tenantId)))
+    return json(400,{error:"Invalid supervisor"});
    const company=tenants.current(s.tenantId);
    if(!company||company.status!=="active")return json(403,{error:"Tenant suspended"});
    if(tenants.seatCount(s.tenantId)>=company.seatLimit)return json(409,{error:"Seat limit reached"});
    const salt=randomBytes(16).toString("hex"),uid=randomUUID();
-   try{stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active) VALUES(?,?,?,?,?,?,1)")
-    .run(uid,s.tenantId,email,role,salt,passwordHash(pass,salt))}catch{return json(409,{error:"Email already registered"})}
-   return json(201,{id:uid,role});
+   try{stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active,supervisor_id,professional_type) VALUES(?,?,?,?,?,?,1,?,?)")
+    .run(uid,s.tenantId,email,role,salt,passwordHash(pass,salt),supervisorId,professionalType)}catch{return json(409,{error:"Email already registered"})}
+   return json(201,{id:uid,role,supervisorId,professionalType});
+  }
+  if(/^\/api\/pilot\/users\/[^/]+\/supervisor$/.test(path)&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(s.productMode==="individual"||!["admin","master","director"].includes(s.role)||!csrfOk(req,s))
+    return json(403,{error:"Forbidden"});
+   let body;try{body=JSON.parse(await textBytes(req,1024))}catch{return json(400,{error:"Invalid JSON"})}
+   const userId=decodeURIComponent(path.split("/")[4]),supervisorId=body?.supervisorId||null;
+   if(supervisorId&&!stmt("SELECT 1 FROM cvx_pilot_users WHERE tenant_id=? AND id=? AND role='supervisor' AND active=1").get(s.tenantId,supervisorId))
+    return json(400,{error:"Invalid supervisor"});
+   const changed=stmt("UPDATE cvx_pilot_users SET supervisor_id=? WHERE tenant_id=? AND id=? AND role='operator' AND active=1").run(supervisorId,s.tenantId,userId);
+   if(!changed.changes)return json(404,{error:"Not found"});
+   return json(200,{ok:true,userId,supervisorId});
   }
   if(path==="/api/pilot/backups/status"&&req.method==="GET"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!["admin","master"].includes(s.role))return json(403,{error:"Forbidden"});
+   if(!["admin","master","director"].includes(s.role))return json(403,{error:"Forbidden"});
    const last=offsite?.last()||null;
    return json(200,{offsiteConfigured:!!offsite,verification:last?{
      createdAt:last.created_at,verifiedAt:last.verified_at,sizeBytes:last.size_bytes,verified:true
@@ -404,7 +436,7 @@ export function createPremiumServer({
   }
   if(path==="/api/pilot/backups/offsite"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!["admin","master"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
+   if(!["admin","master","director"].includes(s.role)||!csrfOk(req,s))return json(403,{error:"Forbidden"});
    if(!offsite)return json(503,{error:"Offsite backup not configured"});
    try{
     const data=await offsite.run();
@@ -417,7 +449,7 @@ export function createPremiumServer({
   }
   if(path==="/api/pilot/backup"&&req.method==="POST"){
    const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
-   if(!["admin","master"].includes(session.role))return json(403,{error:"Forbidden"});
+   if(!["admin","master","director"].includes(session.role))return json(403,{error:"Forbidden"});
    if(!csrfOk(req,session)||req.headers.get("x-cvx-backup-confirm")!=="EXPORTAR")
     return json(403,{error:"Forbidden"});
    if(backupRunning)return json(429,{error:"Backup already running"});
