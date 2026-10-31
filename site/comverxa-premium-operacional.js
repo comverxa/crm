@@ -851,7 +851,7 @@ async function init(){
   const tiers=[{minSales:0,bonusCents:0}];
   for(let i=1;i<=3;i++)tiers.push({minSales:Number($("g"+i).value),bonusCents:individual?personalMoneyCents($("b"+i).value):cents($("b"+i).value)});
   if(individual&&$("g4").value.trim())tiers.push({minSales:Number($("g4").value),bonusCents:personalMoneyCents($("b4").value)});
-  return {tiers,salesRateBps:basis($("rateSale").value),activationRateBps:basis($("rateActive").value),recurringRateBps:basis($("rateRecurring").value),
+  return {tiers,salesRateBps:basis($("rateSale").value),activationRateBps:basis($("rateActive").value),recurringRateBps:individual&&["executive","insurance_broker"].includes(currentUser.professionalType)?0:basis($("rateRecurring").value),
     fixedSalaryCents:cents($("fixed").value),teamTargetSales:individual?null:Number($("teamTarget").value),halfSaturday:true};
  },individual?()=>loadRules():null);
  bindForm("sellerGoalForm","/api/commercial/seller-plans",v=>({sellerId:v.sellerId,tiers:[
@@ -902,7 +902,7 @@ async function init(){
   try{
    const value=e.currentTarget.elements.professionalType.value;
    await call("/api/auth/profile",{method:"POST",body:{professionalType:value}});
-   currentUser.professionalType=value;notify("Perfil profissional atualizado.");
+   currentUser.professionalType=value;syncRecurringEligibility();await loadRules();notify("Perfil profissional atualizado.");
   }catch(err){notify(err.message,true)}finally{button.disabled=false}
  });
  $("passwordForm").addEventListener("submit",async e=>{
