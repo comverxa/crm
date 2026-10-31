@@ -115,9 +115,9 @@ test("Professional and Enterprise run as isolated services with distinct databas
 
 test("Commercial period defaults to the local calendar rather than UTC",()=>{
  const script=readFileSync(new URL("../site/comverxa-premium-operacional.js",import.meta.url),"utf8");
- const match=script.match(/function localDateYmd\\(date=new Date\\(\\)\\)\\{[\\s\\S]*?\\n\\}/);
+ const match=script.match(/function localDateYmd\(date=new Date\(\)\)\{[\s\S]*?\n\}/);
  assert.ok(match,"The browser calendar formatter must be defined");
- const localDateYmd=runInNewContext(match[0]+"\\nlocalDateYmd",{Date});
+ const localDateYmd=runInNewContext(match[0]+"\nlocalDateYmd",{Date});
  const localDate=(year,month,day)=>({getFullYear:()=>year,getMonth:()=>month-1,getDate:()=>day});
  assert.equal(localDateYmd(localDate(2026,10,31)),"2026-10-31");
  assert.equal(localDateYmd(localDate(2026,11,1)),"2026-11-01");
