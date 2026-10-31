@@ -6,13 +6,28 @@
  */
 const VALID_STATES=new Set(["lead","negotiation","proposal","sold","active","lost","canceled"]);
 const CLOSED_STATES=new Set(["sold","active"]);
-const ROLES=new Set(["master","admin","manager","operator"]);
+const ROLES=new Set(["master","admin","director","manager","supervisor","operator"]);
 const TENANT_ID=/^[a-zA-Z0-9_.:-]{1,100}$/;
 export function assertScope(session) {
   if (!session || !TENANT_ID.test(session.tenantId||"") ||
       !TENANT_ID.test(session.userId||"") || !ROLES.has(session.role))
     throw new Error("Unauthorized");
   return session;
+}
+/**
+ * Authorization is based on the server-owned session, never on request bodies.
+ * Individual accounts access their own rows; supervisors access assigned sellers.
+ */
+export function canAccessSeller(session,sellerId){
+ assertScope(session);
+ if(session.productMode==="individual"||session.role==="operator")return sellerId===session.userId;
+ if(session.role==="supervisor")return sellerId===session.userId||
+   (Array.isArray(session.teamSellerIds)&&session.teamSellerIds.includes(sellerId));
+ return true;
+}
+export function canViewTeam(session){
+ assertScope(session);
+ return session.productMode!=="individual"&&["master","admin","director","manager","supervisor"].includes(session.role);
 }
 function day(value) {
   if(typeof value!=="string"||! /^\d{4}-\d{2}-\d{2}$/.test(value)) throw Error("Invalid date");
@@ -72,7 +87,7 @@ function rowsForSession(rows,session,{ownOnly=false}={}){
   assertScope(session);
   if(!Array.isArray(rows))throw Error("Invalid rows");
   return rows.filter(row=>row.tenantId===session.tenantId &&
-    ((session.role==="operator"||ownOnly)?row.sellerId===session.userId:true));
+    (ownOnly?row.sellerId===session.userId:canAccessSeller(session,row.sellerId)));
 }
 function saleIsCounted(s){return CLOSED_STATES.has(s.status)}
 function validateSale(s){
@@ -146,6 +161,6 @@ export function renewalQueue({session,contracts,asOf,ownOnly=false}){
 export function assertWriteScope(session,tenantId,sellerId){
   assertScope(session);
   if(tenantId!==session.tenantId)throw Error("Not found");
-  if(session.role==="operator"&&sellerId!==session.userId)throw Error("Forbidden");
+  if(!canAccessSeller(session,sellerId))throw Error("Forbidden");
   return true;
 }
