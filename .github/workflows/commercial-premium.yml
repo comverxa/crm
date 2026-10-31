@@ -9,6 +9,7 @@ on:
       - 'tests/commercial-premium-leads.test.mjs'
       - 'tests/commercial-premium-pilot.test.mjs'
       - 'tests/commercial-products-access.test.mjs'
+      - 'tests/commercial-separate-services.test.mjs'
       - 'tests/commercial-offsite-backup.test.mjs'
       - 'tests/commercial-recovery.test.mjs'
       - 'tests/commercial-migration-inspect.test.mjs'
@@ -30,6 +31,7 @@ on:
       - 'tests/commercial-premium-leads.test.mjs'
       - 'tests/commercial-premium-pilot.test.mjs'
       - 'tests/commercial-products-access.test.mjs'
+      - 'tests/commercial-separate-services.test.mjs'
       - 'tests/commercial-offsite-backup.test.mjs'
       - 'tests/commercial-recovery.test.mjs'
       - 'tests/commercial-migration-inspect.test.mjs'
@@ -76,4 +78,4 @@ jobs:
           node --check site/comverxa-premium-password.js
           node --check site/comverxa-premium-login.js
       - name: Testes integrados sem dados reais
-        run: node --test tests/commercial-products-access.test.mjs tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-premium-leads.test.mjs tests/commercial-premium-pilot.test.mjs tests/commercial-offsite-backup.test.mjs tests/commercial-recovery.test.mjs tests/commercial-migration-inspect.test.mjs tests/commercial-stripe.test.mjs tests/commercial-premium-whatsapp.test.mjs tests/commercial-password-visibility.test.mjs tests/commercial-preview.test.mjs
+        run: node --test tests/commercial-separate-services.test.mjs tests/commercial-products-access.test.mjs tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-premium-leads.test.mjs tests/commercial-premium-pilot.test.mjs tests/commercial-offsite-backup.test.mjs tests/commercial-recovery.test.mjs tests/commercial-migration-inspect.test.mjs tests/commercial-stripe.test.mjs tests/commercial-premium-whatsapp.test.mjs tests/commercial-password-visibility.test.mjs tests/commercial-preview.test.mjs
