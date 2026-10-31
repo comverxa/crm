@@ -294,6 +294,9 @@ export function createPremiumServer({
    if(path==="/api/wa/inbox"&&req.method==="GET"){
     const slot=Number(url.searchParams.get("slot"));
     if(![1,2].includes(slot))return json(400,{error:"Invalid channel"});
+    // Shared channel conversations are not per-seller scoped yet: fail closed for staff.
+    if(ss.productMode!=="individual"&&!["master","admin","director","manager"].includes(ss.role))
+     return json(403,{error:"Team inbox requires assigned conversations"});
     return json(200,{slot,messages:wa.inbox(ss,slot)});
    }
    if(["/api/wa/qr/register","/api/wa/qr/connect","/api/wa/official/register"].includes(path)&&req.method==="POST"){
