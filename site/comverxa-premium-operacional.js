@@ -575,6 +575,10 @@ function bindForm(id,endpoint,transform,after){
 }
 async function init(){
  const me=await call("/api/auth/me");csrf=me.csrf;currentUser=me.user;
+ if(currentUser.productMode==="individual"||currentUser.role==="operator"){
+  $("professionalProfileCard").hidden=false;
+  $("professionalProfileForm").elements.professionalType.value=currentUser.professionalType||"broker";
+ }
  const individual=currentUser.productMode==="individual";
  document.body.dataset.product=individual?"individual":"enterprise";
  const brand=document.querySelector(".brand small");
@@ -760,7 +764,7 @@ async function init(){
   companyPlan.addEventListener("change",syncSeats);productMode.addEventListener("change",syncSeats);syncSeats();
   bindForm("companyForm","/api/platform/companies",v=>({
    tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),productMode:v.productMode,
-   adminEmail:v.adminEmail,adminPassword:v.adminPassword
+   adminEmail:v.adminEmail,adminPassword:v.adminPassword,professionalType:v.professionalType
   }),()=>loadCompanies());
   $("companyTable").addEventListener("click",async e=>{
    const button=e.target.closest("button[data-tenant]");if(!button)return;
@@ -772,6 +776,14 @@ async function init(){
    }catch(err){notify(err.message,true)}finally{button.disabled=false}
   });
  }
+ $("professionalProfileForm").addEventListener("submit",async e=>{
+  e.preventDefault();const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+  try{
+   const value=e.currentTarget.elements.professionalType.value;
+   await call("/api/auth/profile",{method:"POST",body:{professionalType:value}});
+   currentUser.professionalType=value;notify("Perfil profissional atualizado.");
+  }catch(err){notify(err.message,true)}finally{button.disabled=false}
+ });
  $("passwordForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const v=Object.fromEntries(new FormData(e.currentTarget).entries());
