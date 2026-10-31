@@ -1,4 +1,4 @@
-name: COMVERXA Professional - Public Smoke
+name: COMVERXA Professional & Enterprise - Public Smoke
 on:
   push:
     branches:
@@ -13,38 +13,44 @@ permissions:
 jobs:
   health-and-isolation:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
-      - name: Check HTTPS, login page and server-side isolation
+      - name: Verify independent HTTPS login routes and permissions
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          const root="https://comverxa-professional-production.up.railway.app";
-          const assertions=[
-            ["/",303],
-            ["/healthz",200],
-            ["/profissional/login",200],
-            ["/empresa/login",404],
-            ["/login",404],
-            ["/api/auth/me",404],
-            ["/api/profissional/auth/me",401],
-            ["/api/empresa/auth/me",404]
+          const products=[
+           {name:"Professional",base:"https://comverxa-professional-production.up.railway.app",login:"/profissional/login",other:"/empresa/login",api:"/api/profissional/auth/me",otherApi:"/api/empresa/auth/me"},
+           {name:"Enterprise",base:"https://comverxa-enterprise-production.up.railway.app",login:"/empresa/login",other:"/profissional/login",api:"/api/empresa/auth/me",otherApi:"/api/profissional/auth/me"}
           ];
-          let errors=[];
-          for(const [path,want] of assertions){
-            let got=null,last=null;
-            for(let attempt=0;attempt<4;attempt++){
-              try{
-                const r=await fetch(root+path,{redirect:"manual",signal:AbortSignal.timeout(12000)});
-                got=r.status;
-                if(got===want)break;
-                last="Expected "+want+" got "+got;
-              }catch(err){last=String(err.cause?.message||err.message)}
-              await new Promise(resolve=>setTimeout(resolve,1800));
+          const failures=[];
+          for(const p of products){
+           const checks=[["/",303],["/healthz",200],[p.login,200],[p.other,404],["/login",404],
+             ["/api/auth/me",404],[p.api,401],[p.otherApi,404],["/assets/commercial.js",200]];
+           for(const [path,expected] of checks){
+            let response=null,error=null;
+            for(let n=0;n<4;n++){
+             try{
+              response=await fetch(p.base+path,{redirect:"manual",signal:AbortSignal.timeout(12000)});
+              if(response.status===expected)break;
+              error="status="+response.status;
+             }catch(e){error=String(e.message)}
+             await new Promise(r=>setTimeout(r,1400));
             }
-            console.log(path,got,"expected",want);
-            if(got!==want)errors.push(path+": "+last);
+            const status=response?.status??"unavailable";
+            console.log(p.name,path,status,"expected",expected);
+            if(status!==expected)failures.push(p.name+" "+path+": "+error);
+            if(status===200&&path===p.login){
+             const html=await response.text();
+             if(!html.includes("commercial-login.js"))failures.push(p.name+" login HTML missing script");
+            }
+            if(status===200&&path==="/assets/commercial.js"&&p.name==="Professional"){
+             const js=await response.text();
+             if(!js.includes("Minhas metas individuais")||!js.includes("professionalGoalFinance")||!js.includes("personalMoneyCents"))
+              failures.push("Professional published assets are not the premium four-tier build");
+            }
+           }
           }
-          if(errors.length)throw Error("Public smoke failed:\n"+errors.join("\n"));
-          console.log("Public Professional smoke completed successfully");
+          if(failures.length)throw Error("Two-product smoke failed:\n"+failures.join("\n"));
+          console.log("Professional & Enterprise public route checks passed.");
           NODE
