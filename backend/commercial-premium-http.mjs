@@ -14,7 +14,7 @@ export function createCommercialHttpHandler({store,leads=null,getSession,verifyC
   if(!url.pathname.startsWith(endpoint))return json(404,{error:"Not found"});
   if(!enabled)return json(503,{error:"Commercial module not enabled"});
   let session;try{session=await getSession(req)}catch{return json(401,{error:"Unauthorized"})}
-  if(!session?.tenantId||!session?.userId||!["master","admin","manager","operator"].includes(session.role))
+  if(!session?.tenantId||!session?.userId||!["master","admin","director","manager","supervisor","operator"].includes(session.role))
    return json(401,{error:"Unauthorized"});
   const action=url.pathname.slice(endpoint.length);
   if(!["GET","POST"].includes(req.method))return json(405,{error:"Method not allowed"});
@@ -54,14 +54,14 @@ export function createCommercialHttpHandler({store,leads=null,getSession,verifyC
    }
    if(action==="configuration-status"&&req.method==="GET")return json(200,{
     configured:store.getRules(session)!==null,
-    canConfigure:["master","admin","manager"].includes(session.role)
+    canConfigure:["master","admin","director","manager"].includes(session.role)
    });
    if(action==="summary"&&req.method==="GET")return json(200,store.snapshot(session,{month,asOf}));
    if(action==="team"&&req.method==="GET")return json(200,store.teamSummary(session,{month,asOf}));
    if(action==="seller-plans"&&req.method==="GET")return json(200,{plans:store.listSellerPlans(session)});
    if(action==="seller-plans"&&req.method==="POST")return json(201,{plan:store.saveSellerPlan(session,input)});
    if((action==="report/print"||action==="report.csv")&&req.method==="GET"){
-    const managerial=["master","admin","manager"].includes(session.role);
+    const managerial=session.productMode!=="individual"&&["master","admin","director","manager","supervisor"].includes(session.role);
     if(action==="report.csv"&&!managerial)return json(403,{error:"Forbidden"});
     const summary=store.snapshot(session,{month,asOf});
     const team=managerial?store.teamSummary(session,{month,asOf}):null;
