@@ -2,7 +2,7 @@
 const cvxPortal=location.pathname.startsWith("/profissional/")?"profissional":location.pathname.startsWith("/empresa/")?"empresa":"";
 const portalApi=path=>cvxPortal&&path.startsWith("/api/")?"/api/"+cvxPortal+path.slice(4):path;
 const portalPage=page=>cvxPortal?"/"+cvxPortal+"/"+page:"/"+page;
-let csrf="",currentUser=null,period=new Date().toISOString().slice(0,7),currentView="dashboard";
+// Respect the user\'s local calendar, especially around the UTC month boundary.\nfunction localDateYmd(date=new Date()){\n const yyyy=date.getFullYear(),mm=String(date.getMonth()+1).padStart(2,"0"),dd=String(date.getDate()).padStart(2,"0");\n return yyyy+"-"+mm+"-"+dd;\n}\nlet csrf="",currentUser=null,period=localDateYmd().slice(0,7),currentView="dashboard";
 const $=id=>document.getElementById(id);
 const brl=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(value)||0)/100);
 const n=v=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1}).format(Number(v)||0);
@@ -56,7 +56,7 @@ function show(view){
  $("sidebar").classList.remove("open");$("overlay").classList.remove("open");
  refresh().catch(e=>notify(e.message,true));
 }
-function contextMonth(){const asOf=new Date().toISOString().slice(0,10);return "?month="+encodeURIComponent(period)+"&asOf="+asOf}
+function contextMonth(){const asOf=localDateYmd();return "?month="+encodeURIComponent(period)+"&asOf="+asOf}
 
 function cvxTile(root,label,value,detail="",tone=""){
  const el=document.createElement("div");el.className="cvx-tile "+tone;
