@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {DatabaseSync} from "node:sqlite";
 import {teamDashboard,validateSellerPlan} from "../backend/commercial-premium-team.mjs";
 import {createCommercialStore} from "../backend/commercial-premium-store.mjs";
+import {salesSnapshot} from "../backend/commercial-premium-core.mjs";
 import {createCommercialHttpHandler} from "../backend/commercial-premium-http.mjs";
 import {makeCommercialReport,makeCommercialCsv} from "../backend/commercial-premium-reports.mjs";
 
@@ -129,4 +130,26 @@ test("dashboard configuration status is scoped, read-only and respects role",asy
   who=other;
   response=await get();assert.deepEqual(await response.json(),{configured:false,canConfigure:true});
  }finally{db.close()}
+});
+
+test("Professional supports four progressive goals with cumulative individual bonus and independently calculated pace",()=>{
+ const rules={tiers:[{minSales:0,bonusCents:0},{minSales:2,bonusCents:135000},{minSales:4,bonusCents:70000},
+  {minSales:6,bonusCents:100000},{minSales:8,bonusCents:150000}],
+  bonusMode:"incremental",salesRateBps:1000,activationRateBps:0,recurringRateBps:0,halfSaturday:true};
+ const personal={tenantId:"A",userId:"seller",role:"operator",productMode:"individual"};
+ const others={tenantId:"A",userId:"other-seller",role:"operator",productMode:"individual"};
+ const sales=Array.from({length:5},(_,i)=>sale("mine"+i,"seller",10000))
+  .concat(Array.from({length:8},(_,i)=>sale("other"+i,"other-seller",10000)));
+ const result=salesSnapshot({session:personal,sales,month:"2026-10",asOf:"2026-10-20",rules});
+ assert.equal(result.counts.sold,5);
+ assert.equal(result.target.nextMinSales,6);
+ assert.equal(result.target.remaining,1);
+ assert.equal(result.target.achievedBonusCents,205000);
+ assert.equal(result.commissions.effectiveCents,5000);
+ assert.equal(result.earnings.variableCents,210000);
+ assert.ok(result.pace.projectedSales>=5);
+ const enterprise=salesSnapshot({session:{...personal,productMode:"enterprise"},sales,month:"2026-10",asOf:"2026-10-20",rules:{...rules,bonusMode:"highest"},ownOnly:true});
+ assert.equal(enterprise.target.achievedBonusCents,70000);
+ assert.notEqual(result.target.achievedBonusCents,enterprise.target.achievedBonusCents);
+ assert.equal(others.userId,"other-seller");
 });
