@@ -207,6 +207,16 @@ export function createPremiumServer({
   if(path==="/api/auth/me"&&req.method==="GET"){
    const s=sessionFrom(req);return s?json(200,{user:{id:s.userId,email:s.email,role:s.role,productMode:s.productMode,professionalType:s.professionalType},csrf:s.csrf,mustChangePassword:s.mustChangePassword}):json(401,{error:"Unauthorized"});
   }
+  if(path==="/api/auth/profile"&&req.method==="POST"){
+   const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
+   if(!csrfOk(req,s)||s.mustChangePassword)return json(403,{error:"Forbidden"});
+   if(s.productMode!=="individual"&&s.role!=="operator")return json(403,{error:"Forbidden"});
+   let body;try{body=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid JSON"})}
+   if(!["broker","executive"].includes(body?.professionalType))return json(400,{error:"Invalid professional type"});
+   stmt("UPDATE cvx_pilot_users SET professional_type=? WHERE id=? AND tenant_id=?")
+    .run(body.professionalType,s.userId,s.tenantId);
+   return json(200,{ok:true,professionalType:body.professionalType});
+  }
   if(path==="/api/auth/password"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
    if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
@@ -364,13 +374,15 @@ export function createPremiumServer({
    if(s.role!=="master"||!enablePlatformMaster||!csrfOk(req,s))return json(403,{error:"Forbidden"});
    let body;try{body=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid JSON"})}
    const tenantId=body?.tenantId,companyName=body?.companyName,adminEmail=String(body?.adminEmail||"").toLowerCase().trim(),adminPassword=body?.adminPassword;
+   const professionalType=body?.professionalType||"broker";
+   if(!["broker","executive"].includes(professionalType))return json(400,{error:"Invalid professional type"});
    if(!validEmail(adminEmail)||!validPass(adminPassword))return json(400,{error:"Invalid admin credentials"});
    try{
     db.exec("BEGIN IMMEDIATE");
     const company=tenants.create({tenantId,companyName,plan:body?.plan,seatLimit:body?.seatLimit,productMode:body?.productMode||"enterprise"});
     const salt=randomBytes(16).toString("hex");
-    stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active,must_change_password) VALUES(?,?,?,?,?,?,1,1)")
-     .run(randomUUID(),company.id,adminEmail,"admin",salt,passwordHash(adminPassword,salt));
+    stmt("INSERT INTO cvx_pilot_users(id,tenant_id,email,role,salt,passhash,active,must_change_password,professional_type) VALUES(?,?,?,?,?,?,1,1,?)")
+     .run(randomUUID(),company.id,adminEmail,"admin",salt,passwordHash(adminPassword,salt),professionalType);
     db.exec("COMMIT");
     return json(201,{company});
    }catch(error){try{db.exec("ROLLBACK")}catch{}return json(409,{error:"Tenant or admin already registered"})}
