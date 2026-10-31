@@ -91,7 +91,7 @@ export function createPremiumServer({
  tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto",portalMode==="individual"?"individual":"enterprise");
  const stmt=sql=>db.prepare(sql);
  const offsite=offsiteBackupConfig?createOffsiteBackup({db,dbPath,config:offsiteBackupConfig}):null;
- const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,...stripeConfig}):null;
+ const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,portalPath:portalMode==="individual"?"/profissional/app":portalMode==="enterprise"?"/empresa/app":"/app",...stripeConfig}):null;
  const wa=whatsAppConfig?createCommercialWhatsApp({db,publicOrigin,...whatsAppConfig}):null;
  const scheduleHandles=[];
  const email=bootstrapEmail.trim().toLowerCase();
