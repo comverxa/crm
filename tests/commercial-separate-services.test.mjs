@@ -54,6 +54,18 @@ test("Professional and Enterprise run as isolated services with distinct databas
   const meEnterprise=await get(enterprise,"/api/empresa/auth/me",enterpriseCookie);
   assert.equal((await meIndividual.json()).user.productMode,"individual");
   assert.equal((await meEnterprise.json()).user.productMode,"enterprise");
+  const readyIndividual=await get(professional,"/api/profissional/pilot/readiness",professionalCookie);
+  const readyEnterprise=await get(enterprise,"/api/empresa/pilot/readiness",enterpriseCookie);
+  assert.equal(readyIndividual.status,200);
+  assert.equal(readyEnterprise.status,200);
+  const individualReadiness=await readyIndividual.json(),enterpriseReadiness=await readyEnterprise.json();
+  assert.equal(individualReadiness.readyForCommercialRelease,false);
+  assert.equal(enterpriseReadiness.readyForCommercialRelease,false);
+  assert.equal(individualReadiness.service,"individual");
+  assert.equal(enterpriseReadiness.service,"enterprise");
+  assert.equal(individualReadiness.checks.find(x=>x.key==="payment").state,"pending");
+  assert.equal((await get(enterprise,"/api/empresa/pilot/readiness")).status,401);
+  assert.equal((await get(professional,"/api/empresa/pilot/readiness",professionalCookie)).status,404);
   assert.equal((await get(professional,"/api/profissional/auth/me",enterpriseCookie)).status,401);
   assert.equal((await get(enterprise,"/api/empresa/auth/me",professionalCookie)).status,401);
   assert.equal((await login(professional,"empresa","professional@example.test")).status,404);
