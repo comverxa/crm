@@ -7,7 +7,7 @@
  */
 import {DatabaseSync} from "node:sqlite";
 import {createCipheriv,createDecipheriv,createHash,createHmac,randomBytes} from "node:crypto";
-import {readFileSync,existsSync,unlinkSync,statSync} from "node:fs";
+import {readFileSync,writeFileSync,existsSync,unlinkSync,statSync} from "node:fs";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {gzipSync,gunzipSync} from "node:zlib";
@@ -86,6 +86,7 @@ export function createOffsiteBackup({db,dbPath,config,fetchImpl=fetch,now=()=>ne
  async function run(){
   if(running)throw Error("Backup already running");
   running=true;const snapshot=join(tmpdir(),"cvx-offsite-"+randomBytes(16).toString("hex")+".sqlite");
+  const restoredSnapshot=join(tmpdir(),"cvx-restore-"+randomBytes(16).toString("hex")+".sqlite");
   let checkDb;
   try{
    if(statSync(dbPath).size>MAX_DB_BYTES)throw Error("Database exceeds direct backup size limit");
@@ -103,13 +104,19 @@ export function createOffsiteBackup({db,dbPath,config,fetchImpl=fetch,now=()=>ne
    const downloaded=await store.get(objectKey);
    const restored=openSealedSqlite(downloaded,secret);
    if(sha(restored)!==checksum)throw Error("Offsite restore check failed");
+   writeFileSync(restoredSnapshot,restored,{flag:"wx",mode:0o600});
+   checkDb=new DatabaseSync(restoredSnapshot,{readOnly:true});
+   if(!Object.values(checkDb.prepare("PRAGMA integrity_check").get()||{}).includes("ok"))
+    throw Error("Downloaded backup failed SQLite restore integrity");
+   checkDb.close();checkDb=null;
    const stamp=now().toISOString();
    db.prepare("INSERT INTO cvx_pilot_offsite_backups(object_key,checksum,created_at,verified_at,size_bytes) VALUES(?,?,?,?,?)")
     .run(objectKey,checksum,date.toISOString(),stamp,encrypted.length);
-   return {verified:true,createdAt:date.toISOString(),sizeBytes:encrypted.length,checksum};
+   return {verified:true,restoredToTemporaryDatabase:true,createdAt:date.toISOString(),sizeBytes:encrypted.length,checksum};
   }finally{
    try{checkDb?.close()}catch{}
    try{if(existsSync(snapshot))unlinkSync(snapshot)}catch{}
+   try{if(existsSync(restoredSnapshot))unlinkSync(restoredSnapshot)}catch{}
    running=false;
   }
  }
