@@ -44,9 +44,11 @@ jobs:
              const html=await response.text();
              if(!html.includes("commercial-login.js"))failures.push(p.name+" login HTML missing script");
             }
-            if(status===200&&path==="/assets/commercial.js"&&p.name==="Professional"){
+            if(status===200&&path==="/assets/commercial.js"){
              const js=await response.text();
-             if(!js.includes("Minhas metas individuais")||!js.includes("professionalGoalFinance")||!js.includes("personalMoneyCents"))
+             if(!js.includes("function localDateYmd")||!js.includes("period=localDateYmd().slice(0,7)"))
+              failures.push(p.name+" published assets lack the local-calendar correction");
+             if(p.name==="Professional"&&(!js.includes("Minhas metas individuais")||!js.includes("professionalGoalFinance")||!js.includes("personalMoneyCents")))
               failures.push("Professional published assets are not the premium four-tier build");
             }
            }
