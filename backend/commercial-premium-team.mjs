@@ -3,7 +3,7 @@
  * Fase de integração: cálculo isolado, sem acesso direto a clientes ou produção.
  * Autorização sempre resolvida no servidor; não confiar em tenant/role do navegador.
  */
-import {assertScope,validateRules,salesSnapshot} from "./commercial-premium-core.mjs";
+import {assertScope,canAccessSeller,canViewTeam,validateRules,salesSnapshot} from "./commercial-premium-core.mjs";
 
 const ID=/^[a-zA-Z0-9_.:-]{1,100}$/;
 function validId(v){if(typeof v!=="string"||!ID.test(v))throw Error("Invalid seller");return v}
@@ -28,15 +28,15 @@ export function validateSellerPlan(plan){
  */
 export function teamDashboard({session,sales,plans=[],month,asOf,defaultRules,teamTargetSales=null}){
   assertScope(session);
-  if(!["master","admin","manager"].includes(session.role))throw Error("Forbidden");
+  if(!canViewTeam(session))throw Error("Forbidden");
   const rules=validateRules(defaultRules);
   if(!Array.isArray(sales)||!Array.isArray(plans))throw Error("Invalid data");
   if(teamTargetSales!==null&&(!Number.isSafeInteger(teamTargetSales)||teamTargetSales<=0||teamTargetSales>1_000_000))
     throw Error("Invalid team goal");
-  const scoped=sales.filter(s=>s.tenantId===session.tenantId);
+  const scoped=sales.filter(s=>s.tenantId===session.tenantId&&canAccessSeller(session,s.sellerId));
   const planMap=new Map();
   for(const p of plans){
-    if(!p || p.tenantId!==session.tenantId)continue;
+    if(!p || p.tenantId!==session.tenantId||!canAccessSeller(session,p.sellerId))continue;
     const validated=validateSellerPlan(p);
     if(planMap.has(validated.sellerId))throw Error("Duplicate seller plan");
     planMap.set(validated.sellerId,validated);
