@@ -187,7 +187,25 @@ export function createPremiumServer({
    if(origin&&origin!==url.origin)return json(403,{error:"Forbidden"});
    if(!origin&&!["same-origin","none"].includes(req.headers.get("sec-fetch-site")||"same-origin"))return json(403,{error:"Forbidden"});
   }
-  if(path==="/healthz")return json(200,{status:"ok",service:"commercial-pilot"});
+  if(path==="/healthz")return json(200,{status:"ok",service:portalMode==="individual"?"comverxa-professional":portalMode==="enterprise"?"comverxa-enterprise":"commercial-pilot"});
+  if(path==="/api/pilot/readiness"&&req.method==="GET"){
+   const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
+   if(!["master","admin","director"].includes(session.role))return json(403,{error:"Forbidden"});
+   const backup=offsite?.last()||null,channels=wa?await wa.list(session).catch(()=>[]):[];
+   const qr=channels.find(c=>c.slot===1)||null,meta=channels.find(c=>c.slot===2)||null;
+   const checks=[
+    {key:"storage",label:"Serviço e banco independentes",state:portalMode==="both"?"unverified":"configured",detail:"Confirmar volume persistente no Railway"},
+    {key:"backup",label:"Backup externo criptografado",state:backup?.verified_at?"verified":offsite?"configured":"pending",detail:backup?.verified_at?"Última verificação: "+backup.verified_at:"Backup ainda não comprovado"},
+    {key:"recovery",label:"Recuperação de senha por e-mail",state:sendRecoveryEmail?"configured":"pending",detail:"Confirmar entrega e uso real do token"},
+    {key:"qr",label:"WhatsApp por QR",state:qr?.state==="connected"?"provider_connected":"pending",detail:qr?.state||"Número real ainda não conectado"},
+    {key:"meta",label:"WhatsApp Meta oficial",state:meta?.state==="verified"?"provider_connected":"pending",detail:meta?.state||"Credenciais, webhook e número não homologados"},
+    {key:"payment",label:"Pagamento e licenças comerciais",state:"pending",detail:billing?"Stripe somente em modo de testes":"Stripe não configurado"},
+    {key:"domain",label:"Domínio personalizado e HTTPS",state:"external_check",detail:"Verificar DNS e certificado no Railway"},
+    {key:"restore",label:"Ensaio de restauração de backup",state:"pending",detail:"Validação de backup não substitui teste de recuperação"},
+    {key:"e2e",label:"Fluxos reais de venda, acesso e gestão",state:"pending",detail:"Validar jornadas completas com usuários autorizados"}
+   ];
+   return json(200,{service:portalMode,readyForCommercialRelease:false,checks,summary:"Pendente de homologação externa e testes reais; deploy SUCCESS não equivale a comercialização integral."});
+  }
   if(path==="/assets/commercial-theme.css"&&req.method==="GET")return new Response(themeCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
   if(path==="/assets/commercial-password.css"&&req.method==="GET")return new Response(passwordCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
   if(path==="/assets/commercial-password.js"&&req.method==="GET")return new Response(passwordJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
