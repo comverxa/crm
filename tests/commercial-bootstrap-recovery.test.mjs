@@ -38,6 +38,20 @@ test("Bootstrap recovery is single-use, preserves records and never overrides an
   let cookie=signedIn.headers.get("set-cookie").split(";")[0];
   let profile=await (await me(app,cookie)).json();
   assert.equal(profile.mustChangePassword,true);
+  // Regression: the first-login account can choose its dashboard type
+  // without disabling the required password rotation for business access.
+  const saved=await post(app,"/api/profissional/auth/profile",{professionalType:"executive"},cookie,profile.csrf);
+  assert.equal(saved.status,200);
+  assert.equal((await saved.json()).professionalType,"executive");
+  const refreshed=await (await me(app,cookie)).json();
+  assert.equal(refreshed.user.professionalType,"executive");
+  assert.equal(refreshed.mustChangePassword,true);
+  assert.equal((await post(app,"/api/profissional/auth/profile",{professionalType:"broker"},cookie,"invalid-csrf")).status,403);
+  assert.equal((await post(app,"/api/profissional/auth/profile",{professionalType:"director"},cookie,profile.csrf)).status,400);
+  const protectedApi=await app.handler(new Request("https://professional.example.test/api/profissional/commercial/configuration-status",{
+   headers:{cookie}
+  }));
+  assert.equal(protectedApi.status,403);
   app.db.close();app=null;
 
   // A repeated token must never rotate credentials on another restart.
