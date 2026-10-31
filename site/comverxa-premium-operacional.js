@@ -434,6 +434,44 @@ async function loadSales(){
  for(const s of d.sales)row(t,[s.id,s.sellerId,s.soldAt,statusMap[s.status]||s.status,brl(s.premiumCents),brl(s.activationCents),s.commissionState==="retained"?"Retida":"Liberada"]);
  if(!d.sales.length)row(t,["Sem registros nesta competência"]);
 }
+async function loadProfessionalGoals(){
+ if(currentUser?.productMode!=="individual")return;
+ const root=$("professionalGoalExperience");root.hidden=false;
+ const [rulesResponse,snapshot]=await Promise.all([
+  call("/api/commercial/rules"),call("/api/commercial/summary"+contextMonth())
+ ]);
+ const rules=rulesResponse.rules;
+ if(!rules){$("professionalGoalCards").textContent="Configure suas metas e comissões para acompanhar seu progresso.";return}
+ const tiers=rules.tiers.filter(t=>t.minSales>0),sold=Number(snapshot.counts?.sold||0);
+ const current=tiers.findIndex(t=>sold<t.minSales);
+ const cards=$("professionalGoalCards");empty(cards);
+ for(let i=0;i<tiers.length;i++){
+  const tier=tiers[i],previous=i?tiers[i-1]:null,done=sold>=tier.minSales,active=!done&&i===current;
+  const cardEl=document.createElement("div");cardEl.className="goal-tier "+(done?"done":active?"current":"future");
+  const top=document.createElement("div");top.className="goal-tier-top";
+  const label=document.createElement("span");label.textContent="META "+(i+1)+(active?" · ATUAL":"");
+  const state=document.createElement("span");state.textContent=done?"✓ Batida":active?"⚑ Em andamento":"♧ Próxima";
+  top.append(label,state);
+  const amount=document.createElement("strong");amount.textContent=n(tier.minSales)+" vendas";
+  const info=document.createElement("small");
+  info.textContent="+ "+brl(tier.bonusCents)+" de bônus"+(done?" · conquistada":active?" · faltam "+n(tier.minSales-sold)+" vendas":" · ainda não atingida");
+  cardEl.append(top,amount,info);
+  if(active){
+   const track=document.createElement("div");track.className="goal-progress";
+   const fill=document.createElement("span");fill.style.width=Math.min(100,Math.max(0,sold/tier.minSales*100))+"%";track.append(fill);cardEl.append(track);
+  }
+  cards.append(cardEl);
+ }
+ const summary=$("professionalGoalSummary");empty(summary);
+ card(summary,"Vendas realizadas",n(sold));
+ card(summary,"Meta atual",n((tiers[current]||tiers[tiers.length-1])?.minSales||0));
+ card(summary,"Faltam",n(current<0?0:tiers[current].minSales-sold));
+ const pace=$("professionalGoalPace");empty(pace);
+ card(pace,"Dias úteis",n(snapshot.workdays?.total));
+ card(pace,"Dias transcorridos",n(snapshot.workdays?.elapsed));
+ card(pace,"Média por dia",n(snapshot.pace?.averageDaily));
+ card(pace,"Projeção mensal",n(snapshot.pace?.projectedSales));
+}
 async function loadRules(){
  const {rules}=await call("/api/commercial/rules");
  if(!rules)return;
@@ -444,6 +482,7 @@ async function loadRules(){
  $("rateRecurring").value=rules.recurringRateBps/100;
  $("fixed").value=rules.fixedSalaryCents/100;
  if(currentUser?.productMode!=="individual")$("teamTarget").value=rules.teamTargetSales??40;
+ if(currentUser?.productMode==="individual")await loadProfessionalGoals();
 }
 async function loadTeam(){
  const data=await call("/api/commercial/team"+contextMonth());
