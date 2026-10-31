@@ -54,7 +54,7 @@ const enterpriseLoginPage=loginPage.replace("COMVERXA — Acesso Comercial","COM
 
 
 export function createPremiumServer({
-  dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,portalMode="both",
+  dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,portalMode="both",bootstrapResetToken=null,
   htmlPath=new URL("../site/comverxa-premium-operacional.html",import.meta.url),
   jsPath=new URL("../site/comverxa-premium-operacional.js",import.meta.url),
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
@@ -101,6 +101,30 @@ export function createPremiumServer({
    .run(randomUUID(),bootstrapTenant,email,enablePlatformMaster?"master":"admin",salt,passwordHash(bootstrapPassword,salt));
  }
  if(enablePlatformMaster)stmt("UPDATE cvx_pilot_users SET role='master' WHERE email=? AND tenant_id=? AND role='admin'").run(email,bootstrapTenant);
+ // One-time operator-authorized recovery for the initial, never-activated
+ // account only. Does not touch lead, sales, company or other-user records.
+ // The receipt makes the token ineffective on all subsequent restarts.
+ if(bootstrapResetToken!==null&&bootstrapResetToken!==""){
+  if(typeof bootstrapResetToken!=="string"||!/^[A-Za-z0-9_-]{24,128}$/.test(bootstrapResetToken))
+   throw Error("Invalid bootstrap reset token");
+  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_bootstrap_resets (token_hash TEXT PRIMARY KEY,applied_at INTEGER NOT NULL)");
+  const tokenHash=secureHash(bootstrapResetToken);
+  const existingReset=stmt("SELECT 1 FROM cvx_pilot_bootstrap_resets WHERE token_hash=?").get(tokenHash);
+  const bootstrapUser=stmt("SELECT id,tenant_id,active,must_change_password FROM cvx_pilot_users WHERE email=?").get(email);
+  if(!existingReset&&bootstrapUser?.tenant_id===bootstrapTenant&&bootstrapUser.active===1&&bootstrapUser.must_change_password===1){
+   const salt=randomBytes(16).toString("hex");
+   db.exec("BEGIN IMMEDIATE");
+   try{
+    const updated=stmt("UPDATE cvx_pilot_users SET salt=?,passhash=? WHERE id=? AND tenant_id=? AND must_change_password=1 AND active=1")
+     .run(salt,passwordHash(bootstrapPassword,salt),bootstrapUser.id,bootstrapTenant);
+    if(updated.changes!==1)throw Error("Bootstrap recovery eligibility changed");
+    stmt("DELETE FROM cvx_pilot_sessions WHERE user_id=?").run(bootstrapUser.id);
+    stmt("INSERT INTO cvx_pilot_bootstrap_resets(token_hash,applied_at) VALUES(?,?)").run(tokenHash,now());
+    db.exec("COMMIT");
+    console.info("CVX_BOOTSTRAP_RECOVERY_APPLIED");
+   }catch(error){db.exec("ROLLBACK");throw error}
+  }
+ }
  let failMap=new Map();
  function rateLimit(key){
   const time=now(),old=failMap.get(key)||{n:0,until:0};if(old.until<time){old.n=0;old.until=time+900000}
