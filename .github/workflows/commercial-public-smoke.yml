@@ -21,6 +21,7 @@ jobs:
           node --input-type=module <<'NODE'
           const root="https://comverxa-professional-production.up.railway.app";
           const assertions=[
+            ["/",303],
             ["/healthz",200],
             ["/profissional/login",200],
             ["/empresa/login",404],
