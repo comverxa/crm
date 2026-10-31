@@ -536,10 +536,15 @@ async function loadStripe(){
 }
 async function loadUsers(){
  const d=await call("/api/pilot/users");
- const tbody=$("usersTable"),options=$("sellerOptions");empty(tbody);empty(options);
+ const tbody=$("usersTable"),options=$("sellerOptions"),supervisors=$("supervisorOptions");
+ empty(tbody);empty(options);if(supervisors)empty(supervisors);
+ const roles={operator:"Corretor / Executivo",supervisor:"Supervisor",manager:"Gerente",director:"Diretor",admin:"Administrador",master:"ADM Master"};
  for(const u of d.users){
-  row(tbody,[u.email,u.role,u.id]);
-  const opt=document.createElement("option");opt.value=u.id;opt.label=u.email+" — "+u.role;options.append(opt);
+  row(tbody,[u.email,roles[u.role]||u.role,u.id,u.supervisorId||"—"]);
+  const option=document.createElement("option");option.value=u.id;option.label=u.email+" — "+(roles[u.role]||u.role);options.append(option);
+  if(u.role==="supervisor"&&supervisors){
+   const item=document.createElement("option");item.value=u.id;item.label=u.email;supervisors.append(item);
+  }
  }
 }
 async function refresh(){
@@ -615,7 +620,7 @@ async function init(){
    location.assign(data.url);
   }catch(err){notify("Não foi possível abrir o Stripe: "+err.message,true);button.disabled=false}
  });
- if(["admin","master"].includes(currentUser.role)){
+ if(["admin","master","director"].includes(currentUser.role)&&!individual){
   $("runOffsiteBackup").addEventListener("click",async()=>{
    const btn=$("runOffsiteBackup");btn.disabled=true;notify("Iniciando backup criptografado e verificação de restauração.");
    try{const result=await call("/api/pilot/backups/offsite",{method:"POST",body:{}});
@@ -730,20 +735,31 @@ async function init(){
   e.preventDefault();const btn=e.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
   try{
    const v=Object.fromEntries(new FormData(e.currentTarget).entries());
-   const created=await call("/api/pilot/users",{method:"POST",body:{email:v.email,password:v.password,role:v.role}});
+   const created=await call("/api/pilot/users",{method:"POST",body:{email:v.email,password:v.password,role:v.role,professionalType:v.professionalType,supervisorId:v.supervisorId||null}});
    notify("Usuário criado. ID do vendedor: "+created.id);
    e.currentTarget.reset();await loadUsers();
   }catch(error){notify(error.message,true)}finally{btn.disabled=false}
  });
+ if(["admin","master","director"].includes(currentUser.role)&&!individual){
+  $("assignSupervisorForm").addEventListener("submit",async event=>{
+   event.preventDefault();const values=Object.fromEntries(new FormData(event.currentTarget).entries());
+   const button=event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+   try{
+    await call("/api/pilot/users/"+encodeURIComponent(values.userId)+"/supervisor",{method:"POST",body:{supervisorId:values.supervisorId||null}});
+    await loadUsers();notify("Supervisor responsável atualizado.");
+   }catch(error){notify(error.message,true)}finally{button.disabled=false}
+  });
+ }
  if(currentUser.role==="master"){
   const companyForm=$("companyForm");
   const companyPlan=companyForm.querySelector('select[name="plan"]');
   const seatInput=companyForm.querySelector('input[name="seatLimit"]');
+  const productMode=companyForm.querySelector('select[name="productMode"]');
   const seatsByPlan={starter:1,professional:3,business:8};
-  const syncSeats=()=>{seatInput.value=String(seatsByPlan[companyPlan.value]||1)};
-  companyPlan.addEventListener("change",syncSeats);syncSeats();
+  const syncSeats=()=>{seatInput.value=String(productMode.value==="individual"?1:seatsByPlan[companyPlan.value]||1)};
+  companyPlan.addEventListener("change",syncSeats);productMode.addEventListener("change",syncSeats);syncSeats();
   bindForm("companyForm","/api/platform/companies",v=>({
-   tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),
+   tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),productMode:v.productMode,
    adminEmail:v.adminEmail,adminPassword:v.adminPassword
   }),()=>loadCompanies());
   $("companyTable").addEventListener("click",async e=>{
