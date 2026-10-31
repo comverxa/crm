@@ -54,7 +54,7 @@ const enterpriseLoginPage=loginPage.replace("COMVERXA — Acesso Comercial","COM
 
 
 export function createPremiumServer({
-  dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,
+  dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,portalMode="both",
   htmlPath=new URL("../site/comverxa-premium-operacional.html",import.meta.url),
   jsPath=new URL("../site/comverxa-premium-operacional.js",import.meta.url),
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
@@ -64,6 +64,7 @@ export function createPremiumServer({
   publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null,stripeConfig=null,whatsAppConfig=null
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
+ if(!["both","individual","enterprise"].includes(portalMode))throw Error("Invalid standalone product mode");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
  const allowedOrigin=new URL(publicOrigin);
  if(allowedOrigin.protocol!=="https:"||allowedOrigin.pathname!=="/"||allowedOrigin.search||allowedOrigin.hash)
@@ -87,7 +88,7 @@ export function createPremiumServer({
  const store=createCommercialStore(db);
  const leads=createLeadsStore(db);
  const tenants=createTenantStore(db);
- tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto");
+ tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto",portalMode==="individual"?"individual":"enterprise");
  const stmt=sql=>db.prepare(sql);
  const offsite=offsiteBackupConfig?createOffsiteBackup({db,dbPath,config:offsiteBackupConfig}):null;
  const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,...stripeConfig}):null;
@@ -151,6 +152,12 @@ export function createPremiumServer({
    rawPath.startsWith("/api/empresa/")?"/api/"+rawPath.slice("/api/empresa/".length):rawPath;
   // Explicitly refuse cross-origin writes, not only CSRF.
   const fromProvider=(path.startsWith("/api/wa/qr/webhook/")||/^\/api\/wa\/meta\/[^/]+\/webhook$/.test(path)||path==="/api/billing/stripe/webhook");
+   // In single-product deployments, reject every route from the other CRM,
+   // including legacy unscoped authentication and its session cookie.
+   // Only signed provider webhooks, static assets and health checks are exempt.
+   if(portalMode!=="both"&&rawPath!=="/"&&rawPath!=="/healthz"&&!rawPath.startsWith("/assets/")&&
+      portal!==portalMode&&!(portal===null&&fromProvider))
+    return json(404,{error:"Not found"});
   if(req.method!=="GET"&&req.method!=="HEAD"&&!fromProvider){
    const origin=req.headers.get("origin");
    if(origin&&origin!==url.origin)return json(403,{error:"Forbidden"});
@@ -162,6 +169,8 @@ export function createPremiumServer({
   if(path==="/assets/commercial-password.js"&&req.method==="GET")return new Response(passwordJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"||path==="/assets/commercial-recovery.js"))return new Response(path.endsWith("login.js")?loginJs:path.endsWith("recovery.js")?recoveryJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(path==="/"){
+   if(portalMode!=="both")
+    return Response.redirect(url.origin+(portalMode==="individual"?"/profissional/login":"/empresa/login"),303);
    const selector=page("COMVERXA | Escolha o CRM",'<div style="color:#52d1e8;font-weight:800">COMVERXA</div><h1>Escolha seu CRM</h1><p>Dois produtos independentes, cada um com seu login e suas próprias informações.</p><a href="/profissional/login" style="color:#52d1e8;display:block;margin:20px 0">Professional — Executivo e corretor</a><a href="/empresa/login" style="color:#52d1e8;display:block;margin:20px 0">Enterprise — Empresa, direção e gestão</a>');
    return new Response(selector,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
   }
@@ -421,6 +430,8 @@ export function createPremiumServer({
    let body;try{body=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid JSON"})}
    const tenantId=body?.tenantId,companyName=body?.companyName,adminEmail=String(body?.adminEmail||"").toLowerCase().trim(),adminPassword=body?.adminPassword;
    const professionalType=body?.professionalType||"broker";
+   if(portalMode!=="both"&&(body?.productMode||"enterprise")!==portalMode)
+    return json(403,{error:"This product cannot create accounts for the other CRM"});
    if(!["broker","executive"].includes(professionalType))return json(400,{error:"Invalid professional type"});
    if(!validEmail(adminEmail)||!validPass(adminPassword))return json(400,{error:"Invalid admin credentials"});
    try{
