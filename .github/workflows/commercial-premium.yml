@@ -81,3 +81,37 @@ jobs:
           node --check site/comverxa-premium-login.js
       - name: Testes integrados sem dados reais
         run: node --test tests/commercial-bootstrap-recovery.test.mjs tests/commercial-separate-services.test.mjs tests/commercial-products-access.test.mjs tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-premium-leads.test.mjs tests/commercial-premium-pilot.test.mjs tests/commercial-offsite-backup.test.mjs tests/commercial-recovery.test.mjs tests/commercial-migration-inspect.test.mjs tests/commercial-stripe.test.mjs tests/commercial-premium-whatsapp.test.mjs tests/commercial-password-visibility.test.mjs tests/commercial-preview.test.mjs
+      - name: Smoke HTTPS dos dois CRMs publicados (sem credenciais)
+        run: |
+          node --input-type=module <<'NODE'
+          const services=[
+           ["Professional","https://comverxa-professional-production.up.railway.app","profissional","empresa"],
+           ["Enterprise","https://comverxa-enterprise-production.up.railway.app","empresa","profissional"]
+          ];
+          const issues=[];
+          for(const [label,base,portal,other] of services){
+           for(const [path,expected] of [
+            ["/",303],["/healthz",200],["/"+portal+"/login",200],["/"+other+"/login",404],
+            ["/"+portal+"/app",303],["/api/"+portal+"/auth/me",401],["/api/"+other+"/auth/me",404],
+            ["/assets/commercial.js",200]
+           ]){
+            let res,last;
+            for(let i=0;i<4;i++){
+             try{res=await fetch(base+path,{redirect:"manual",signal:AbortSignal.timeout(10000)});
+              if(res.status===expected)break;
+              last="HTTP "+res.status;
+             }catch(err){last=String(err.message)}
+             await new Promise(done=>setTimeout(done,1200));
+            }
+            const actual=res?.status??"unreachable";
+            console.log(label,path,actual,expected);
+            if(actual!==expected)issues.push(label+" "+path+": "+last);
+            if(label==="Professional"&&path==="/assets/commercial.js"&&actual===200){
+              const js=await res.text();
+              if(!js.includes("personalMoneyCents")||!js.includes("professionalGoalFinance"))
+               issues.push("Professional published assets do not include premium goals");
+            }
+           }
+          }
+          if(issues.length)throw Error("Public smoke checks failed: "+issues.join(" | "));
+          NODE
