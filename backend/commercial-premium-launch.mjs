@@ -53,7 +53,7 @@ const app=createPremiumServer({
  bootstrapResetToken:env.CVX_COM_BOOTSTRAP_RESET_ONCE||null,
  enablePlatformMaster:env.CVX_COM_ENABLE_MASTER==="1",
  cookieSecure:env.CVX_COM_COOKIE_INSECURE_LOCAL_ONLY!=="1",
- offsiteBackupConfig,backupSchedule:configured,
+ offsiteBackupConfig,backupSchedule:configured,backupForceOnBoot:env.CVX_BACKUP_VERIFY_ON_BOOT==="1",
  publicOrigin:env.CVX_COM_PUBLIC_ORIGIN||"https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail,stripeConfig,whatsAppConfig
 });
 app.server.listen(port,"0.0.0.0",()=>console.log("COMVERXA Premium isolated pilot listening on PORT",port));
