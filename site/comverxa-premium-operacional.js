@@ -13,6 +13,18 @@ const basis=v=>{
  if(!Number.isFinite(x)||x<0||x>100)throw Error("Taxa deve estar entre 0 e 100");
  return Math.round(x*100);
 };
+function isEnterpriseLeader(){
+ return currentUser?.productMode!=="individual"&&["master","admin","director","manager","supervisor"].includes(currentUser?.role);
+}
+function experienceLabel(){
+ if(currentUser?.productMode==="individual"||currentUser?.role==="operator")
+  return currentUser?.professionalType==="executive"?"Dashboard do executivo":"Dashboard do corretor";
+ return {supervisor:"Dashboard de supervisão",manager:"Dashboard gerencial",director:"Dashboard da diretoria",master:"Dashboard empresarial",admin:"Dashboard empresarial"}[currentUser?.role]||"Dashboard Comercial";
+}
+function experienceScope(){
+ if(currentUser?.productMode==="individual"||currentUser?.role==="operator")return "Minha carteira";
+ return currentUser?.role==="supervisor"?"Minha equipe":currentUser?.role==="director"?"Visão da diretoria":"Visão da empresa";
+}
 const statusMap={lead:"Lead",negotiation:"Negociação",proposal:"Proposta",sold:"Vendido",active:"Ativo",lost:"Perdido",canceled:"Cancelado"};
 function notify(msg,error=false){const t=$("toast");t.textContent=msg;t.style.background=error?"#752c42":"#285066";t.hidden=false;setTimeout(()=>{t.hidden=true},5500)}
 async function call(path,{method="GET",body}={}){
@@ -119,7 +131,7 @@ async function renderSalesHistory(showUnconfiguredRanking=false){
    cvxTile(kpis,"Em negociação",n(negotiating),"Registros comerciais");
    cvxTile(kpis,"Propostas",n(proposals),"Registros comerciais");
    cvxTile(kpis,"Perdas em vendas",n(lost),"Registros comerciais","gold");
-   if(["admin","master","manager"].includes(currentUser.role)){
+   if(isEnterpriseLeader()){
     const ranking=$("cvxRanking");empty(ranking);
     const ordered=[...bySeller.values()].sort((a,b)=>b.sales-a.sales||b.amountCents-a.amountCents||a.id.localeCompare(b.id));
     ranking.append(textEl("p","Ranking por vendas confirmadas, sem cálculo de comissões."));
@@ -141,11 +153,11 @@ async function renderSalesHistory(showUnconfiguredRanking=false){
 
 async function renderPremiumDashboard(data){
  if(!$("cvxKpis"))return;
- const enterprise=["admin","master","manager"].includes(currentUser.role);
+ const enterprise=isEnterpriseLeader();
  $("cvxEnterprise").hidden=!enterprise;
- $("cvxHeading").textContent=enterprise?"Dashboard empresarial":"Dashboard individual";
+ $("cvxHeading").textContent=experienceLabel();
  $("cvxSubheading").textContent=enterprise?"Gestão da equipe, metas e resultados por competência.":"Suas vendas, metas, comissões e oportunidades.";
- $("cvxModeLabel").textContent=enterprise?"Visão da empresa":"Minha carteira";
+ $("cvxModeLabel").textContent=experienceScope();
  $("cvxFeedback").textContent="Dados do período: "+period+" · Atualizados a partir dos registros do Comercial.";
  const k=$("cvxKpis");empty(k);
  const sold=Number(data.counts?.sold||0),goal=Number(data.target?.nextMinSales??data.target?.achievedMinSales??0),remaining=Number(data.target?.remaining||0);
@@ -221,10 +233,10 @@ async function loadDashboard(){
   const message=status.canConfigure
    ?"Metas e comissões ainda não foram configuradas. Abra Metas e Comissão para definir as regras da empresa."
    :"As regras comerciais da sua empresa ainda não foram configuradas. Solicite a configuração ao gestor.";
-  const enterprise=["admin","master","manager"].includes(currentUser.role);
-  $("cvxHeading").textContent=enterprise?"Dashboard empresarial":"Dashboard individual";
+  const enterprise=isEnterpriseLeader();
+  $("cvxHeading").textContent=experienceLabel();
   $("cvxSubheading").textContent="Configuração comercial pendente";
-  $("cvxModeLabel").textContent=enterprise?"Visão da empresa":"Minha carteira";
+  $("cvxModeLabel").textContent=experienceScope();
   $("cvxEnterprise").hidden=!enterprise;
   $("cvxFeedback").textContent=message;
   for(const id of ["metrics","pace","earnings","cvxKpis","cvxPace","cvxGoalChart","cvxFunnel","cvxRanking","cvxFinance","cvxChannels","cvxInsights"]){
@@ -524,10 +536,15 @@ async function loadStripe(){
 }
 async function loadUsers(){
  const d=await call("/api/pilot/users");
- const tbody=$("usersTable"),options=$("sellerOptions");empty(tbody);empty(options);
+ const tbody=$("usersTable"),options=$("sellerOptions"),supervisors=$("supervisorOptions");
+ empty(tbody);empty(options);if(supervisors)empty(supervisors);
+ const roles={operator:"Corretor / Executivo",supervisor:"Supervisor",manager:"Gerente",director:"Diretor",admin:"Administrador",master:"ADM Master"};
  for(const u of d.users){
-  row(tbody,[u.email,u.role,u.id]);
-  const opt=document.createElement("option");opt.value=u.id;opt.label=u.email+" — "+u.role;options.append(opt);
+  row(tbody,[u.email,roles[u.role]||u.role,u.id,u.supervisorId||"—"]);
+  const option=document.createElement("option");option.value=u.id;option.label=u.email+" — "+(roles[u.role]||u.role);options.append(option);
+  if(u.role==="supervisor"&&supervisors){
+   const item=document.createElement("option");item.value=u.id;item.label=u.email;supervisors.append(item);
+  }
  }
 }
 async function refresh(){
@@ -558,21 +575,43 @@ function bindForm(id,endpoint,transform,after){
 }
 async function init(){
  const me=await call("/api/auth/me");csrf=me.csrf;currentUser=me.user;
+ if(currentUser.productMode==="individual"||currentUser.role==="operator"){
+  $("professionalProfileCard").hidden=false;
+  $("professionalProfileForm").elements.professionalType.value=currentUser.professionalType||"broker";
+ }
+ const individual=currentUser.productMode==="individual";
+ document.body.dataset.product=individual?"individual":"enterprise";
+ const brand=document.querySelector(".brand small");
+ if(brand)brand.textContent=individual?"PROFESSIONAL · INDIVIDUAL":"ENTERPRISE · EMPRESAS";
+ const heading=document.querySelector("header .toolbar strong");
+ if(heading)heading.textContent=individual?"COMVERXA / Professional":"COMVERXA / Enterprise";
+ const note=document.querySelector("#sidebar .foot");
+ if(note&&individual)note.textContent="Carteira exclusiva do profissional. WhatsApp depende de conexão validada.";
+ if(note&&!individual)note.textContent="Permissões e indicadores por cargo na empresa. Integrações dependem de validação.";
  $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
  $("cvxExport").addEventListener("click",()=>{window.open("/api/commercial/report/print"+contextMonth(),"_blank","noopener,noreferrer")});
  $("period").value=period;
  $("saleSeller").value=currentUser.id;$("policySeller").value=currentUser.id;$("leadSeller").value=currentUser.id;
- if(currentUser.role==="operator"){
-  document.querySelectorAll('#nav [data-view="team"],#nav [data-view="users"]').forEach(b=>b.hidden=true);
-  $("rulesForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
+ if(currentUser.role==="operator"||individual){
+  document.querySelectorAll('#nav [data-view="team"],#nav [data-view="users"],#nav [data-view="companies"]').forEach(b=>b.hidden=true);
+  if(currentUser.role==="operator")$("rulesForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
   $("saleSeller").readOnly=true;$("policySeller").readOnly=true;$("leadSeller").readOnly=true;
   $("printReport").hidden=false;
  }
- if(!["admin","master"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="users"]').forEach(el=>{el.hidden=true})}
- if(!["admin","master"].includes(currentUser.role)){$("offsiteBackupPanel").hidden=true}
+ if(!individual&&["supervisor","operator"].includes(currentUser.role)){
+  $("waInboxSlot").disabled=true;$("waLoadInbox").disabled=true;
+  $("waInboxTable").replaceChildren();
+  row($("waInboxTable"),["A caixa de entrada corporativa compartilhada exige distribuição de conversas pela gestão."]);
+ }
+ if(currentUser.role==="supervisor"){
+  document.querySelectorAll('#nav [data-view="goals"],#nav [data-view="users"],#nav [data-view="billing"]').forEach(el=>el.hidden=true);
+  $("sellerGoalForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
+ }
+ if(!["admin","master","director"].includes(currentUser.role)||individual){document.querySelectorAll('#nav [data-view="users"]').forEach(el=>{el.hidden=true})}
+ if(!["admin","master","director"].includes(currentUser.role)||individual){$("offsiteBackupPanel").hidden=true}
  if(currentUser.role==="master"){document.querySelectorAll('#nav [data-view="companies"]').forEach(el=>{el.hidden=false})}
- if(!["admin","master","manager"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="billing"]').forEach(el=>{el.hidden=true})}
- if(!me.mustChangePassword&&["admin","master","manager"].includes(currentUser.role)){
+ if(!["admin","master","manager","director"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="billing"]').forEach(el=>{el.hidden=true})}
+ if(!me.mustChangePassword&&!individual&&["admin","master","director"].includes(currentUser.role)){
   loadUsers().catch(e=>notify("Não foi possível carregar os usuários: "+e.message,true));
  }
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
@@ -590,7 +629,7 @@ async function init(){
    location.assign(data.url);
   }catch(err){notify("Não foi possível abrir o Stripe: "+err.message,true);button.disabled=false}
  });
- if(["admin","master"].includes(currentUser.role)){
+ if(["admin","master","director"].includes(currentUser.role)&&!individual){
   $("runOffsiteBackup").addEventListener("click",async()=>{
    const btn=$("runOffsiteBackup");btn.disabled=true;notify("Iniciando backup criptografado e verificação de restauração.");
    try{const result=await call("/api/pilot/backups/offsite",{method:"POST",body:{}});
@@ -705,21 +744,32 @@ async function init(){
   e.preventDefault();const btn=e.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
   try{
    const v=Object.fromEntries(new FormData(e.currentTarget).entries());
-   const created=await call("/api/pilot/users",{method:"POST",body:{email:v.email,password:v.password,role:v.role}});
+   const created=await call("/api/pilot/users",{method:"POST",body:{email:v.email,password:v.password,role:v.role,professionalType:v.professionalType,supervisorId:v.supervisorId||null}});
    notify("Usuário criado. ID do vendedor: "+created.id);
    e.currentTarget.reset();await loadUsers();
   }catch(error){notify(error.message,true)}finally{btn.disabled=false}
  });
+ if(["admin","master","director"].includes(currentUser.role)&&!individual){
+  $("assignSupervisorForm").addEventListener("submit",async event=>{
+   event.preventDefault();const values=Object.fromEntries(new FormData(event.currentTarget).entries());
+   const button=event.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+   try{
+    await call("/api/pilot/users/"+encodeURIComponent(values.userId)+"/supervisor",{method:"POST",body:{supervisorId:values.supervisorId||null}});
+    await loadUsers();notify("Supervisor responsável atualizado.");
+   }catch(error){notify(error.message,true)}finally{button.disabled=false}
+  });
+ }
  if(currentUser.role==="master"){
   const companyForm=$("companyForm");
   const companyPlan=companyForm.querySelector('select[name="plan"]');
   const seatInput=companyForm.querySelector('input[name="seatLimit"]');
+  const productMode=companyForm.querySelector('select[name="productMode"]');
   const seatsByPlan={starter:1,professional:3,business:8};
-  const syncSeats=()=>{seatInput.value=String(seatsByPlan[companyPlan.value]||1)};
-  companyPlan.addEventListener("change",syncSeats);syncSeats();
+  const syncSeats=()=>{seatInput.value=String(productMode.value==="individual"?1:seatsByPlan[companyPlan.value]||1)};
+  companyPlan.addEventListener("change",syncSeats);productMode.addEventListener("change",syncSeats);syncSeats();
   bindForm("companyForm","/api/platform/companies",v=>({
-   tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),
-   adminEmail:v.adminEmail,adminPassword:v.adminPassword
+   tenantId:v.tenantId,companyName:v.companyName,plan:v.plan,seatLimit:Number(v.seatLimit),productMode:v.productMode,
+   adminEmail:v.adminEmail,adminPassword:v.adminPassword,professionalType:v.professionalType
   }),()=>loadCompanies());
   $("companyTable").addEventListener("click",async e=>{
    const button=e.target.closest("button[data-tenant]");if(!button)return;
@@ -731,6 +781,14 @@ async function init(){
    }catch(err){notify(err.message,true)}finally{button.disabled=false}
   });
  }
+ $("professionalProfileForm").addEventListener("submit",async e=>{
+  e.preventDefault();const button=e.currentTarget.querySelector('button[type="submit"]');button.disabled=true;
+  try{
+   const value=e.currentTarget.elements.professionalType.value;
+   await call("/api/auth/profile",{method:"POST",body:{professionalType:value}});
+   currentUser.professionalType=value;notify("Perfil profissional atualizado.");
+  }catch(err){notify(err.message,true)}finally{button.disabled=false}
+ });
  $("passwordForm").addEventListener("submit",async e=>{
   e.preventDefault();
   const v=Object.fromEntries(new FormData(e.currentTarget).entries());

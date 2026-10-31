@@ -3,7 +3,7 @@
  * Does not send messages, scrape leads or process payments.
  */
 import {randomUUID} from "node:crypto";
-import {assertScope,assertWriteScope} from "./commercial-premium-core.mjs";
+import {assertScope,assertWriteScope,canAccessSeller} from "./commercial-premium-core.mjs";
 const stages=["lead","contacted","negotiation","proposal","won","lost","on_hold"];
 const heat=["cold","warm","hot"];
 const origins=["whatsapp","referral","paid","campaign","organic","other"];
@@ -37,7 +37,7 @@ export function createLeadsStore(db){
  const scoped=(session,leadId)=>{
   assertScope(session);
   const r=stmt(db,"SELECT * FROM cvx_pilot_leads WHERE tenant_id=? AND id=?").get(session.tenantId,id(leadId));
-  if(!r||(session.role==="operator"&&r.seller_id!==session.userId))throw Error("Not found");
+  if(!r||!canAccessSeller(session,r.seller_id))throw Error("Not found");
   return r;
  };
  const canonical=(input,session)=>{
@@ -73,7 +73,7 @@ export function createLeadsStore(db){
    const old=scoped(session,leadId);
    if(!input||typeof input!=="object")throw Error("Invalid lead");
    if(!Number.isSafeInteger(input.expectedVersion)||input.expectedVersion!==old.version)throw Error("Version conflict");
-   if(input.sellerId!==undefined&&input.sellerId!==old.seller_id&&!["manager","admin","master"].includes(session.role))throw Error("Forbidden");
+   if(input.sellerId!==undefined&&input.sellerId!==old.seller_id&&!["manager","director","admin","master","supervisor"].includes(session.role))throw Error("Forbidden");
    const values=canonical({sellerId:input.sellerId??old.seller_id,
     name:input.name??old.name,phone:input.phone??old.phone,email:input.email??old.email,
     stage:input.stage??old.stage,temperature:input.temperature??old.temperature,source:input.source??old.source,uf:input.uf??old.uf,
@@ -94,7 +94,11 @@ export function createLeadsStore(db){
    if(ddd!==undefined&&!/^[0-9]{2}$/.test(ddd))throw Error("Invalid DDD");
    if(uf!==undefined&&!/^[A-Z]{2}$/.test(uf))throw Error("Invalid state");
    let sql="SELECT * FROM cvx_pilot_leads WHERE tenant_id=?",args=[session.tenantId];
-   if(session.role==="operator"){sql+=" AND seller_id=?";args.push(session.userId)}
+   if(session.productMode==="individual"||session.role==="operator"){sql+=" AND seller_id=?";args.push(session.userId)}
+   else if(session.role==="supervisor"){
+    const ids=[...new Set([session.userId,...(Array.isArray(session.teamSellerIds)?session.teamSellerIds:[])])];
+    sql+=" AND seller_id IN ("+ids.map(()=>"?").join(",")+")";args.push(...ids);
+   }
    if(stage){sql+=" AND stage=?";args.push(stage)}
    if(ddd){sql+=" AND ddd=?";args.push(ddd)}
    if(uf){sql+=" AND uf=?";args.push(uf)}

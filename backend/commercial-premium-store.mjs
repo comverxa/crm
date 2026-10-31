@@ -3,7 +3,7 @@
  * Inject a Bun or Node SQLite connection. The caller MUST validate the session on
  * the server and take encrypted backups before using this with real customer data.
  */
-import {assertScope,assertWriteScope,validateRules,salesSnapshot,renewalQueue,money} from "./commercial-premium-core.mjs";
+import {assertScope,assertWriteScope,canAccessSeller,canViewTeam,validateRules,salesSnapshot,renewalQueue,money} from "./commercial-premium-core.mjs";
 import {validateSellerPlan,teamDashboard} from "./commercial-premium-team.mjs";
 const ident=/^[a-zA-Z0-9_.:-]{1,100}$/;
 function id(s){if(typeof s!=="string"||!ident.test(s))throw Error("Invalid id");return s}
@@ -15,6 +15,14 @@ function audit(db,s,action,entity){
 }
 function tx(db,fn){db.exec("BEGIN IMMEDIATE");try{const v=fn();db.exec("COMMIT");return v}catch(e){db.exec("ROLLBACK");throw e}}
 function oneOf(x,allowed){if(!allowed.includes(x))throw Error("Invalid enum");return x}
+function sellerFilter(s){
+ if(s.productMode==="individual"||s.role==="operator")return {sql:" AND seller_id=?",args:[s.userId]};
+ if(s.role==="supervisor"){
+  const ids=[...new Set([s.userId,...(Array.isArray(s.teamSellerIds)?s.teamSellerIds:[])])];
+  return {sql:" AND seller_id IN ("+ids.map(()=>"?").join(",")+")",args:ids};
+ }
+ return {sql:"",args:[]};
+}
 function sale(r){return {id:r.id,tenantId:r.tenant_id,sellerId:r.seller_id,soldAt:r.sold_at,status:r.status,
  premiumCents:r.premium_cents,activationCents:r.activation_cents,recurringCents:r.recurring_cents,commissionState:r.commission_state}}
 function policy(r){return {id:r.id,tenantId:r.tenant_id,sellerId:r.seller_id,productType:r.product_type,status:r.status,
@@ -31,7 +39,7 @@ export function createCommercialStore(db){
  db.exec("CREATE INDEX IF NOT EXISTS cvx_comm_audit_scope ON cvx_comm_audit(tenant_id,event_id)");
  return {
   saveRules(s,input){
-   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   assertScope(s);if(!["master","admin","director","manager"].includes(s.role))throw Error("Forbidden");
    const rules=validateRules(input),now=new Date().toISOString();
    tx(db,()=>{stmt(db,"INSERT INTO cvx_comm_rules (tenant_id,rules_json,updated_at,actor_id) VALUES (?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET rules_json=excluded.rules_json,updated_at=excluded.updated_at,actor_id=excluded.actor_id").run(s.tenantId,JSON.stringify(rules),now,s.userId);audit(db,s,"RULES_UPDATED","rules")});
    return rules;
@@ -54,8 +62,9 @@ export function createCommercialStore(db){
   },
   listSales(s,month){
    assertScope(s);if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error("Invalid month");
-   const sql="SELECT * FROM cvx_comm_sales WHERE tenant_id=? AND sold_at>=? AND sold_at<=?"+(s.role==="operator"?" AND seller_id=?":"")+" ORDER BY sold_at DESC,id DESC LIMIT 10001";
-   const params=[s.tenantId,month+"-01",month+"-31"];if(s.role==="operator")params.push(s.userId);
+   const filter=sellerFilter(s);
+   const sql="SELECT * FROM cvx_comm_sales WHERE tenant_id=? AND sold_at>=? AND sold_at<=?"+filter.sql+" ORDER BY sold_at DESC,id DESC LIMIT 10001";
+   const params=[s.tenantId,month+"-01",month+"-31",...filter.args];
    const rows=stmt(db,sql).all(...params);if(rows.length>10000)throw Error("Result too large; paginate");
    return rows.map(sale);
   },
@@ -77,26 +86,29 @@ export function createCommercialStore(db){
   },
   listPolicies(s,{limit=10000}={}){
    assertScope(s);if(!Number.isInteger(limit)||limit<1||limit>10000)throw Error("Invalid limit");
-   const sql="SELECT * FROM cvx_comm_policies WHERE tenant_id=?"+(s.role==="operator"?" AND seller_id=?":"")+" ORDER BY ends_on ASC LIMIT ?";
-   const args=s.role==="operator"?[s.tenantId,s.userId,limit]:[s.tenantId,limit];
+   const filter=sellerFilter(s);
+   const sql="SELECT * FROM cvx_comm_policies WHERE tenant_id=?"+filter.sql+" ORDER BY ends_on ASC LIMIT ?";
+   const args=[s.tenantId,...filter.args,limit];
    return stmt(db,sql).all(...args).map(policy);
   },
   saveSellerPlan(s,input){
-   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   assertScope(s);if(!["master","admin","director","manager"].includes(s.role))throw Error("Forbidden");
    if(input?.tenantId!==undefined&&input.tenantId!==s.tenantId)throw Error("Not found");
    const defaults=this.getRules(s);if(!defaults)throw Error("Commission rules not configured");
    const plan=validateSellerPlan({...defaults,...input,tenantId:s.tenantId});
+   if(!canAccessSeller(s,plan.sellerId))throw Error("Forbidden");
    tx(db,()=>{
     stmt(db,"INSERT INTO cvx_comm_seller_plans(tenant_id,seller_id,plan_json,updated_at,actor_id) VALUES (?,?,?,?,?) ON CONFLICT(tenant_id,seller_id) DO UPDATE SET plan_json=excluded.plan_json,updated_at=excluded.updated_at,actor_id=excluded.actor_id").run(s.tenantId,plan.sellerId,JSON.stringify(plan),new Date().toISOString(),s.userId);
     audit(db,s,"SELLER_PLAN_UPDATED",plan.sellerId);
    });return plan;
   },
   listSellerPlans(s){
-   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
-   return stmt(db,"SELECT plan_json FROM cvx_comm_seller_plans WHERE tenant_id=? ORDER BY seller_id ASC LIMIT 1001").all(s.tenantId).map(r=>JSON.parse(r.plan_json));
+   assertScope(s);if(!canViewTeam(s))throw Error("Forbidden");
+   return stmt(db,"SELECT plan_json FROM cvx_comm_seller_plans WHERE tenant_id=? ORDER BY seller_id ASC LIMIT 1001").all(s.tenantId)
+    .map(r=>JSON.parse(r.plan_json)).filter(p=>canAccessSeller(s,p.sellerId));
   },
   teamSummary(s,{month,asOf,teamTargetSales=null}){
-   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   assertScope(s);if(!canViewTeam(s))throw Error("Forbidden");
    const defaultRules=this.getRules(s);if(!defaultRules)throw Error("Commission rules not configured");
    return teamDashboard({session:s,sales:this.listSales(s,month),plans:this.listSellerPlans(s),month,asOf,defaultRules,teamTargetSales:teamTargetSales??defaultRules.teamTargetSales??null});
   },
@@ -106,7 +118,7 @@ export function createCommercialStore(db){
   },
   renewals(s,{asOf}){return renewalQueue({session:s,contracts:this.listPolicies(s),asOf})},
   listAudit(s,{limit=100}={}){
-   assertScope(s);if(!["master","admin","manager"].includes(s.role))throw Error("Forbidden");
+   assertScope(s);if(s.productMode==="individual"||!["master","admin","director","manager"].includes(s.role))throw Error("Forbidden");
    if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error("Invalid limit");
    return stmt(db,"SELECT actor_id,action,entity_id,created_at FROM cvx_comm_audit WHERE tenant_id=? ORDER BY event_id DESC LIMIT ?").all(s.tenantId,limit);
   }
