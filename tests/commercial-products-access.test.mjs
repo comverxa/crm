@@ -94,6 +94,12 @@ test("login, individual onboarding and supervisor reassignment enforce organizat
   assert.equal(r.status,201);
   const solo=await login("single@exemplo.test","SingleStartSecure-2026!");
   assert.equal(solo.me.user.productMode,"individual");
+  let profile=await post(solo,"/api/auth/profile",{professionalType:"executive"});
+  assert.equal(profile.status,200);
+  const freshMe=await get(solo,"/api/auth/me").then(r=>r.json());
+  assert.equal(freshMe.user.professionalType,"executive");
+  profile=await post(solo,"/api/auth/profile",{professionalType:"director"});
+  assert.equal(profile.status,400);
   assert.equal((await get(solo,"/api/pilot/company").then(r=>r.json())).company.productMode,"individual");
   assert.equal((await get(solo,"/api/commercial/team?month="+period+"&asOf="+asOf)).status,403);
   assert.equal((await get(solo,"/api/pilot/users")).status,403);
@@ -119,6 +125,7 @@ test("login, individual onboarding and supervisor reassignment enforce organizat
   const director=await login("director@exemplo.test","StrongEmployeePassword2026!");
   assert.equal(supervisor.me.user.role,"supervisor");
   assert.equal(director.me.user.role,"director");
+  assert.equal((await post(director,"/api/auth/profile",{professionalType:"executive"})).status,403);
   assert.equal((await get(supervisor,"/api/pilot/users").then(r=>r.json())).users.length,2);
   assert.equal((await post(admin,"/api/commercial/rules",rules)).status,200);
   for(const [id,sellerId] of [["A",brokerA],["B",brokerB]]){
