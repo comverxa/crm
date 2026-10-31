@@ -450,6 +450,10 @@ export function createPremiumServer({
   if(path==="/api/pilot/backup"&&req.method==="POST"){
    const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
    if(!["admin","master","director"].includes(session.role))return json(403,{error:"Forbidden"});
+   // Direct SQLite export includes ALL tenants; never give a company admin other companies' data.
+   const tenantCount=Number(stmt("SELECT COUNT(*) AS n FROM cvx_pilot_tenants").get().n);
+   if(session.role!=="master"&&(tenantCount!==1||session.productMode==="individual"))
+    return json(403,{error:"Multi-tenant backup restricted to platform administrator"});
    if(!csrfOk(req,session)||req.headers.get("x-cvx-backup-confirm")!=="EXPORTAR")
     return json(403,{error:"Forbidden"});
    if(backupRunning)return json(429,{error:"Backup already running"});
