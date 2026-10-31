@@ -1,4 +1,7 @@
-// COMVERXA Premium — isolated pilot UI; ONLY communicates with same-origin, authenticated endpoints.
+// COMVERXA Premium — two strictly scoped product portals; all API calls stay in their product.
+const cvxPortal=location.pathname.startsWith("/profissional/")?"profissional":location.pathname.startsWith("/empresa/")?"empresa":"";
+const portalApi=path=>cvxPortal&&path.startsWith("/api/")?"/api/"+cvxPortal+path.slice(4):path;
+const portalPage=page=>cvxPortal?"/"+cvxPortal+"/"+page:"/"+page;
 let csrf="",currentUser=null,period=new Date().toISOString().slice(0,7),currentView="dashboard";
 const $=id=>document.getElementById(id);
 const brl=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(value)||0)/100);
@@ -29,8 +32,8 @@ const statusMap={lead:"Lead",negotiation:"Negociação",proposal:"Proposta",sold
 function notify(msg,error=false){const t=$("toast");t.textContent=msg;t.style.background=error?"#752c42":"#285066";t.hidden=false;setTimeout(()=>{t.hidden=true},5500)}
 async function call(path,{method="GET",body}={}){
  const headers={accept:"application/json"};if(body!==undefined){headers["content-type"]="application/json";headers["x-csrf-token"]=csrf}
- const r=await fetch(path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:"same-origin",cache:"no-store"});
- if(r.status===401){location.assign("/login");throw Error("Sessão expirada")}
+ const r=await fetch(portalApi(path),{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:"same-origin",cache:"no-store"});
+ if(r.status===401){location.assign(portalPage("login"));throw Error("Sessão expirada")}
  const contentType=r.headers.get("content-type")||"";
  const v=contentType.includes("json")?await r.json():{error:"Resposta inesperada"};
  if(!r.ok)throw Error(v.error==="Invalid request"?"Verifique os campos e regras informadas":v.error==="Forbidden"?"Ação não permitida para este usuário":v.error==="Not found"?"Registro não encontrado":"Falha: "+(v.error||r.status));
@@ -549,8 +552,8 @@ async function loadUsers(){
 }
 async function refresh(){
  const base=contextMonth();
- $("printReport").href="/api/commercial/report/print"+base;
- $("exportCsv").href="/api/commercial/report.csv"+base;
+ $("printReport").href=portalApi("/api/commercial/report/print"+base);
+ $("exportCsv").href=portalApi("/api/commercial/report.csv"+base);
  if(currentView==="dashboard")return loadDashboard();
  if(currentView==="sales")return loadSales();
  if(currentView==="whatsapp")return loadWhatsApp();
@@ -575,6 +578,9 @@ function bindForm(id,endpoint,transform,after){
 }
 async function init(){
  const me=await call("/api/auth/me");csrf=me.csrf;currentUser=me.user;
+ if(cvxPortal==="profissional"&&currentUser.productMode!=="individual"||cvxPortal==="empresa"&&currentUser.productMode!=="enterprise"){
+  location.assign(portalPage("login"));return;
+ }
  if(currentUser.productMode==="individual"||currentUser.role==="operator"){
   $("professionalProfileCard").hidden=false;
   $("professionalProfileForm").elements.professionalType.value=currentUser.professionalType||"broker";
@@ -589,7 +595,7 @@ async function init(){
  if(note&&individual)note.textContent="Carteira exclusiva do profissional. WhatsApp depende de conexão validada.";
  if(note&&!individual)note.textContent="Permissões e indicadores por cargo na empresa. Integrações dependem de validação.";
  $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
- $("cvxExport").addEventListener("click",()=>{window.open("/api/commercial/report/print"+contextMonth(),"_blank","noopener,noreferrer")});
+ $("cvxExport").addEventListener("click",()=>{window.open(portalApi("/api/commercial/report/print"+contextMonth()),"_blank","noopener,noreferrer")});
  $("period").value=period;
  $("saleSeller").value=currentUser.id;$("policySeller").value=currentUser.id;$("leadSeller").value=currentUser.id;
  if(currentUser.role==="operator"||individual){
@@ -618,7 +624,7 @@ async function init(){
  $("mobileMenu").addEventListener("click",()=>{$("sidebar").classList.toggle("open");$("overlay").classList.toggle("open")});
  $("overlay").addEventListener("click",()=>{$("sidebar").classList.remove("open");$("overlay").classList.remove("open")});
  $("period").addEventListener("change",()=>{period=$("period").value;refresh().catch(e=>notify(e.message,true))});
- $("logout").addEventListener("click",async()=>{try{await call("/api/auth/logout",{method:"POST",body:{}})}finally{location.assign("/login")}});
+ $("logout").addEventListener("click",async()=>{try{await call("/api/auth/logout",{method:"POST",body:{}})}finally{location.assign(portalPage("login"))}});
  $("stripePlans").addEventListener("click",async event=>{
   const button=event.target.closest("button[data-stripe-plan]");
   if(!button||button.disabled)return;
@@ -640,7 +646,7 @@ async function init(){
   $("pilotBackup").addEventListener("click",async()=>{
    const button=$("pilotBackup");button.disabled=true;
    try{
-    const resp=await fetch("/api/pilot/backup",{method:"POST",credentials:"same-origin",
+    const resp=await fetch(portalApi("/api/pilot/backup"),{method:"POST",credentials:"same-origin",
      headers:{"x-csrf-token":csrf,"x-cvx-backup-confirm":"EXPORTAR"},cache:"no-store"});
     if(!resp.ok)throw Error("Backup não disponível ("+resp.status+").");
     const blob=await resp.blob(),url=URL.createObjectURL(blob);
@@ -795,7 +801,7 @@ async function init(){
   if(v.newPassword!==v.confirmPassword){notify("Confirmação da senha não confere.",true);return}
   const b=e.currentTarget.querySelector('button[type="submit"]');b.disabled=true;
   try{await call("/api/auth/password",{method:"POST",body:{oldPassword:v.oldPassword,newPassword:v.newPassword}});
-   location.assign("/login");
+   location.assign(portalPage("login"));
   }catch(error){notify("Não foi possível alterar a senha: "+error.message,true)}finally{b.disabled=false}
  });
  if(me.mustChangePassword){

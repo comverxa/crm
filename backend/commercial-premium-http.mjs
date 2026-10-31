@@ -11,12 +11,17 @@ export function createCommercialHttpHandler({store,leads=null,getSession,verifyC
   throw Error("Authenticated integration dependencies required");
  return async function commercialRequest(req){
   let url;try{url=new URL(req.url)}catch{return json(404,{error:"Not found"})}
-  if(!url.pathname.startsWith(endpoint))return json(404,{error:"Not found"});
+  // Product-scoped paths map to the same business API, but use separate sessions.
+  const scopedPath=url.pathname.startsWith("/api/profissional/commercial/")?
+    endpoint+url.pathname.slice("/api/profissional/commercial/".length):
+    url.pathname.startsWith("/api/empresa/commercial/")?
+    endpoint+url.pathname.slice("/api/empresa/commercial/".length):url.pathname;
+  if(!scopedPath.startsWith(endpoint))return json(404,{error:"Not found"});
   if(!enabled)return json(503,{error:"Commercial module not enabled"});
   let session;try{session=await getSession(req)}catch{return json(401,{error:"Unauthorized"})}
   if(!session?.tenantId||!session?.userId||!["master","admin","director","manager","supervisor","operator"].includes(session.role))
    return json(401,{error:"Unauthorized"});
-  const action=url.pathname.slice(endpoint.length);
+  const action=scopedPath.slice(endpoint.length);
   if(!["GET","POST"].includes(req.method))return json(405,{error:"Method not allowed"});
   if(req.method==="POST"){
    let csrfOk=false;try{csrfOk=await verifyCsrf(req,session)}catch{}

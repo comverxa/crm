@@ -69,24 +69,26 @@ test("login, individual onboarding and supervisor reassignment enforce organizat
  const started=await new Promise(resolve=>app.server.listen(0,"127.0.0.1",resolve));
  const base="http://127.0.0.1:"+app.server.address().port;
  async function login(email,password){
-  const r=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});
+  const route=email==="single@exemplo.test"?"/api/profissional":"/api/empresa";
+  const r=await fetch(base+route+"/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password})});
   assert.equal(r.status,200, "login "+email);
   let cookie=r.headers.get("set-cookie").split(";")[0];
-  let me=await (await fetch(base+"/api/auth/me",{headers:{cookie}})).json();
+  let me=await (await fetch(base+route+"/auth/me",{headers:{cookie}})).json();
   if(me.mustChangePassword){
    const changed=password+"-rotated";
-   const rotation=await fetch(base+"/api/auth/password",{method:"POST",headers:{"content-type":"application/json",cookie,"x-csrf-token":me.csrf},
+   const rotation=await fetch(base+route+"/auth/password",{method:"POST",headers:{"content-type":"application/json",cookie,"x-csrf-token":me.csrf},
     body:JSON.stringify({oldPassword:password,newPassword:changed})});
    assert.equal(rotation.status,200);
-   const response=await fetch(base+"/api/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password:changed})});
+   const response=await fetch(base+route+"/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email,password:changed})});
    assert.equal(response.status,200);
    cookie=response.headers.get("set-cookie").split(";")[0];
-   me=await (await fetch(base+"/api/auth/me",{headers:{cookie}})).json();
+   me=await (await fetch(base+route+"/auth/me",{headers:{cookie}})).json();
   }
-  return {cookie,me};
+  return {cookie,me,route};
  }
- const post=async(auth,path,data)=>fetch(base+path,{method:"POST",headers:{"content-type":"application/json",cookie:auth.cookie,"x-csrf-token":auth.me.csrf},body:JSON.stringify(data)});
- const get=(auth,path)=>fetch(base+path,{headers:{cookie:auth.cookie}});
+ const scoped=(auth,path)=>auth.route&&path.startsWith("/api/")?auth.route+path.slice(4):path;
+ const post=async(auth,path,data)=>fetch(base+scoped(auth,path),{method:"POST",headers:{"content-type":"application/json",cookie:auth.cookie,"x-csrf-token":auth.me.csrf},body:JSON.stringify(data)});
+ const get=(auth,path)=>fetch(base+scoped(auth,path),{headers:{cookie:auth.cookie}});
  try{
   const master=await login(masterMail,masterPass);
   let r=await post(master,"/api/platform/companies",{tenantId:"single",companyName:"Corretor Individual",productMode:"individual",
@@ -94,6 +96,18 @@ test("login, individual onboarding and supervisor reassignment enforce organizat
   assert.equal(r.status,201);
   const solo=await login("single@exemplo.test","SingleStartSecure-2026!");
   assert.equal(solo.me.user.productMode,"individual");
+  assert.match(solo.cookie,/^cvx_professional_session=/);
+  assert.match(master.cookie,/^cvx_enterprise_session=/);
+  assert.equal((await get(solo,"/api/auth/me")).status,200);
+  assert.equal((await fetch(base+"/api/empresa/auth/me",{headers:{cookie:solo.cookie}})).status,401);
+  assert.equal((await fetch(base+"/api/profissional/auth/me",{headers:{cookie:master.cookie}})).status,401);
+  assert.equal((await fetch(base+"/profissional/app",{headers:{cookie:master.cookie},redirect:"manual"})).status,303);
+  assert.equal((await fetch(base+"/empresa/app",{headers:{cookie:solo.cookie},redirect:"manual"})).status,303);
+  const wrong=await fetch(base+"/api/empresa/auth/login",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({email:"single@exemplo.test",password:"SingleStartSecure-2026!-rotated"})});
+  assert.equal(wrong.status,403);
+  assert.match(await (await fetch(base+"/profissional/login")).text(),/Login do executivo e corretor/);
+  assert.match(await (await fetch(base+"/empresa/login")).text(),/Login da empresa/);
   let profile=await post(solo,"/api/auth/profile",{professionalType:"executive"});
   assert.equal(profile.status,200);
   const freshMe=await get(solo,"/api/auth/me").then(r=>r.json());
