@@ -190,3 +190,22 @@ test("one tenant cannot open conflicting parallel or cross-plan Stripe Checkouts
   assert.equal(ctx.calls,1);
  }finally{db.close()}
 });
+
+test("Independent Stripe checkout redirects only to the corresponding CRM, never the legacy app",async()=>{
+ for(const portalPath of ["/profissional/app","/empresa/app"]){
+  const db=new DatabaseSync(":memory:");let form;
+  try{
+   const app=createStripeBilling({db,secretKey:secret,webhookSecret,priceIds,baseUrl:"https://example.test",
+    portalPath,clock:()=>timestamp,fetchImpl:async(url,request)=>{
+     form=new URLSearchParams(request.body);
+     return new Response(JSON.stringify({id:sid,url:"https://checkout.stripe.com/c/pay/cs_test_checkout_0001"}),{status:200});
+    }});
+   await app.checkout("tenant-123","starter","demo@example.test");
+   assert.equal(form.get("success_url"),"https://example.test"+portalPath+"?checkout=return");
+   assert.equal(form.get("cancel_url"),"https://example.test"+portalPath+"?checkout=canceled");
+  }finally{db.close()}
+ }
+ const db=new DatabaseSync(":memory:");
+ try{assert.throws(()=>createStripeBilling({db,secretKey:secret,webhookSecret,priceIds,baseUrl:"https://example.test",portalPath:"//attacker.com"}),/Invalid Stripe return path/)}
+ finally{db.close()}
+});
