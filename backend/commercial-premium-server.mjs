@@ -60,7 +60,7 @@ export function createPremiumServer({
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
   recoveryJsPath=new URL("../site/comverxa-premium-recovery.js",import.meta.url),
   recoveryHtmlPath=new URL("../site/comverxa-premium-recovery.html",import.meta.url),
-  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,
+  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,backupForceOnBoot=false,
   publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null,stripeConfig=null,whatsAppConfig=null
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
@@ -618,12 +618,14 @@ export function createPremiumServer({
   }catch(error){res.writeHead(500,{"content-type":"application/json","cache-control":"no-store"});res.end(JSON.stringify({error:"Internal error"}))}
  });
  if(offsite&&backupSchedule){
+  let forceOnce=backupForceOnBoot===true;
   const runScheduled=async()=>{
    try{
     const last=offsite.last(),age=last?Date.now()-Date.parse(last.verified_at):Infinity;
-    if(age<20*3600*1000)return;
+    if(age<20*3600*1000&&!forceOnce)return;
+    forceOnce=false;
     const result=await offsite.run();
-    console.info("CVX_OFFSITE_BACKUP_VERIFIED",JSON.stringify({verified:result.verified,createdAt:result.createdAt,sizeBytes:result.sizeBytes}));
+    console.info("CVX_OFFSITE_BACKUP_VERIFIED",JSON.stringify({verified:result.verified,restoredToTemporaryDatabase:result.restoredToTemporaryDatabase===true,createdAt:result.createdAt,sizeBytes:result.sizeBytes}));
    }catch(error){
     console.warn("CVX_OFFSITE_BACKUP_FAILED",JSON.stringify({kind:error?.name||"Error"}));
    }
