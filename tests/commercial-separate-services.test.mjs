@@ -55,6 +55,8 @@ test("Professional and Enterprise run as isolated services with distinct databas
   const meEnterprise=await get(enterprise,"/api/empresa/auth/me",enterpriseCookie);
   assert.equal((await meIndividual.json()).user.productMode,"individual");
   assert.equal((await meEnterprise.json()).user.productMode,"enterprise");
+  assert.equal((await get(professional,"/api/profissional/platform/companies",professionalCookie)).status,403);
+  assert.equal((await get(enterprise,"/api/empresa/platform/companies",enterpriseCookie)).status,403);
   const readyIndividual=await get(professional,"/api/profissional/pilot/readiness",professionalCookie);
   const readyEnterprise=await get(enterprise,"/api/empresa/pilot/readiness",enterpriseCookie);
   assert.equal(readyIndividual.status,200);
