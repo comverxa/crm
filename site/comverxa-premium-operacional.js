@@ -13,6 +13,18 @@ const basis=v=>{
  if(!Number.isFinite(x)||x<0||x>100)throw Error("Taxa deve estar entre 0 e 100");
  return Math.round(x*100);
 };
+function isEnterpriseLeader(){
+ return currentUser?.productMode!=="individual"&&["master","admin","director","manager","supervisor"].includes(currentUser?.role);
+}
+function experienceLabel(){
+ if(currentUser?.productMode==="individual"||currentUser?.role==="operator")
+  return currentUser?.professionalType==="executive"?"Dashboard do executivo":"Dashboard do corretor";
+ return {supervisor:"Dashboard de supervisão",manager:"Dashboard gerencial",director:"Dashboard da diretoria",master:"Dashboard empresarial",admin:"Dashboard empresarial"}[currentUser?.role]||"Dashboard Comercial";
+}
+function experienceScope(){
+ if(currentUser?.productMode==="individual"||currentUser?.role==="operator")return "Minha carteira";
+ return currentUser?.role==="supervisor"?"Minha equipe":currentUser?.role==="director"?"Visão da diretoria":"Visão da empresa";
+}
 const statusMap={lead:"Lead",negotiation:"Negociação",proposal:"Proposta",sold:"Vendido",active:"Ativo",lost:"Perdido",canceled:"Cancelado"};
 function notify(msg,error=false){const t=$("toast");t.textContent=msg;t.style.background=error?"#752c42":"#285066";t.hidden=false;setTimeout(()=>{t.hidden=true},5500)}
 async function call(path,{method="GET",body}={}){
@@ -141,11 +153,11 @@ async function renderSalesHistory(showUnconfiguredRanking=false){
 
 async function renderPremiumDashboard(data){
  if(!$("cvxKpis"))return;
- const enterprise=["admin","master","manager"].includes(currentUser.role);
+ const enterprise=isEnterpriseLeader();
  $("cvxEnterprise").hidden=!enterprise;
- $("cvxHeading").textContent=enterprise?"Dashboard empresarial":"Dashboard individual";
+ $("cvxHeading").textContent=experienceLabel();
  $("cvxSubheading").textContent=enterprise?"Gestão da equipe, metas e resultados por competência.":"Suas vendas, metas, comissões e oportunidades.";
- $("cvxModeLabel").textContent=enterprise?"Visão da empresa":"Minha carteira";
+ $("cvxModeLabel").textContent=experienceScope();
  $("cvxFeedback").textContent="Dados do período: "+period+" · Atualizados a partir dos registros do Comercial.";
  const k=$("cvxKpis");empty(k);
  const sold=Number(data.counts?.sold||0),goal=Number(data.target?.nextMinSales??data.target?.achievedMinSales??0),remaining=Number(data.target?.remaining||0);
@@ -221,10 +233,10 @@ async function loadDashboard(){
   const message=status.canConfigure
    ?"Metas e comissões ainda não foram configuradas. Abra Metas e Comissão para definir as regras da empresa."
    :"As regras comerciais da sua empresa ainda não foram configuradas. Solicite a configuração ao gestor.";
-  const enterprise=["admin","master","manager"].includes(currentUser.role);
-  $("cvxHeading").textContent=enterprise?"Dashboard empresarial":"Dashboard individual";
+  const enterprise=isEnterpriseLeader();
+  $("cvxHeading").textContent=experienceLabel();
   $("cvxSubheading").textContent="Configuração comercial pendente";
-  $("cvxModeLabel").textContent=enterprise?"Visão da empresa":"Minha carteira";
+  $("cvxModeLabel").textContent=experienceScope();
   $("cvxEnterprise").hidden=!enterprise;
   $("cvxFeedback").textContent=message;
   for(const id of ["metrics","pace","earnings","cvxKpis","cvxPace","cvxGoalChart","cvxFunnel","cvxRanking","cvxFinance","cvxChannels","cvxInsights"]){
@@ -558,21 +570,34 @@ function bindForm(id,endpoint,transform,after){
 }
 async function init(){
  const me=await call("/api/auth/me");csrf=me.csrf;currentUser=me.user;
+ const individual=currentUser.productMode==="individual";
+ document.body.dataset.product=individual?"individual":"enterprise";
+ const brand=document.querySelector(".brand small");
+ if(brand)brand.textContent=individual?"PROFESSIONAL · INDIVIDUAL":"ENTERPRISE · EMPRESAS";
+ const heading=document.querySelector("header .toolbar strong");
+ if(heading)heading.textContent=individual?"COMVERXA / Professional":"COMVERXA / Enterprise";
+ const note=document.querySelector("#sidebar .foot");
+ if(note&&individual)note.textContent="Carteira exclusiva do profissional. WhatsApp depende de conexão validada.";
+ if(note&&!individual)note.textContent="Permissões e indicadores por cargo na empresa. Integrações dependem de validação.";
  $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
  $("cvxExport").addEventListener("click",()=>{window.open("/api/commercial/report/print"+contextMonth(),"_blank","noopener,noreferrer")});
  $("period").value=period;
  $("saleSeller").value=currentUser.id;$("policySeller").value=currentUser.id;$("leadSeller").value=currentUser.id;
- if(currentUser.role==="operator"){
-  document.querySelectorAll('#nav [data-view="team"],#nav [data-view="users"]').forEach(b=>b.hidden=true);
-  $("rulesForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
+ if(currentUser.role==="operator"||individual){
+  document.querySelectorAll('#nav [data-view="team"],#nav [data-view="users"],#nav [data-view="companies"]').forEach(b=>b.hidden=true);
+  if(currentUser.role==="operator")$("rulesForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
   $("saleSeller").readOnly=true;$("policySeller").readOnly=true;$("leadSeller").readOnly=true;
   $("printReport").hidden=false;
  }
- if(!["admin","master"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="users"]').forEach(el=>{el.hidden=true})}
- if(!["admin","master"].includes(currentUser.role)){$("offsiteBackupPanel").hidden=true}
+ if(currentUser.role==="supervisor"){
+  document.querySelectorAll('#nav [data-view="goals"],#nav [data-view="users"],#nav [data-view="billing"]').forEach(el=>el.hidden=true);
+  $("sellerGoalForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
+ }
+ if(!["admin","master","director"].includes(currentUser.role)||individual){document.querySelectorAll('#nav [data-view="users"]').forEach(el=>{el.hidden=true})}
+ if(!["admin","master","director"].includes(currentUser.role)||individual){$("offsiteBackupPanel").hidden=true}
  if(currentUser.role==="master"){document.querySelectorAll('#nav [data-view="companies"]').forEach(el=>{el.hidden=false})}
- if(!["admin","master","manager"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="billing"]').forEach(el=>{el.hidden=true})}
- if(!me.mustChangePassword&&["admin","master","manager"].includes(currentUser.role)){
+ if(!["admin","master","manager","director"].includes(currentUser.role)){document.querySelectorAll('#nav [data-view="billing"]').forEach(el=>{el.hidden=true})}
+ if(!me.mustChangePassword&&!individual&&["admin","master","director"].includes(currentUser.role)){
   loadUsers().catch(e=>notify("Não foi possível carregar os usuários: "+e.message,true));
  }
  document.querySelectorAll("#nav [data-view]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
