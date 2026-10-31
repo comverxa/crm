@@ -57,6 +57,10 @@ test("HTTP pilot login, secure session, CSRF, sales and logout end-to-end",async
  ({cookie,me}=await unlock(base,cookie,email,password));csrf=me.csrf;
  r=await fetch(base+"/app",{headers:{cookie}});assert.equal(r.status,200);
  assert.match(await r.text(),/COMVERXA Premium Comercial/);
+ // Sales activity remains available before commission rules are configured.
+ r=await fetch(base+"/api/commercial/sales?month=2026-10",{headers:{cookie}});
+ assert.equal(r.status,200);
+ assert.deepEqual((await r.json()).sales,[]);
  const post=async(path,payload,token=csrf,extra={})=>fetch(base+path,{method:"POST",
  headers:{"content-type":"application/json",cookie,"x-csrf-token":token,...extra},body:JSON.stringify(payload)});
  const rules={tiers:[{minSales:0,bonusCents:0},{minSales:1,bonusCents:25000}],
@@ -67,6 +71,8 @@ test("HTTP pilot login, secure session, CSRF, sales and logout end-to-end",async
  r=await post("/api/commercial/sales",{id:"TEST-01",sellerId:me.user.id,status:"sold",soldAt:"2026-10-20",
  premiumCents:15000,activationCents:2500,recurringCents:0});
  assert.equal(r.status,201);
+ r=await fetch(base+"/api/commercial/sales?month=2026-10",{headers:{cookie}});
+ assert.equal(r.status,200);assert.equal((await r.json()).sales.length,1);
  r=await fetch(base+"/api/commercial/summary?month=2026-10&asOf=2026-10-29",{headers:{cookie}});
  assert.equal(r.status,200);const dash=await r.json();
  assert.equal(dash.counts.sold,1);assert.equal(dash.commissions.effectiveCents,0);assert.equal(dash.commissions.retainedCents,1625);

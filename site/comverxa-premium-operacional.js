@@ -60,6 +60,85 @@ function cvxBar(root,label,count,max){
 function cvxMessage(root,message){
  root.replaceChildren(textEl("p",message));root.firstChild.className="cvx-empty";
 }
+
+/**
+ * Histórico de produção sem depender de regras de comissão.
+ * A API /sales já aplica escopo de empresa e de vendedor no servidor.
+ * Não representa pagamentos recebidos nem eventos do CRM principal.
+ */
+async function renderSalesHistory(showUnconfiguredRanking=false){
+ const host=$("cvxDailySales");if(!host)return;
+ empty(host);
+ try{
+  const response=await call("/api/commercial/sales?month="+encodeURIComponent(period));
+  const sales=Array.isArray(response.sales)?response.sales:[];
+  const [year,month]=period.split("-").map(Number);
+  const daysInMonth=new Date(Date.UTC(year,month,0)).getUTCDate();
+  const perDay=Array(daysInMonth).fill(0),bySeller=new Map();
+  let sold=0,lost=0,negotiating=0,proposals=0,valueCents=0;
+  for(const item of sales){
+   if(typeof item.soldAt!=="string"||!item.soldAt.startsWith(period+"-"))continue;
+   const day=Number(item.soldAt.slice(8,10));
+   if(!Number.isInteger(day)||day<1||day>daysInMonth)continue;
+   if(item.status==="lost")lost++;
+   if(item.status==="negotiation")negotiating++;
+   if(item.status==="proposal")proposals++;
+   if(item.status!=="sold"&&item.status!=="active")continue;
+   sold++;perDay[day-1]++;
+   const amount=(Number(item.premiumCents)||0)+(Number(item.activationCents)||0)+(Number(item.recurringCents)||0);
+   valueCents+=amount;
+   const id=String(item.sellerId||"Sem responsável");
+   const entry=bySeller.get(id)||{id,sales:0,amountCents:0};
+   entry.sales++;entry.amountCents+=amount;bySeller.set(id,entry);
+  }
+  const heading=textEl("p",n(sold)+" vendas confirmadas na competência · "+brl(valueCents)+" em valores registrados (não necessariamente recebidos).");
+  heading.className="cvx-chart-foot";host.append(heading);
+  const graph=document.createElement("div");graph.className="cvx-daily-chart";
+  graph.setAttribute("role","img");
+  graph.setAttribute("aria-label","Vendas confirmadas por dia do mês "+period);
+  const maximum=Math.max(1,...perDay);
+  for(let index=0;index<perDay.length;index++){
+   const count=perDay[index],day=document.createElement("div");
+   day.className="cvx-day";
+   day.title=String(index+1).padStart(2,"0")+"/"+String(month).padStart(2,"0")+": "+n(count)+" vendas";
+   const quantity=textEl("strong",count?String(count):"·");
+   const track=document.createElement("div");track.className="cvx-day-track";
+   const fill=document.createElement("div");fill.className="cvx-day-fill";
+   fill.style.height=(count?Math.max(5,count/maximum*100):0)+"%";
+   track.append(fill);
+   day.append(quantity,track,textEl("small",String(index+1).padStart(2,"0")));
+   graph.append(day);
+  }
+  host.append(graph);
+  const note=textEl("p","Datas e valores obtidos dos registros de vendas deste perfil no COMVERXA Comercial.");
+  note.className="cvx-chart-foot";host.append(note);
+  if(showUnconfiguredRanking){
+   const kpis=$("cvxKpis");
+   cvxTile(kpis,"Vendas confirmadas",n(sold),"Sem depender da configuração de comissão","cyan");
+   cvxTile(kpis,"Valor de vendas registrado",brl(valueCents),"Valor comercial; não representa recebimento");
+   cvxTile(kpis,"Em negociação",n(negotiating),"Registros comerciais");
+   cvxTile(kpis,"Propostas",n(proposals),"Registros comerciais");
+   cvxTile(kpis,"Perdas em vendas",n(lost),"Registros comerciais","gold");
+   if(["admin","master","manager"].includes(currentUser.role)){
+    const ranking=$("cvxRanking");empty(ranking);
+    const ordered=[...bySeller.values()].sort((a,b)=>b.sales-a.sales||b.amountCents-a.amountCents||a.id.localeCompare(b.id));
+    ranking.append(textEl("p","Ranking por vendas confirmadas, sem cálculo de comissões."));
+    for(const [index,seller] of ordered.slice(0,12).entries()){
+     const line=document.createElement("div");line.className="cvx-rank";
+     line.append(textEl("span",String(index+1)),textEl("span",seller.id),textEl("strong",n(seller.sales)+" vendas"));
+     const track=document.createElement("div");track.className="cvx-track";
+     const fill=document.createElement("div");fill.className="cvx-fill";
+     fill.style.width=Math.min(100,100*seller.sales/Math.max(1,sold))+"%";
+     track.append(fill);line.append(track);ranking.append(line);
+    }
+    if(!ordered.length)ranking.append(textEl("p","Ainda não há vendas confirmadas para esta equipe no período."));
+   }
+  }
+ }catch(error){
+  cvxMessage(host,"Histórico diário indisponível: "+error.message);
+ }
+}
+
 async function renderPremiumDashboard(data){
  if(!$("cvxKpis"))return;
  const enterprise=["admin","master","manager"].includes(currentUser.role);
@@ -193,6 +272,7 @@ async function loadDashboard(){
    cvxMessage($("cvxRanking"),"O ranking de vendas será exibido após a configuração de metas.");
    cvxMessage($("cvxFinance"),"Comissões e valores financeiros ainda não foram configurados.");
   }
+  await renderSalesHistory(true);
   return;
  }
  const data=await call("/api/commercial/summary"+contextMonth());
@@ -215,6 +295,7 @@ async function loadDashboard(){
  if(data.earnings.totalCents!==null)earnings.append(textEl("p","Ganho previsto (operador): "+brl(data.earnings.totalCents)));
  await loadDashboardInsights();
  await renderPremiumDashboard(data);
+ await renderSalesHistory();
 }
 async function loadDashboardInsights(){
  const funnel=$("dashFunnel"),wa=$("dashWa");
