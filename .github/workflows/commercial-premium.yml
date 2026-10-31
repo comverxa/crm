@@ -1,0 +1,79 @@
+name: COMVERXA Premium Comercial v1
+on:
+  push:
+    branches: [feature/comverxa-premium-comercial-v1]
+    paths:
+      - 'backend/commercial-premium-*.mjs'
+      - 'tests/commercial-premium.test.mjs'
+      - 'tests/commercial-premium-v2.test.mjs'
+      - 'tests/commercial-premium-leads.test.mjs'
+      - 'tests/commercial-premium-pilot.test.mjs'
+      - 'tests/commercial-products-access.test.mjs'
+      - 'tests/commercial-offsite-backup.test.mjs'
+      - 'tests/commercial-recovery.test.mjs'
+      - 'tests/commercial-migration-inspect.test.mjs'
+      - 'tests/commercial-stripe.test.mjs'
+      - 'tests/commercial-premium-whatsapp.test.mjs'
+      - 'tests/commercial-password-visibility.test.mjs'
+      - 'site/comverxa-premium-password.*'
+      - 'site/comverxa-premium-theme.css'
+      - 'backend/commercial-migration-inspect.mjs'
+      - 'site/comverxa-premium-operacional*'
+      - 'tests/commercial-preview.test.mjs'
+      - 'site/comverxa-premium-comercial.html'
+      - '.github/workflows/commercial-premium.yml'
+  pull_request:
+    paths:
+      - 'backend/commercial-premium-*.mjs'
+      - 'tests/commercial-premium.test.mjs'
+      - 'tests/commercial-premium-v2.test.mjs'
+      - 'tests/commercial-premium-leads.test.mjs'
+      - 'tests/commercial-premium-pilot.test.mjs'
+      - 'tests/commercial-products-access.test.mjs'
+      - 'tests/commercial-offsite-backup.test.mjs'
+      - 'tests/commercial-recovery.test.mjs'
+      - 'tests/commercial-migration-inspect.test.mjs'
+      - 'tests/commercial-stripe.test.mjs'
+      - 'tests/commercial-premium-whatsapp.test.mjs'
+      - 'tests/commercial-password-visibility.test.mjs'
+      - 'site/comverxa-premium-password.*'
+      - 'site/comverxa-premium-theme.css'
+      - 'backend/commercial-migration-inspect.mjs'
+      - 'site/comverxa-premium-operacional*'
+      - 'tests/commercial-preview.test.mjs'
+      - 'site/comverxa-premium-comercial.html'
+      - '.github/workflows/commercial-premium.yml'
+permissions:
+  contents: read
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validar sintaxe
+        run: |
+          node --check backend/commercial-premium-core.mjs
+          node --check backend/commercial-premium-store.mjs
+          node --check backend/commercial-premium-http.mjs
+          node --check backend/commercial-premium-team.mjs
+          node --check backend/commercial-premium-tenants.mjs
+          node --check backend/commercial-premium-leads.mjs
+          node --check backend/commercial-premium-reports.mjs
+          node --check backend/commercial-premium-server.mjs
+          node --check backend/commercial-premium-offsite-backup.mjs
+          node --check backend/commercial-premium-mail.mjs
+          node --check backend/commercial-premium-stripe.mjs
+          node --check backend/commercial-premium-whatsapp.mjs
+          node --check backend/commercial-premium-pricing.mjs
+          node --check backend/commercial-migration-inspect.mjs
+          node --check site/comverxa-premium-recovery.js
+          node --check backend/commercial-premium-launch.mjs
+          node --check site/comverxa-premium-operacional.js
+          node --check site/comverxa-premium-password.js
+          node --check site/comverxa-premium-login.js
+      - name: Testes integrados sem dados reais
+        run: node --test tests/commercial-products-access.test.mjs tests/commercial-premium.test.mjs tests/commercial-premium-v2.test.mjs tests/commercial-premium-leads.test.mjs tests/commercial-premium-pilot.test.mjs tests/commercial-offsite-backup.test.mjs tests/commercial-recovery.test.mjs tests/commercial-migration-inspect.test.mjs tests/commercial-stripe.test.mjs tests/commercial-premium-whatsapp.test.mjs tests/commercial-password-visibility.test.mjs tests/commercial-preview.test.mjs

@@ -1,0 +1,25 @@
+name: COMVERXA Comercial - Acesso publico e protecao
+on:
+  push:
+    branches: [feature/comverxa-premium-comercial-v1, main]
+    paths:
+      - 'tests/commercial-live-smoke.mjs'
+      - '.github/workflows/commercial-live-smoke.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '7 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar acesso real via HTTPS (sem senha)
+        env:
+          CVX_COM_SMOKE_URL: https://comverxa-comercial-piloto-production.up.railway.app
+        run: node tests/commercial-live-smoke.mjs
