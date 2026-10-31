@@ -40,7 +40,7 @@ function asForm(fields){
  for(const [name,value] of Object.entries(fields))if(value!==null&&value!==undefined)data.set(name,scalar(value));
  return data;
 }
-export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},priceIdsAnnual={},baseUrl,
+export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},priceIdsAnnual={},baseUrl,portalPath="/app",
   fetchImpl=fetch,clock=()=>Date.now()}={}){
  if(!db||typeof db.prepare!=="function")throw Error("SQLite required");
  if(!TEST_SECRET.test(secretKey||""))throw Error("Stripe TEST key required");
@@ -48,6 +48,7 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},pric
  const base=new URL(baseUrl);
  if(base.protocol!=="https:"||base.username||base.password||base.search||base.hash||base.pathname!=="/")
   throw Error("HTTPS public origin required");
+ if(!["/app","/profissional/app","/empresa/app"].includes(portalPath))throw Error("Invalid Stripe return path");
  validateCatalogPrices({monthly:priceIds,annual:priceIdsAnnual});
  const prices={monthly:{},annual:{}};
  for(const plan of PLAN_SET){
@@ -104,8 +105,8 @@ export function createStripeBilling({db,secretKey,webhookSecret,priceIds={},pric
    .run(intent,tenantId,plan,priceId,cycle,createdAt);
   try{
    const session=await postStripe("checkout/sessions",{
-    mode:"subscription",expires_at:Math.floor(clock()/1000)+1800,success_url:base.origin+"/app?checkout=return",
-    cancel_url:base.origin+"/app?checkout=canceled",customer_email:email,
+    mode:"subscription",expires_at:Math.floor(clock()/1000)+1800,success_url:base.origin+portalPath+"?checkout=return",
+    cancel_url:base.origin+portalPath+"?checkout=canceled",customer_email:email,
     client_reference_id:tenantId,"line_items[0][price]":priceId,"line_items[0][quantity]":"1",
     "metadata[tenant_id]":tenantId,"metadata[plan]":plan,"metadata[cycle]":cycle,"metadata[intent_id]":intent,
     "subscription_data[metadata][tenant_id]":tenantId,
