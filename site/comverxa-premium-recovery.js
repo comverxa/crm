@@ -1,15 +1,18 @@
+const portal=location.pathname.startsWith("/profissional/")?"profissional":location.pathname.startsWith("/empresa/")?"empresa":"";
+const portalPage=page=>portal?"/"+portal+"/"+page:"/"+page;
+const portalApi=path=>portal?"/api/"+portal+path.slice(4):path;
 const $=id=>document.getElementById(id);
 const token=new URLSearchParams(location.search).get("token")||"";
-if(location.pathname==="/reset"){
+if(location.pathname.endsWith("/reset")){
  $("forgotSection").hidden=true;$("resetSection").hidden=false;
- history.replaceState(null,"","/reset");
+ history.replaceState(null,"",portalPage("reset"));
  if(!/^[A-Za-z0-9_-]{40,100}$/.test(token)){
   $("status").textContent="Link inválido. Solicite um novo link de recuperação.";
   $("resetForm").querySelector("button").disabled=true;
  }
 }
 async function send(path,body){
- const response=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify(body)});
+ const response=await fetch(portalApi(path),{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify(body)});
  if(response.status>=500)throw Error("Serviço de e-mail temporariamente indisponível.");
  if(!response.ok)throw Error("Não foi possível concluir. Solicite outro link e tente novamente.");
  return response;
@@ -30,6 +33,6 @@ $("resetForm").addEventListener("submit",async event=>{
   await send("/api/auth/reset",{token,newPassword:data.get("password")});
   $("status").textContent="Senha redefinida. Entre com a nova senha, digitada manualmente.";
   form.reset();
-  location.assign("/login?senha_atualizada=1");
+  location.assign(portalPage("login")+"?senha_atualizada=1");
  }catch(err){$("status").textContent=err.message}finally{btn.disabled=false}
 });
