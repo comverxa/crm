@@ -68,6 +68,31 @@ test("Professional and Enterprise run as isolated services with distinct databas
   }));
   assert.equal(forbidden.status,403);
   assert.equal(professional.db.prepare("SELECT count(*) AS total FROM cvx_pilot_tenants WHERE id='wrong-product'").get().total,0);
+  // A Professional account can configure sales tiers and bonuses, never a
+  // collective target. Enterprise must retain its independent team target.
+  const individualSession={tenantId:"bootstrap-professional",userId:me.user.id,role:me.user.role,productMode:"individual"};
+  const enterpriseMe=await get(enterprise,"/api/empresa/auth/me",enterpriseCookie).then(r=>r.json());
+  const corporateSession={tenantId:"bootstrap-enterprise",userId:enterpriseMe.user.id,role:enterpriseMe.user.role,productMode:"enterprise"};
+  const commissionRules={tiers:[{minSales:0,bonusCents:0},{minSales:10,bonusCents:25000},{minSales:20,bonusCents:50000}],
+   salesRateBps:1000,activationRateBps:500,recurringRateBps:200,teamTargetSales:40};
+  const personal=professional.store.saveRules(individualSession,commissionRules);
+  const corporate=enterprise.store.saveRules(corporateSession,commissionRules);
+  assert.equal(personal.teamTargetSales,null);
+  assert.equal(professional.store.getRules(individualSession).teamTargetSales,null);
+  assert.equal(corporate.teamTargetSales,40);
+  assert.equal(enterprise.store.getRules(corporateSession).teamTargetSales,40);
+  const storedPersonal=JSON.parse(professional.db.prepare("SELECT rules_json FROM cvx_comm_rules WHERE tenant_id=?").get(individualSession.tenantId).rules_json);
+  assert.equal(storedPersonal.teamTargetSales,null);
+  professional.store.upsertSale(individualSession,{
+   id:"personal-sale-1",sellerId:individualSession.userId,soldAt:"2026-10-30",status:"sold",premiumCents:15000
+  });
+  const summary=professional.store.snapshot(individualSession,{month:"2026-10",asOf:"2026-10-30"});
+  assert.equal(summary.counts.sold,1);
+  assert.equal(summary.target.nextMinSales,10);
+  assert.equal(summary.target.remaining,9);
+  assert.equal(summary.target.completionPct,10);
+  assert.throws(()=>professional.store.teamSummary(individualSession,{month:"2026-10",asOf:"2026-10-30"}),/Forbidden/);
+  assert.equal(enterprise.store.listSales(corporateSession,"2026-10").length,0);
  }finally{
   professional?.db.close();enterprise?.db.close();
   rmSync(dir,{recursive:true,force:true});
