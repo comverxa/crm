@@ -164,7 +164,7 @@ async function renderPremiumDashboard(data){
  $("cvxFeedback").textContent="Dados do período: "+period+" · Atualizados a partir dos registros do Comercial.";
  const k=$("cvxKpis");empty(k);
  const sold=Number(data.counts?.sold||0),goal=Number(data.target?.nextMinSales??data.target?.achievedMinSales??0),remaining=Number(data.target?.remaining||0);
- cvxTile(k,"Meta do período",n(goal)+" vendas","Faixa progressiva de remuneração");
+ cvxTile(k,currentUser?.productMode==="individual"?"Minha meta individual":"Meta do período",n(goal)+" vendas","Faixa progressiva de remuneração");
  cvxTile(k,"Realizado",n(sold)+" vendas","Vendas confirmadas","cyan");
  cvxTile(k,"Faltam",n(remaining)+" vendas","Para atingir a próxima faixa");
  cvxTile(k,"Atingimento",n(data.target?.completionPct||0)+"%","Da meta aplicável","gold");
@@ -233,7 +233,9 @@ async function loadDashboard(){
  const status=await call("/api/commercial/configuration-status");
  $("cvxExport").disabled=!status.configured;
  if(!status.configured){
-  const message=status.canConfigure
+  const message=currentUser?.productMode==="individual"
+   ?"Configure suas próprias metas de vendas, bônus e comissões em Metas e Comissão."
+   :status.canConfigure
    ?"Metas e comissões ainda não foram configuradas. Abra Metas e Comissão para definir as regras da empresa."
    :"As regras comerciais da sua empresa ainda não foram configuradas. Solicite a configuração ao gestor.";
   const enterprise=isEnterpriseLeader();
@@ -441,7 +443,7 @@ async function loadRules(){
  $("rateActive").value=rules.activationRateBps/100;
  $("rateRecurring").value=rules.recurringRateBps/100;
  $("fixed").value=rules.fixedSalaryCents/100;
- $("teamTarget").value=rules.teamTargetSales||40;
+ if(currentUser?.productMode!=="individual")$("teamTarget").value=rules.teamTargetSales??40;
 }
 async function loadTeam(){
  const data=await call("/api/commercial/team"+contextMonth());
@@ -587,6 +589,19 @@ async function init(){
  }
  const individual=currentUser.productMode==="individual";
  document.body.dataset.product=individual?"individual":"enterprise";
+ // Personal goals are independent from team production and company targets.
+ if(individual){
+  $("goalsTitle").textContent="Minhas metas individuais";
+  $("goalsDescription").textContent="Metas por faixa de vendas da sua própria carteira. Bônus, comissões e projeções são exclusivamente individuais.";
+  $("rulesTitle").textContent="Minhas metas e comissões";
+  $("saveRulesButton").textContent="Salvar minhas metas individuais";
+  $("teamTargetLabel").hidden=true;
+  $("teamTargetLabel").style.display="none";
+  $("teamTarget").disabled=true;
+  document.querySelectorAll("#goals .individual-goal-label").forEach((label,index)=>{
+   label.textContent="Minha meta "+(index+1)+" (vendas)";
+  });
+ }
  const brand=document.querySelector(".brand small");
  if(brand)brand.textContent=individual?"PROFESSIONAL · INDIVIDUAL":"ENTERPRISE · EMPRESAS";
  const heading=document.querySelector("header .toolbar strong");
@@ -742,7 +757,7 @@ async function init(){
   const tiers=[{minSales:0,bonusCents:0}];
   for(let i=1;i<=3;i++)tiers.push({minSales:Number($("g"+i).value),bonusCents:cents($("b"+i).value)});
   return {tiers,salesRateBps:basis($("rateSale").value),activationRateBps:basis($("rateActive").value),recurringRateBps:basis($("rateRecurring").value),
-    fixedSalaryCents:cents($("fixed").value),teamTargetSales:Number($("teamTarget").value),halfSaturday:true};
+    fixedSalaryCents:cents($("fixed").value),teamTargetSales:individual?null:Number($("teamTarget").value),halfSaturday:true};
  });
  bindForm("sellerGoalForm","/api/commercial/seller-plans",v=>({sellerId:v.sellerId,tiers:[
   {minSales:0,bonusCents:0},{minSales:Number(v.goal1),bonusCents:cents(v.bonus1)},{minSales:Number(v.goal2),bonusCents:cents(v.bonus2)}]}));
