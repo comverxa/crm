@@ -37,8 +37,8 @@ const portalFromPath=path=>/^\/(?:api\/)?profissional(?:\/|$)/.test(path)?"indiv
  /^\/(?:api\/)?empresa(?:\/|$)/.test(path)?"enterprise":null;
 const cookieName=mode=>mode==="individual"?"cvx_professional_session":mode==="enterprise"?"cvx_enterprise_session":"cvx_pilot_session";
 const cookieValue=(header,name="cvx_pilot_session")=>{
- const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,"\\const cookieValue=s=>{const m=/(?:^|;\s*)cvx_pilot_session=([A-Za-z0-9_-]{32,100})(?:;|$)/.exec(s||"");return m?.[1]||null};");
- const m=new RegExp("(?:^|;\\s*)"+escaped+"=([A-Za-z0-9_-]{32,100})(?:;|$)").exec(header||"");
+ if(!/^[a-z_]{3,40}$/.test(name))return null;
+ const m=new RegExp("(?:^|;\\s*)"+name+"=([A-Za-z0-9_-]{32,100})(?:;|$)").exec(header||"");
  return m?.[1]||null;
 };
 const professionalLoginPage=loginPage.replace("COMVERXA — Acesso Comercial","COMVERXA Professional | Acesso exclusivo")
