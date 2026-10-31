@@ -131,7 +131,7 @@ async function renderSalesHistory(showUnconfiguredRanking=false){
    cvxTile(kpis,"Em negociação",n(negotiating),"Registros comerciais");
    cvxTile(kpis,"Propostas",n(proposals),"Registros comerciais");
    cvxTile(kpis,"Perdas em vendas",n(lost),"Registros comerciais","gold");
-   if(["admin","master","manager"].includes(currentUser.role)){
+   if(isEnterpriseLeader()){
     const ranking=$("cvxRanking");empty(ranking);
     const ordered=[...bySeller.values()].sort((a,b)=>b.sales-a.sales||b.amountCents-a.amountCents||a.id.localeCompare(b.id));
     ranking.append(textEl("p","Ranking por vendas confirmadas, sem cálculo de comissões."));
