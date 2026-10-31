@@ -308,7 +308,7 @@ export function createPremiumServer({
    if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
    if(s.productMode!=="individual"&&s.role!=="operator")return json(403,{error:"Forbidden"});
    let body;try{body=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid JSON"})}
-   if(!["broker","executive"].includes(body?.professionalType))return json(400,{error:"Invalid professional type"});
+   if(!["broker","executive","external_executive","insurance_broker"].includes(body?.professionalType))return json(400,{error:"Invalid professional type"});
    stmt("UPDATE cvx_pilot_users SET professional_type=? WHERE id=? AND tenant_id=?")
     .run(body.professionalType,s.userId,s.tenantId);
    return json(200,{ok:true,professionalType:body.professionalType});
@@ -476,7 +476,7 @@ export function createPremiumServer({
    const professionalType=body?.professionalType||"broker";
    if(portalMode!=="both"&&(body?.productMode||"enterprise")!==portalMode)
     return json(403,{error:"This product cannot create accounts for the other CRM"});
-   if(!["broker","executive"].includes(professionalType))return json(400,{error:"Invalid professional type"});
+   if(!["broker","executive","external_executive","insurance_broker"].includes(professionalType))return json(400,{error:"Invalid professional type"});
    if(!validEmail(adminEmail)||!validPass(adminPassword))return json(400,{error:"Invalid admin credentials"});
    try{
     db.exec("BEGIN IMMEDIATE");
@@ -516,7 +516,7 @@ export function createPremiumServer({
    const email=String(data?.email||"").trim().toLowerCase(),pass=data?.password,role=data?.role;
    if(!validEmail(email)||!validPass(pass)||!["manager","director","supervisor","operator"].includes(role))return json(400,{error:"Invalid user"});
    const supervisorId=data?.supervisorId||null,professionalType=data?.professionalType||"broker";
-   if(!["broker","executive"].includes(professionalType))return json(400,{error:"Invalid professional type"});
+   if(!["broker","executive","external_executive","insurance_broker"].includes(professionalType))return json(400,{error:"Invalid professional type"});
    if(supervisorId&&(role!=="operator"||!stmt("SELECT 1 FROM cvx_pilot_users WHERE id=? AND tenant_id=? AND role='supervisor' AND active=1").get(supervisorId,s.tenantId)))
     return json(400,{error:"Invalid supervisor"});
    const company=tenants.current(s.tenantId);
