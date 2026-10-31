@@ -2,7 +2,12 @@
 const cvxPortal=location.pathname.startsWith("/profissional/")?"profissional":location.pathname.startsWith("/empresa/")?"empresa":"";
 const portalApi=path=>cvxPortal&&path.startsWith("/api/")?"/api/"+cvxPortal+path.slice(4):path;
 const portalPage=page=>cvxPortal?"/"+cvxPortal+"/"+page:"/"+page;
-// Respect the user\'s local calendar, especially around the UTC month boundary.\nfunction localDateYmd(date=new Date()){\n const yyyy=date.getFullYear(),mm=String(date.getMonth()+1).padStart(2,"0"),dd=String(date.getDate()).padStart(2,"0");\n return yyyy+"-"+mm+"-"+dd;\n}\nlet csrf="",currentUser=null,period=localDateYmd().slice(0,7),currentView="dashboard";
+// Respect the user's local calendar, especially around the UTC month boundary.
+function localDateYmd(date=new Date()){
+ const yyyy=date.getFullYear(),mm=String(date.getMonth()+1).padStart(2,"0"),dd=String(date.getDate()).padStart(2,"0");
+ return yyyy+"-"+mm+"-"+dd;
+}
+let csrf="",currentUser=null,period=localDateYmd().slice(0,7),currentView="dashboard";
 const $=id=>document.getElementById(id);
 const brl=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(value)||0)/100);
 const n=v=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1}).format(Number(v)||0);
