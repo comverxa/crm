@@ -609,6 +609,8 @@ async function init(){
  const note=document.querySelector("#sidebar .foot");
  if(note&&individual)note.textContent="Carteira exclusiva do profissional. WhatsApp depende de conexão validada.";
  if(note&&!individual)note.textContent="Permissões e indicadores por cargo na empresa. Integrações dependem de validação.";
+ const banner=document.querySelector(".banner");
+ if(banner&&individual)banner.textContent="COMVERXA PROFESSIONAL · Metas, vendas, bônus e comissões exclusivamente individuais. Canais WhatsApp dependem de conexão validada.";
  $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
  $("cvxExport").addEventListener("click",()=>{window.open(portalApi("/api/commercial/report/print"+contextMonth()),"_blank","noopener,noreferrer")});
  $("period").value=period;
