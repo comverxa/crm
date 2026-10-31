@@ -1,0 +1,49 @@
+name: COMVERXA Professional - Public Smoke
+on:
+  push:
+    branches:
+      - feature/comverxa-servicos-independentes
+    paths:
+      - '.github/workflows/commercial-public-smoke.yml'
+      - 'backend/commercial-premium-*.mjs'
+      - 'site/comverxa-premium-*'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health-and-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check HTTPS, login page and server-side isolation
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const root="https://comverxa-professional-production.up.railway.app";
+          const assertions=[
+            ["/healthz",200],
+            ["/profissional/login",200],
+            ["/empresa/login",404],
+            ["/login",404],
+            ["/api/auth/me",404],
+            ["/api/profissional/auth/me",401],
+            ["/api/empresa/auth/me",404]
+          ];
+          let errors=[];
+          for(const [path,want] of assertions){
+            let got=null,last=null;
+            for(let attempt=0;attempt<4;attempt++){
+              try{
+                const r=await fetch(root+path,{redirect:"manual",signal:AbortSignal.timeout(12000)});
+                got=r.status;
+                if(got===want)break;
+                last="Expected "+want+" got "+got;
+              }catch(err){last=String(err.cause?.message||err.message)}
+              await new Promise(resolve=>setTimeout(resolve,1800));
+            }
+            console.log(path,got,"expected",want);
+            if(got!==want)errors.push(path+": "+last);
+          }
+          if(errors.length)throw Error("Public smoke failed:\n"+errors.join("\n"));
+          console.log("Public Professional smoke completed successfully");
+          NODE
