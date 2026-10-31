@@ -13,6 +13,7 @@ const port=Number(process.env.PORT||3000);
 if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)||!/^([a-f0-9]{32}):([a-f0-9]{128})$/.test(verifier)||!/^https:\/\/[^/]+$/.test(origin))throw Error("Owner credentials and HTTPS origin required");
 const [salt,expected]=verifier.split(":");
 const sessions=new Map();
+const failedLogins=new Map();
 const ttl=8*3600*1000;
 const digest=x=>createHash("sha256").update(x).digest("hex");
 const same=(a,b)=>{const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y)};
@@ -29,15 +30,22 @@ const server=http.createServer(async(req,res)=>{
  if(path==="/healthz")return send(res,200,"ok");
  if(req.method==="GET"&&path==="/owner")return send(res,200,active?dashboard:login);
  if(req.method==="POST"&&path==="/owner/login"){
-  if(req.headers.origin&&req.headers.origin!==origin)return send(res,403,"Forbidden");
+  if(req.headers.origin!==origin)return send(res,403,"Forbidden");
+  const ip=String(req.socket.remoteAddress||"unknown");
+  const attempts=failedLogins.get(ip)||{count:0,until:0};
+  if(attempts.until>Date.now())return send(res,429,"Muitas tentativas. Tente mais tarde.",{"retry-after":"900"});
   let data;try{data=await body(req)}catch{return send(res,413,"Too large")}
   const supplied=scryptSync(String(data.get("password")||""),Buffer.from(salt,"hex"),64).toString("hex");
-  if(String(data.get("email")||"").toLowerCase()!==email||!same(supplied,expected))return send(res,401,"Credenciais inválidas");
+  if(String(data.get("email")||"").toLowerCase()!==email||!same(supplied,expected)){
+   attempts.count++;if(attempts.count>=5)attempts.until=Date.now()+900000;
+   failedLogins.set(ip,attempts);return send(res,401,"Credenciais inválidas");
+  }
+  failedLogins.delete(ip);
   const token=randomBytes(32).toString("hex");sessions.set(digest(token),Date.now()+ttl);
   return send(res,303,"",{"location":"/owner","set-cookie":`cvx_owner_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/owner; Max-Age=28800`});
  }
  if(req.method==="POST"&&path==="/owner/logout"){
-  if(req.headers.origin&&req.headers.origin!==origin)return send(res,403,"Forbidden");
+  if(req.headers.origin!==origin)return send(res,403,"Forbidden");
   if(cookie)sessions.delete(digest(cookie));
   return send(res,303,"",{"location":"/owner","set-cookie":"cvx_owner_session=; HttpOnly; Secure; SameSite=Strict; Path=/owner; Max-Age=0"});
  }
