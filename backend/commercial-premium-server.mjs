@@ -285,7 +285,9 @@ export function createPremiumServer({
   }
   if(path==="/api/auth/profile"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!csrfOk(req,s)||s.mustChangePassword)return json(403,{error:"Forbidden"});
+   // The required first-login password change protects business operations,
+   // but must not block editing this harmless professional display preference.
+   if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
    if(s.productMode!=="individual"&&s.role!=="operator")return json(403,{error:"Forbidden"});
    let body;try{body=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid JSON"})}
    if(!["broker","executive"].includes(body?.professionalType))return json(400,{error:"Invalid professional type"});
