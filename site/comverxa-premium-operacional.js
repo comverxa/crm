@@ -614,6 +614,21 @@ async function loadUsers(){
   }
  }
 }
+async function loadReadiness(){
+ const list=$("readinessList"),overview=$("readinessOverview");if(!list||!overview)return;
+ const response=await call("/api/pilot/readiness");
+ overview.textContent=response.readyForCommercialRelease?"Homologação concluída":"Homologação integral ainda pendente — confira as etapas abaixo.";
+ empty(list);
+ const labels={verified:"Verificado",configured:"Configurado; requer teste",provider_connected:"Provedor conectado; falta teste real",external_check:"Validação externa pendente",pending:"Pendente",unverified:"Não verificado"};
+ for(const item of response.checks||[]){
+  const line=document.createElement("div");line.className="card";line.style.padding="12px";
+  const head=document.createElement("strong");head.textContent=item.label;
+  const indicator=document.createElement("span");indicator.className="flag"+(item.state==="verified"?"":" warn");
+  indicator.style.marginLeft="8px";indicator.textContent=labels[item.state]||"Pendente";
+  const detail=textEl("p",item.detail||"");detail.className="note";detail.style.margin="7px 0 0";
+  line.append(head,indicator,detail);list.append(line);
+ }
+}
 async function refresh(){
  const base=contextMonth();
  $("printReport").href=portalApi("/api/commercial/report/print"+base);
@@ -628,6 +643,7 @@ async function refresh(){
  if(currentView==="companies")return loadCompanies();
  if(currentView==="billing")return loadStripe();
  if(currentView==="users"){await loadUsers();if(["admin","master"].includes(currentUser.role))await loadOffsiteStatus();return}
+ if(currentView==="account"&&["master","admin","director"].includes(currentUser.role))return loadReadiness();
 }
 function bindForm(id,endpoint,transform,after){
  $(id).addEventListener("submit",async e=>{
@@ -667,6 +683,10 @@ async function init(){
   document.querySelectorAll("#goals .individual-goal-label").forEach((label,index)=>{
    label.textContent="Minha meta "+(index+1)+" (vendas)";
   });
+ }
+ if(["master","admin","director"].includes(currentUser.role)){
+  $("readinessCard").hidden=false;
+  $("refreshReadiness").addEventListener("click",()=>loadReadiness().catch(err=>notify(err.message,true)));
  }
  const brand=document.querySelector(".brand small");
  if(brand)brand.textContent=individual?"PROFESSIONAL · INDIVIDUAL":"ENTERPRISE · EMPRESAS";
