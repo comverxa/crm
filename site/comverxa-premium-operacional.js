@@ -598,6 +598,11 @@ async function init(){
   $("saleSeller").readOnly=true;$("policySeller").readOnly=true;$("leadSeller").readOnly=true;
   $("printReport").hidden=false;
  }
+ if(!individual&&["supervisor","operator"].includes(currentUser.role)){
+  $("waInboxSlot").disabled=true;$("waLoadInbox").disabled=true;
+  $("waInboxTable").replaceChildren();
+  row($("waInboxTable"),["A caixa de entrada corporativa compartilhada exige distribuição de conversas pela gestão."]);
+ }
  if(currentUser.role==="supervisor"){
   document.querySelectorAll('#nav [data-view="goals"],#nav [data-view="users"],#nav [data-view="billing"]').forEach(el=>el.hidden=true);
   $("sellerGoalForm").querySelectorAll("input,button").forEach(el=>el.disabled=true);
