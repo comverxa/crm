@@ -187,6 +187,8 @@ export function createPremiumServer({
    if(origin&&origin!==url.origin)return json(403,{error:"Forbidden"});
    if(!origin&&!["same-origin","none"].includes(req.headers.get("sec-fetch-site")||"same-origin"))return json(403,{error:"Forbidden"});
   }
+  // Platform ownership operations are not exposed on customer-facing products.
+  if(portalMode!=="both"&&path.startsWith("/api/platform/"))return json(403,{error:"Platform administration unavailable on customer portals"});
   if(path==="/healthz")return json(200,{status:"ok",service:portalMode==="individual"?"comverxa-professional":portalMode==="enterprise"?"comverxa-enterprise":"commercial-pilot"});
   if(path==="/api/pilot/readiness"&&req.method==="GET"){
    const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
