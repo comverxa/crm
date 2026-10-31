@@ -40,11 +40,11 @@ export function createCommercialStore(db){
  return {
   saveRules(s,input){
    assertScope(s);if(!["master","admin","director","manager"].includes(s.role))throw Error("Forbidden");
-   const rules=validateRules(input),now=new Date().toISOString();
+   const rules=validateRules(s.productMode==="individual"?{...input,teamTargetSales:null,bonusMode:"incremental"}:input),now=new Date().toISOString();
    tx(db,()=>{stmt(db,"INSERT INTO cvx_comm_rules (tenant_id,rules_json,updated_at,actor_id) VALUES (?,?,?,?) ON CONFLICT(tenant_id) DO UPDATE SET rules_json=excluded.rules_json,updated_at=excluded.updated_at,actor_id=excluded.actor_id").run(s.tenantId,JSON.stringify(rules),now,s.userId);audit(db,s,"RULES_UPDATED","rules")});
    return rules;
   },
-  getRules(s){assertScope(s);const r=stmt(db,"SELECT rules_json FROM cvx_comm_rules WHERE tenant_id=?").get(s.tenantId);return r?validateRules(JSON.parse(r.rules_json)):null},
+  getRules(s){assertScope(s);const r=stmt(db,"SELECT rules_json FROM cvx_comm_rules WHERE tenant_id=?").get(s.tenantId);if(!r)return null;const rules=validateRules(JSON.parse(r.rules_json));return s.productMode==="individual"?{...rules,teamTargetSales:null}:rules},
   upsertSale(s,v){
    assertScope(s);if(!v||typeof v!=="object")throw Error("Invalid sale");
    if(v.tenantId!==undefined&&v.tenantId!==s.tenantId)throw Error("Not found");

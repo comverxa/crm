@@ -54,15 +54,17 @@ function pctPart(cents,bps){return rounded(money(cents)*rate(bps)/10000)}
 export function validateRules(rules) {
   if(!rules || typeof rules!=="object" || !Array.isArray(rules.tiers) || rules.tiers.length===0 || rules.tiers.length>30)
     throw Error("Invalid rules");
+  const bonusMode=rules.bonusMode??"highest";
+  if(!["highest","incremental"].includes(bonusMode))throw Error("Invalid bonus mode");
   const tiers=rules.tiers.map(t=>{
     if(!Number.isSafeInteger(t.minSales)||t.minSales<0||t.minSales>1_000_000) throw Error("Invalid sales threshold");
     return {minSales:t.minSales,bonusCents:money(t.bonusCents)};
   });
   for(let i=1;i<tiers.length;i++)
-    if(tiers[i].minSales<=tiers[i-1].minSales || tiers[i].bonusCents<tiers[i-1].bonusCents)
+    if(tiers[i].minSales<=tiers[i-1].minSales || (bonusMode==="highest"&&tiers[i].bonusCents<tiers[i-1].bonusCents))
       throw Error("Tiers must increase");
   const cfg={
-    tiers,salesRateBps:rate(rules.salesRateBps??0),
+    tiers,bonusMode,salesRateBps:rate(rules.salesRateBps??0),
     activationRateBps:rate(rules.activationRateBps??0),
     recurringRateBps:rate(rules.recurringRateBps??0),
     fixedSalaryCents:money(rules.fixedSalaryCents??0),
@@ -119,6 +121,11 @@ export function salesSnapshot({session,sales,month,asOf,rules,ownOnly=false}){
   }
   const achieved=[...cfg.tiers].reverse().find(t=>counts.sold>=t.minSales)||null;
   const next=cfg.tiers.find(t=>counts.sold<t.minSales)||null;
+  // In Professional, each achieved tier grants an additional bonus.
+  // Legacy Enterprise and existing configurations keep highest-tier semantics.
+  const earnedBonusCents=cfg.bonusMode==="incremental"?
+    cfg.tiers.filter(t=>t.minSales>0&&counts.sold>=t.minSales).reduce((total,t)=>total+t.bonusCents,0):
+    achieved?.bonusCents??0;
   const days=workdays(month,asOf,cfg);
   const avg=days.elapsed>0?counts.sold/days.elapsed:0;
   const projected=days.elapsed>0?Math.max(counts.sold,avg*days.total):counts.sold;
@@ -129,12 +136,12 @@ export function salesSnapshot({session,sales,month,asOf,rules,ownOnly=false}){
     month,asOf,counts,workdays:days,
     target:{achievedMinSales:achieved?.minSales??null,nextMinSales:next?.minSales??null,
       remaining:next?next.minSales-counts.sold:0,completionPct:completion,
-      achievedBonusCents:achieved?.bonusCents??0,nextBonusCents:next?.bonusCents??0},
+      achievedBonusCents:earnedBonusCents,nextBonusCents:next?.bonusCents??0},
     commissions:{effectiveCents:effective,retainedCents:retained},
     revenueCents:revenue,earnings:{
       fixedSalaryCents:session.role==="operator"?cfg.fixedSalaryCents:null,
-      variableCents:effective+(achieved?.bonusCents??0),
-      totalCents:session.role==="operator"?cfg.fixedSalaryCents+effective+(achieved?.bonusCents??0):null,
+      variableCents:effective+earnedBonusCents,
+      totalCents:session.role==="operator"?cfg.fixedSalaryCents+effective+earnedBonusCents:null,
       nextTierPotentialBonusCents:next?.bonusCents??0,
     },pace:{averageDaily:rounded(avg*100)/100,requiredDaily:rounded(required*100)/100,
       projectedSales:rounded(projected*10)/10,projectedTargetPct:target.minSales?rounded(projected*1000/target.minSales)/10:100,

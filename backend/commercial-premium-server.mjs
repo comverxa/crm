@@ -54,16 +54,17 @@ const enterpriseLoginPage=loginPage.replace("COMVERXA — Acesso Comercial","COM
 
 
 export function createPremiumServer({
-  dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,
+  dbPath,bootstrapEmail,bootstrapPassword,bootstrapTenant="pilot-empresa",cookieSecure=true,portalMode="both",bootstrapResetToken=null,
   htmlPath=new URL("../site/comverxa-premium-operacional.html",import.meta.url),
   jsPath=new URL("../site/comverxa-premium-operacional.js",import.meta.url),
   loginJsPath=new URL("../site/comverxa-premium-login.js",import.meta.url),
   recoveryJsPath=new URL("../site/comverxa-premium-recovery.js",import.meta.url),
   recoveryHtmlPath=new URL("../site/comverxa-premium-recovery.html",import.meta.url),
-  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,
+  now=()=>Date.now(),enablePlatformMaster=false,offsiteBackupConfig=null,backupSchedule=false,backupForceOnBoot=false,
   publicOrigin="https://comverxa-comercial-piloto-production.up.railway.app",sendRecoveryEmail=null,stripeConfig=null,whatsAppConfig=null
 }={}){
  if(typeof dbPath!=="string"||!dbPath.trim())throw Error("CVX_COM_DB_PATH required");
+ if(!["both","individual","enterprise"].includes(portalMode))throw Error("Invalid standalone product mode");
  if(!validEmail(bootstrapEmail)||!validPass(bootstrapPassword))throw Error("Strong bootstrap credentials required");
  const allowedOrigin=new URL(publicOrigin);
  if(allowedOrigin.protocol!=="https:"||allowedOrigin.pathname!=="/"||allowedOrigin.search||allowedOrigin.hash)
@@ -87,10 +88,10 @@ export function createPremiumServer({
  const store=createCommercialStore(db);
  const leads=createLeadsStore(db);
  const tenants=createTenantStore(db);
- tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto");
+ tenants.ensureTenant(bootstrapTenant,"COMVERXA Piloto",portalMode==="individual"?"individual":"enterprise");
  const stmt=sql=>db.prepare(sql);
  const offsite=offsiteBackupConfig?createOffsiteBackup({db,dbPath,config:offsiteBackupConfig}):null;
- const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,...stripeConfig}):null;
+ const billing=stripeConfig?createStripeBilling({db,baseUrl:publicOrigin,portalPath:portalMode==="individual"?"/profissional/app":portalMode==="enterprise"?"/empresa/app":"/app",...stripeConfig}):null;
  const wa=whatsAppConfig?createCommercialWhatsApp({db,publicOrigin,...whatsAppConfig}):null;
  const scheduleHandles=[];
  const email=bootstrapEmail.trim().toLowerCase();
@@ -100,6 +101,30 @@ export function createPremiumServer({
    .run(randomUUID(),bootstrapTenant,email,enablePlatformMaster?"master":"admin",salt,passwordHash(bootstrapPassword,salt));
  }
  if(enablePlatformMaster)stmt("UPDATE cvx_pilot_users SET role='master' WHERE email=? AND tenant_id=? AND role='admin'").run(email,bootstrapTenant);
+ // One-time operator-authorized recovery for the initial, never-activated
+ // account only. Does not touch lead, sales, company or other-user records.
+ // The receipt makes the token ineffective on all subsequent restarts.
+ if(bootstrapResetToken!==null&&bootstrapResetToken!==""){
+  if(typeof bootstrapResetToken!=="string"||!/^[A-Za-z0-9_-]{24,128}$/.test(bootstrapResetToken))
+   throw Error("Invalid bootstrap reset token");
+  db.exec("CREATE TABLE IF NOT EXISTS cvx_pilot_bootstrap_resets (token_hash TEXT PRIMARY KEY,applied_at INTEGER NOT NULL)");
+  const tokenHash=secureHash(bootstrapResetToken);
+  const existingReset=stmt("SELECT 1 FROM cvx_pilot_bootstrap_resets WHERE token_hash=?").get(tokenHash);
+  const bootstrapUser=stmt("SELECT id,tenant_id,active,must_change_password FROM cvx_pilot_users WHERE email=?").get(email);
+  if(!existingReset&&bootstrapUser?.tenant_id===bootstrapTenant&&bootstrapUser.active===1&&bootstrapUser.must_change_password===1){
+   const salt=randomBytes(16).toString("hex");
+   db.exec("BEGIN IMMEDIATE");
+   try{
+    const updated=stmt("UPDATE cvx_pilot_users SET salt=?,passhash=? WHERE id=? AND tenant_id=? AND must_change_password=1 AND active=1")
+     .run(salt,passwordHash(bootstrapPassword,salt),bootstrapUser.id,bootstrapTenant);
+    if(updated.changes!==1)throw Error("Bootstrap recovery eligibility changed");
+    stmt("DELETE FROM cvx_pilot_sessions WHERE user_id=?").run(bootstrapUser.id);
+    stmt("INSERT INTO cvx_pilot_bootstrap_resets(token_hash,applied_at) VALUES(?,?)").run(tokenHash,now());
+    db.exec("COMMIT");
+    console.info("CVX_BOOTSTRAP_RECOVERY_APPLIED");
+   }catch(error){db.exec("ROLLBACK");throw error}
+  }
+ }
  let failMap=new Map();
  function rateLimit(key){
   const time=now(),old=failMap.get(key)||{n:0,until:0};if(old.until<time){old.n=0;old.until=time+900000}
@@ -151,17 +176,43 @@ export function createPremiumServer({
    rawPath.startsWith("/api/empresa/")?"/api/"+rawPath.slice("/api/empresa/".length):rawPath;
   // Explicitly refuse cross-origin writes, not only CSRF.
   const fromProvider=(path.startsWith("/api/wa/qr/webhook/")||/^\/api\/wa\/meta\/[^/]+\/webhook$/.test(path)||path==="/api/billing/stripe/webhook");
+   // In single-product deployments, reject every route from the other CRM,
+   // including legacy unscoped authentication and its session cookie.
+   // Only signed provider webhooks, static assets and health checks are exempt.
+   if(portalMode!=="both"&&rawPath!=="/"&&rawPath!=="/healthz"&&!rawPath.startsWith("/assets/")&&
+      portal!==portalMode&&!(portal===null&&fromProvider))
+    return json(404,{error:"Not found"});
   if(req.method!=="GET"&&req.method!=="HEAD"&&!fromProvider){
    const origin=req.headers.get("origin");
    if(origin&&origin!==url.origin)return json(403,{error:"Forbidden"});
    if(!origin&&!["same-origin","none"].includes(req.headers.get("sec-fetch-site")||"same-origin"))return json(403,{error:"Forbidden"});
   }
-  if(path==="/healthz")return json(200,{status:"ok",service:"commercial-pilot"});
+  if(path==="/healthz")return json(200,{status:"ok",service:portalMode==="individual"?"comverxa-professional":portalMode==="enterprise"?"comverxa-enterprise":"commercial-pilot"});
+  if(path==="/api/pilot/readiness"&&req.method==="GET"){
+   const session=sessionFrom(req);if(!session)return json(401,{error:"Unauthorized"});
+   if(!["master","admin","director"].includes(session.role))return json(403,{error:"Forbidden"});
+   const backup=offsite?.last()||null,channels=wa?await wa.list(session).catch(()=>[]):[];
+   const qr=channels.find(c=>c.slot===1)||null,meta=channels.find(c=>c.slot===2)||null;
+   const checks=[
+    {key:"storage",label:"Serviço e banco independentes",state:portalMode==="both"?"unverified":"configured",detail:"Confirmar volume persistente no Railway"},
+    {key:"backup",label:"Backup externo criptografado",state:backup?.verified_at?"verified":offsite?"configured":"pending",detail:backup?.verified_at?"Última verificação: "+backup.verified_at:"Backup ainda não comprovado"},
+    {key:"recovery",label:"Recuperação de senha por e-mail",state:sendRecoveryEmail?"configured":"pending",detail:"Confirmar entrega e uso real do token"},
+    {key:"qr",label:"WhatsApp por QR",state:qr?.state==="connected"?"provider_connected":"pending",detail:qr?.state||"Número real ainda não conectado"},
+    {key:"meta",label:"WhatsApp Meta oficial",state:meta?.state==="verified"?"provider_connected":"pending",detail:meta?.state||"Credenciais, webhook e número não homologados"},
+    {key:"payment",label:"Pagamento e licenças comerciais",state:"pending",detail:billing?"Stripe somente em modo de testes":"Stripe não configurado"},
+    {key:"domain",label:"Domínio personalizado e HTTPS",state:"external_check",detail:"Verificar DNS e certificado no Railway"},
+    {key:"restore",label:"Ensaio de restauração de backup",state:"pending",detail:"Validação de backup não substitui teste de recuperação"},
+    {key:"e2e",label:"Fluxos reais de venda, acesso e gestão",state:"pending",detail:"Validar jornadas completas com usuários autorizados"}
+   ];
+   return json(200,{service:portalMode,readyForCommercialRelease:false,checks,summary:"Pendente de homologação externa e testes reais; deploy SUCCESS não equivale a comercialização integral."});
+  }
   if(path==="/assets/commercial-theme.css"&&req.method==="GET")return new Response(themeCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
   if(path==="/assets/commercial-password.css"&&req.method==="GET")return new Response(passwordCss,{status:200,headers:{"content-type":"text/css; charset=utf-8"}});
   if(path==="/assets/commercial-password.js"&&req.method==="GET")return new Response(passwordJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(req.method==="GET"&&(path==="/assets/commercial.js"||path==="/assets/commercial-login.js"||path==="/assets/commercial-recovery.js"))return new Response(path.endsWith("login.js")?loginJs:path.endsWith("recovery.js")?recoveryJs:appJs,{status:200,headers:{"content-type":"text/javascript; charset=utf-8"}});
   if(path==="/"){
+   if(portalMode!=="both")
+    return Response.redirect(url.origin+(portalMode==="individual"?"/profissional/login":"/empresa/login"),303);
    const selector=page("COMVERXA | Escolha o CRM",'<div style="color:#52d1e8;font-weight:800">COMVERXA</div><h1>Escolha seu CRM</h1><p>Dois produtos independentes, cada um com seu login e suas próprias informações.</p><a href="/profissional/login" style="color:#52d1e8;display:block;margin:20px 0">Professional — Executivo e corretor</a><a href="/empresa/login" style="color:#52d1e8;display:block;margin:20px 0">Enterprise — Empresa, direção e gestão</a>');
    return new Response(selector,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
   }
@@ -252,7 +303,9 @@ export function createPremiumServer({
   }
   if(path==="/api/auth/profile"&&req.method==="POST"){
    const s=sessionFrom(req);if(!s)return json(401,{error:"Unauthorized"});
-   if(!csrfOk(req,s)||s.mustChangePassword)return json(403,{error:"Forbidden"});
+   // The required first-login password change protects business operations,
+   // but must not block editing this harmless professional display preference.
+   if(!csrfOk(req,s))return json(403,{error:"Forbidden"});
    if(s.productMode!=="individual"&&s.role!=="operator")return json(403,{error:"Forbidden"});
    let body;try{body=JSON.parse(await textBytes(req,2048))}catch{return json(400,{error:"Invalid JSON"})}
    if(!["broker","executive"].includes(body?.professionalType))return json(400,{error:"Invalid professional type"});
@@ -421,6 +474,8 @@ export function createPremiumServer({
    let body;try{body=JSON.parse(await textBytes(req,4096))}catch{return json(400,{error:"Invalid JSON"})}
    const tenantId=body?.tenantId,companyName=body?.companyName,adminEmail=String(body?.adminEmail||"").toLowerCase().trim(),adminPassword=body?.adminPassword;
    const professionalType=body?.professionalType||"broker";
+   if(portalMode!=="both"&&(body?.productMode||"enterprise")!==portalMode)
+    return json(403,{error:"This product cannot create accounts for the other CRM"});
    if(!["broker","executive"].includes(professionalType))return json(400,{error:"Invalid professional type"});
    if(!validEmail(adminEmail)||!validPass(adminPassword))return json(400,{error:"Invalid admin credentials"});
    try{
@@ -563,12 +618,14 @@ export function createPremiumServer({
   }catch(error){res.writeHead(500,{"content-type":"application/json","cache-control":"no-store"});res.end(JSON.stringify({error:"Internal error"}))}
  });
  if(offsite&&backupSchedule){
+  let forceOnce=backupForceOnBoot===true;
   const runScheduled=async()=>{
    try{
     const last=offsite.last(),age=last?Date.now()-Date.parse(last.verified_at):Infinity;
-    if(age<20*3600*1000)return;
+    if(age<20*3600*1000&&!forceOnce)return;
+    forceOnce=false;
     const result=await offsite.run();
-    console.info("CVX_OFFSITE_BACKUP_VERIFIED",JSON.stringify({verified:result.verified,createdAt:result.createdAt,sizeBytes:result.sizeBytes}));
+    console.info("CVX_OFFSITE_BACKUP_VERIFIED",JSON.stringify({verified:result.verified,restoredToTemporaryDatabase:result.restoredToTemporaryDatabase===true,createdAt:result.createdAt,sizeBytes:result.sizeBytes}));
    }catch(error){
     console.warn("CVX_OFFSITE_BACKUP_FAILED",JSON.stringify({kind:error?.name||"Error"}));
    }

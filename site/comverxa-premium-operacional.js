@@ -2,7 +2,12 @@
 const cvxPortal=location.pathname.startsWith("/profissional/")?"profissional":location.pathname.startsWith("/empresa/")?"empresa":"";
 const portalApi=path=>cvxPortal&&path.startsWith("/api/")?"/api/"+cvxPortal+path.slice(4):path;
 const portalPage=page=>cvxPortal?"/"+cvxPortal+"/"+page:"/"+page;
-let csrf="",currentUser=null,period=new Date().toISOString().slice(0,7),currentView="dashboard";
+// Respect the user's local calendar, especially around the UTC month boundary.
+function localDateYmd(date=new Date()){
+ const yyyy=date.getFullYear(),mm=String(date.getMonth()+1).padStart(2,"0"),dd=String(date.getDate()).padStart(2,"0");
+ return yyyy+"-"+mm+"-"+dd;
+}
+let csrf="",currentUser=null,period=localDateYmd().slice(0,7),currentView="dashboard";
 const $=id=>document.getElementById(id);
 const brl=value=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format((Number(value)||0)/100);
 const n=v=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1}).format(Number(v)||0);
@@ -56,7 +61,7 @@ function show(view){
  $("sidebar").classList.remove("open");$("overlay").classList.remove("open");
  refresh().catch(e=>notify(e.message,true));
 }
-function contextMonth(){const asOf=new Date().toISOString().slice(0,10);return "?month="+encodeURIComponent(period)+"&asOf="+asOf}
+function contextMonth(){const asOf=localDateYmd();return "?month="+encodeURIComponent(period)+"&asOf="+asOf}
 
 function cvxTile(root,label,value,detail="",tone=""){
  const el=document.createElement("div");el.className="cvx-tile "+tone;
@@ -164,7 +169,7 @@ async function renderPremiumDashboard(data){
  $("cvxFeedback").textContent="Dados do período: "+period+" · Atualizados a partir dos registros do Comercial.";
  const k=$("cvxKpis");empty(k);
  const sold=Number(data.counts?.sold||0),goal=Number(data.target?.nextMinSales??data.target?.achievedMinSales??0),remaining=Number(data.target?.remaining||0);
- cvxTile(k,"Meta do período",n(goal)+" vendas","Faixa progressiva de remuneração");
+ cvxTile(k,currentUser?.productMode==="individual"?"Minha meta individual":"Meta do período",n(goal)+" vendas","Faixa progressiva de remuneração");
  cvxTile(k,"Realizado",n(sold)+" vendas","Vendas confirmadas","cyan");
  cvxTile(k,"Faltam",n(remaining)+" vendas","Para atingir a próxima faixa");
  cvxTile(k,"Atingimento",n(data.target?.completionPct||0)+"%","Da meta aplicável","gold");
@@ -233,7 +238,9 @@ async function loadDashboard(){
  const status=await call("/api/commercial/configuration-status");
  $("cvxExport").disabled=!status.configured;
  if(!status.configured){
-  const message=status.canConfigure
+  const message=currentUser?.productMode==="individual"
+   ?"Configure suas próprias metas de vendas, bônus e comissões em Metas e Comissão."
+   :status.canConfigure
    ?"Metas e comissões ainda não foram configuradas. Abra Metas e Comissão para definir as regras da empresa."
    :"As regras comerciais da sua empresa ainda não foram configuradas. Solicite a configuração ao gestor.";
   const enterprise=isEnterpriseLeader();
@@ -432,16 +439,78 @@ async function loadSales(){
  for(const s of d.sales)row(t,[s.id,s.sellerId,s.soldAt,statusMap[s.status]||s.status,brl(s.premiumCents),brl(s.activationCents),s.commissionState==="retained"?"Retida":"Liberada"]);
  if(!d.sales.length)row(t,["Sem registros nesta competência"]);
 }
+function personalMoneyCents(value){
+ const raw=String(value??"").trim().replace(/\s/g,"");
+ if(!raw)return 0;
+ if(!/^[0-9.,]+$/.test(raw))throw Error("Bônus: informe um valor válido em reais");
+ let normalized=raw;
+ if(raw.includes(",")){
+  if(!/^\d{1,3}(?:\.\d{3})*,\d{1,2}$/.test(raw)&&!/^\d+,\d{1,2}$/.test(raw))throw Error("Use 1300 ou 1.300,50");
+  normalized=raw.replace(/\./g,"").replace(",",".");
+ }else if(/^\d{1,3}(?:\.\d{3})+$/.test(raw))normalized=raw.replace(/\./g,"");
+ else if(!/^\d+(?:\.\d{1,2})?$/.test(raw))throw Error("Use 1300 ou 1300,50");
+ return cents(normalized);
+}
+async function loadProfessionalGoals({rules:givenRules=null}={}){
+ if(currentUser?.productMode!=="individual")return;
+ $("professionalGoalExperience").hidden=false;
+ const [result,snap]=await Promise.all([givenRules?Promise.resolve({rules:givenRules}):call("/api/commercial/rules"),call("/api/commercial/summary"+contextMonth())]);
+ const {rules}=result;
+ const cards=$("professionalGoalCards"),summary=$("professionalGoalSummary"),pace=$("professionalGoalPace"),finance=$("professionalGoalFinance"),notice=$("professionalGoalStatus");
+ for(const el of [cards,summary,pace,finance])empty(el);
+ if(!rules){notice.textContent="Configure suas metas individuais para ver o progresso e as comissões.";return;}
+ const tiers=rules.tiers.filter(t=>t.minSales>0),sold=Number(snap.counts?.sold||0),index=tiers.findIndex(t=>sold<t.minSales);
+ for(let i=0;i<tiers.length;i++){
+  const tier=tiers[i],done=sold>=tier.minSales,active=!done&&i===index;
+  const el=document.createElement("article");el.className="goal-tier "+(done?"done":active?"current":"future");
+  const head=document.createElement("div");head.className="goal-tier-top";
+  const title=textEl("span","META "+(i+1)+(active?" · ATUAL":"")),status=textEl("span",done?"✓ Batida":active?"● Em andamento":"◌ Próxima");
+  status.className="goal-state";head.append(title,status);
+  const value=textEl("strong",n(tier.minSales)+" vendas"),bonus=textEl("span","+ "+brl(tier.bonusCents)+" de bônus"+(done?" · conquistado":""));
+  bonus.className="goal-bonus";el.append(head,value,bonus);
+  if(active){
+   const pct=Math.max(0,Math.min(100,sold/Math.max(1,tier.minSales)*100)),progress=document.createElement("div"),fill=document.createElement("span");
+   progress.className="goal-progress";progress.setAttribute("role","progressbar");progress.setAttribute("aria-label","Progresso da meta "+(i+1));
+   progress.setAttribute("aria-valuenow",String(Math.min(sold,tier.minSales)));progress.setAttribute("aria-valuemin","0");progress.setAttribute("aria-valuemax",String(tier.minSales));
+   fill.style.width=pct+"%";progress.append(fill);
+   const detail=document.createElement("div");detail.className="goal-progress-detail";detail.append(textEl("span","Faltam "+n(tier.minSales-sold)+" vendas"),textEl("span",n(pct)+"%"));el.append(detail,progress);
+  }else if(!done){const hint=textEl("span","Disponível após a meta anterior");hint.className="goal-progress-detail";el.append(hint)}
+  cards.append(el);
+ }
+ const current=index>=0?tiers[index]:tiers[tiers.length-1],remaining=index>=0?Math.max(0,current.minSales-sold):0;
+ card(summary,"Vendas realizadas",n(sold),"Confirmadas no período");
+ card(summary,index<0?"Última meta":"Meta atual",n(current?.minSales||0),"Vendas da faixa");
+ card(summary,"Faltam",n(remaining),"Para a próxima meta");
+ card(summary,"Bônus conquistados",brl(snap.target?.achievedBonusCents),"Faixas atingidas");
+ card(pace,"Dias úteis",n(snap.workdays?.total),"Calendário do mês");
+ card(pace,"Dias trabalhados",n(snap.workdays?.elapsed),"Dias úteis decorridos");
+ card(pace,"Dias úteis restantes",n(snap.workdays?.remaining),"Até o fim do mês");
+ card(pace,"Média diária",n(snap.pace?.averageDaily),"Vendas / dia útil");
+ card(pace,"Projeção mensal",n(snap.pace?.projectedSales),"Estimativa, não garantia");
+ card(pace,"Ritmo necessário",n(snap.pace?.requiredDaily),"Vendas / dia útil");
+ const paid=Number(snap.commissions?.effectiveCents||0),held=Number(snap.commissions?.retainedCents||0),bonus=Number(snap.target?.achievedBonusCents||0);
+ card(finance,"Comissões efetivas",brl(paid),"Apenas valores classificados como efetivos");
+ card(finance,"Comissões retidas",brl(held),"Aguardando liberação");
+ card(finance,"Bônus conquistados",brl(bonus),"Metas individuais atingidas");
+ card(finance,"Total estimado",brl(paid+bonus),"Comissões efetivas + bônus, não pago");
+ notice.textContent=index<0?"Todas as metas configuradas foram alcançadas!":snap.pace?.atRisk?"O ritmo necessário está acima da média atual. Reforce os follow-ups.":"Acompanhe sua média de vendas e o progresso até a próxima meta.";
+}
 async function loadRules(){
  const {rules}=await call("/api/commercial/rules");
  if(!rules)return;
  const tier=rules.tiers.filter(x=>x.minSales>0).slice(0,3);
  for(let i=0;i<tier.length;i++){$("g"+(i+1)).value=tier[i].minSales;$("b"+(i+1)).value=tier[i].bonusCents/100}
+ if(currentUser?.productMode==="individual"){
+  const fourth=rules.tiers.filter(t=>t.minSales>0)[3];
+  $("g4").value=fourth?.minSales??"";$("b4").value=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format((fourth?.bonusCents||0)/100);
+  for(let i=1;i<=3;i++)$("b"+i).value=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format((tier[i-1]?.bonusCents||0)/100);
+ }
  $("rateSale").value=rules.salesRateBps/100;
  $("rateActive").value=rules.activationRateBps/100;
  $("rateRecurring").value=rules.recurringRateBps/100;
  $("fixed").value=rules.fixedSalaryCents/100;
- $("teamTarget").value=rules.teamTargetSales||40;
+ if(currentUser?.productMode!=="individual")$("teamTarget").value=rules.teamTargetSales??40;
+ if(currentUser?.productMode==="individual")await loadProfessionalGoals({rules});
 }
 async function loadTeam(){
  const data=await call("/api/commercial/team"+contextMonth());
@@ -550,6 +619,21 @@ async function loadUsers(){
   }
  }
 }
+async function loadReadiness(){
+ const list=$("readinessList"),overview=$("readinessOverview");if(!list||!overview)return;
+ const response=await call("/api/pilot/readiness");
+ overview.textContent=response.readyForCommercialRelease?"Homologação concluída":"Homologação integral ainda pendente — confira as etapas abaixo.";
+ empty(list);
+ const labels={verified:"Verificado",configured:"Configurado; requer teste",provider_connected:"Provedor conectado; falta teste real",external_check:"Validação externa pendente",pending:"Pendente",unverified:"Não verificado"};
+ for(const item of response.checks||[]){
+  const line=document.createElement("div");line.className="card";line.style.padding="12px";
+  const head=document.createElement("strong");head.textContent=item.label;
+  const indicator=document.createElement("span");indicator.className="flag"+(item.state==="verified"?"":" warn");
+  indicator.style.marginLeft="8px";indicator.textContent=labels[item.state]||"Pendente";
+  const detail=textEl("p",item.detail||"");detail.className="note";detail.style.margin="7px 0 0";
+  line.append(head,indicator,detail);list.append(line);
+ }
+}
 async function refresh(){
  const base=contextMonth();
  $("printReport").href=portalApi("/api/commercial/report/print"+base);
@@ -564,6 +648,7 @@ async function refresh(){
  if(currentView==="companies")return loadCompanies();
  if(currentView==="billing")return loadStripe();
  if(currentView==="users"){await loadUsers();if(["admin","master"].includes(currentUser.role))await loadOffsiteStatus();return}
+ if(currentView==="account"&&["master","admin","director"].includes(currentUser.role))return loadReadiness();
 }
 function bindForm(id,endpoint,transform,after){
  $(id).addEventListener("submit",async e=>{
@@ -571,7 +656,7 @@ function bindForm(id,endpoint,transform,after){
   try{
    const values=Object.fromEntries(new FormData(e.currentTarget).entries());
    await call(endpoint,{method:"POST",body:transform(values)});
-   notify("Registro salvo com sucesso no piloto");if(after)await after();
+   notify("Registro salvo com sucesso.");if(after)await after();
    await refresh();
   }catch(err){notify(err.message,true)}finally{btn.disabled=false}
  });
@@ -587,6 +672,27 @@ async function init(){
  }
  const individual=currentUser.productMode==="individual";
  document.body.dataset.product=individual?"individual":"enterprise";
+ // Personal goals are independent from team production and company targets.
+ if(individual){
+  $("goalsTitle").textContent="Minhas metas individuais";
+  $("goalsDescription").textContent="Metas por faixa de vendas da sua própria carteira. Bônus, comissões e projeções são exclusivamente individuais.";
+  $("rulesTitle").textContent="Minhas metas e comissões";
+  $("rulesHelper").hidden=false;
+  $("recalculateGoals").hidden=false;
+  document.querySelectorAll(".professional-fourth-goal").forEach(label=>{label.hidden=false;label.style.display="grid";label.querySelector("input").disabled=false});
+  for(let i=1;i<=4;i++){$("b"+i).type="text";$("b"+i).inputMode="decimal";}
+  $("saveRulesButton").textContent="Salvar minhas metas individuais";
+  $("teamTargetLabel").hidden=true;
+  $("teamTargetLabel").style.display="none";
+  $("teamTarget").disabled=true;
+  document.querySelectorAll("#goals .individual-goal-label").forEach((label,index)=>{
+   label.textContent="Minha meta "+(index+1)+" (vendas)";
+  });
+ }
+ if(["master","admin","director"].includes(currentUser.role)){
+  $("readinessCard").hidden=false;
+  $("refreshReadiness").addEventListener("click",()=>loadReadiness().catch(err=>notify(err.message,true)));
+ }
  const brand=document.querySelector(".brand small");
  if(brand)brand.textContent=individual?"PROFESSIONAL · INDIVIDUAL":"ENTERPRISE · EMPRESAS";
  const heading=document.querySelector("header .toolbar strong");
@@ -594,6 +700,9 @@ async function init(){
  const note=document.querySelector("#sidebar .foot");
  if(note&&individual)note.textContent="Carteira exclusiva do profissional. WhatsApp depende de conexão validada.";
  if(note&&!individual)note.textContent="Permissões e indicadores por cargo na empresa. Integrações dependem de validação.";
+ const banner=document.querySelector(".banner");
+ if(banner&&individual)banner.textContent="COMVERXA PROFESSIONAL · Metas, vendas, bônus e comissões exclusivamente individuais. Canais WhatsApp dependem de conexão validada.";
+ $("recalculateGoals").addEventListener("click",()=>loadProfessionalGoals().catch(e=>notify(e.message,true)));
  $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
  $("cvxExport").addEventListener("click",()=>{window.open(portalApi("/api/commercial/report/print"+contextMonth()),"_blank","noopener,noreferrer")});
  $("period").value=period;
@@ -740,10 +849,11 @@ async function init(){
  bindForm("policyForm","/api/commercial/policies",v=>({id:v.id,sellerId:v.sellerId,startsOn:v.startsOn,endsOn:v.endsOn,productType:v.productType,status:v.status}));
  bindForm("rulesForm","/api/commercial/rules",v=>{
   const tiers=[{minSales:0,bonusCents:0}];
-  for(let i=1;i<=3;i++)tiers.push({minSales:Number($("g"+i).value),bonusCents:cents($("b"+i).value)});
+  for(let i=1;i<=3;i++)tiers.push({minSales:Number($("g"+i).value),bonusCents:individual?personalMoneyCents($("b"+i).value):cents($("b"+i).value)});
+  if(individual&&$("g4").value.trim())tiers.push({minSales:Number($("g4").value),bonusCents:personalMoneyCents($("b4").value)});
   return {tiers,salesRateBps:basis($("rateSale").value),activationRateBps:basis($("rateActive").value),recurringRateBps:basis($("rateRecurring").value),
-    fixedSalaryCents:cents($("fixed").value),teamTargetSales:Number($("teamTarget").value),halfSaturday:true};
- });
+    fixedSalaryCents:cents($("fixed").value),teamTargetSales:individual?null:Number($("teamTarget").value),halfSaturday:true};
+ },individual?()=>loadRules():null);
  bindForm("sellerGoalForm","/api/commercial/seller-plans",v=>({sellerId:v.sellerId,tiers:[
   {minSales:0,bonusCents:0},{minSales:Number(v.goal1),bonusCents:cents(v.bonus1)},{minSales:Number(v.goal2),bonusCents:cents(v.bonus2)}]}));
  $("userForm").addEventListener("submit",async e=>{

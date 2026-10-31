@@ -1,0 +1,58 @@
+name: COMVERXA Professional & Enterprise - Public Smoke
+on:
+  push:
+    branches:
+      - feature/comverxa-servicos-independentes
+    paths:
+      - '.github/workflows/commercial-public-smoke.yml'
+      - 'backend/commercial-premium-*.mjs'
+      - 'site/comverxa-premium-*'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health-and-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify independent HTTPS login routes and permissions
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const products=[
+           {name:"Professional",base:"https://comverxa-professional-production.up.railway.app",login:"/profissional/login",other:"/empresa/login",api:"/api/profissional/auth/me",otherApi:"/api/empresa/auth/me"},
+           {name:"Enterprise",base:"https://comverxa-enterprise-production.up.railway.app",login:"/empresa/login",other:"/profissional/login",api:"/api/empresa/auth/me",otherApi:"/api/profissional/auth/me"}
+          ];
+          const failures=[];
+          for(const p of products){
+           const checks=[["/",303],["/healthz",200],[p.login,200],[p.other,404],["/login",404],
+             ["/api/auth/me",404],[p.api,401],[p.otherApi,404],["/assets/commercial.js",200]];
+           for(const [path,expected] of checks){
+            let response=null,error=null;
+            for(let n=0;n<4;n++){
+             try{
+              response=await fetch(p.base+path,{redirect:"manual",signal:AbortSignal.timeout(12000)});
+              if(response.status===expected)break;
+              error="status="+response.status;
+             }catch(e){error=String(e.message)}
+             await new Promise(r=>setTimeout(r,1400));
+            }
+            const status=response?.status??"unavailable";
+            console.log(p.name,path,status,"expected",expected);
+            if(status!==expected)failures.push(p.name+" "+path+": "+error);
+            if(status===200&&path===p.login){
+             const html=await response.text();
+             if(!html.includes("commercial-login.js"))failures.push(p.name+" login HTML missing script");
+            }
+            if(status===200&&path==="/assets/commercial.js"){
+             const js=await response.text();
+             if(!js.includes("function localDateYmd")||!js.includes("period=localDateYmd().slice(0,7)"))
+              failures.push(p.name+" published assets lack the local-calendar correction");
+             if(p.name==="Professional"&&(!js.includes("Minhas metas individuais")||!js.includes("professionalGoalFinance")||!js.includes("personalMoneyCents")))
+              failures.push("Professional published assets are not the premium four-tier build");
+            }
+           }
+          }
+          if(failures.length)throw Error("Two-product smoke failed:\n"+failures.join("\n"));
+          console.log("Professional & Enterprise public route checks passed.");
+          NODE

@@ -46,6 +46,7 @@ test("S3 PUT and GET signed with SigV4; downloaded restore equals source",async(
   assert.equal(offsite.last(),null);
   const result=await offsite.run();
   assert.equal(result.verified,true);
+  assert.equal(result.restoredToTemporaryDatabase,true);
   assert.ok(result.sizeBytes>100);
   assert.deepEqual(calls,["PUT","GET"]);
   assert.ok(offsite.last().checksum.length===64);
