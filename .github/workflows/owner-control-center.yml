@@ -1,0 +1,31 @@
+name: Control Center and product isolation review
+on:
+  pull_request:
+    paths:
+      - 'backend/owner-control-center.mjs'
+      - 'backend/commercial-premium-server.mjs'
+      - 'backend/commercial-premium-store.mjs'
+      - 'site/comverxa-premium-operacional.*'
+      - 'tests/commercial-separate-services.test.mjs'
+      - '.github/workflows/owner-control-center.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: |
+          node --check backend/owner-control-center.mjs
+          node --check backend/commercial-premium-server.mjs
+          node --check backend/commercial-premium-store.mjs
+          node --check site/comverxa-premium-operacional.js
+      - name: Test product isolation and commission logic
+        run: |
+          node --test tests/commercial-separate-services.test.mjs tests/commercial-premium.test.mjs
