@@ -635,7 +635,7 @@ function bindForm(id,endpoint,transform,after){
   try{
    const values=Object.fromEntries(new FormData(e.currentTarget).entries());
    await call(endpoint,{method:"POST",body:transform(values)});
-   notify("Registro salvo com sucesso no piloto");if(after)await after();
+   notify("Registro salvo com sucesso.");if(after)await after();
    await refresh();
   }catch(err){notify(err.message,true)}finally{btn.disabled=false}
  });
