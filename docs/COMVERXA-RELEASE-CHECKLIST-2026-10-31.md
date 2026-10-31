@@ -19,7 +19,11 @@ Nenhum banco ou volume do COMVERXA principal ou do antigo piloto foi reutilizado
 - [ ] Testar entrega real de e-mail de recuperação e utilização do token no Professional e Enterprise
 - [ ] Teste de login/logout com contas reais em ambos os serviços e troca obrigatória da senha inicial
 - [ ] Testes de venda, lead, comissão, vigência, renovação, perfil profissional, PDF, menus e iOS/Android em sessão real
-- [ ] Exercício formal de restauração em ambiente separado, com autenticação, integridade e tempo de recuperação documentados
+- [x] Recuperação técnica: em 31/10/2026, 02h22 UTC, cada serviço baixou o backup criptografado de seu bucket, abriu SQLite temporário restaurado e concluiu PRAGMA integrity_check com sucesso (logs Railway: restoredToTemporaryDatabase=true)
+- [ ] Simulação operacional completa de desastre em ambiente independente, incluindo autenticação, procedimento, responsáveis e tempo de recuperação documentados
+
+- [x] Correção de retorno do Stripe Checkout para a rota individual /profissional/app ou empresarial /empresa/app, com testes automatizados
+- [x] Página Minha conta inclui diagnóstico administrativo de homologação, sem afirmar liberação comercial prematura
 
 ## Integrações
 - **QR Evolution:** configuração de servidor habilitada por referência a credenciais de infraestrutura já existente. NÃO significa que um número foi escaneado/conectado. É necessário criar instância pelo painel e escanear QR em cada ambiente.
