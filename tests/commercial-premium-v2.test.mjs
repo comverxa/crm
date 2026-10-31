@@ -148,8 +148,8 @@ test("Professional supports four progressive goals with cumulative individual bo
  assert.equal(result.commissions.effectiveCents,5000);
  assert.equal(result.earnings.variableCents,210000);
  assert.ok(result.pace.projectedSales>=5);
- const enterprise=salesSnapshot({session:{...personal,productMode:"enterprise"},sales,month:"2026-10",asOf:"2026-10-20",rules:{...rules,bonusMode:"highest"},ownOnly:true});
- assert.equal(enterprise.target.achievedBonusCents,70000);
+ const enterprise=salesSnapshot({session:{...personal,productMode:"enterprise"},sales,month:"2026-10",asOf:"2026-10-20",rules:{...rules,bonusMode:"highest",tiers:[{minSales:0,bonusCents:0},{minSales:2,bonusCents:135000},{minSales:4,bonusCents:200000},{minSales:6,bonusCents:250000},{minSales:8,bonusCents:300000}]},ownOnly:true});
+ assert.equal(enterprise.target.achievedBonusCents,200000);
  assert.notEqual(result.target.achievedBonusCents,enterprise.target.achievedBonusCents);
  assert.equal(others.userId,"other-seller");
 });
