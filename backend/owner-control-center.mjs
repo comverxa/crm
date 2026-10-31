@@ -10,7 +10,7 @@ const email=(process.env.CVX_OWNER_EMAIL||"").trim().toLowerCase();
 const verifier=process.env.CVX_OWNER_PASSWORD_HASH||"";
 const origin=process.env.CVX_OWNER_ORIGIN||"";
 const port=Number(process.env.PORT||3000);
-if(!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)||!/^([a-f0-9]{32}):([a-f0-9]{128})$/.test(verifier)||!/^https:\\/\\/[^/]+$/.test(origin))throw Error("Owner credentials and HTTPS origin required");
+if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)||!/^([a-f0-9]{32}):([a-f0-9]{128})$/.test(verifier)||!/^https:\/\/[^/]+$/.test(origin))throw Error("Owner credentials and HTTPS origin required");
 const [salt,expected]=verifier.split(":");
 const sessions=new Map();
 const ttl=8*3600*1000;
