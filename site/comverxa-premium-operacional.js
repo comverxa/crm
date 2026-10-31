@@ -434,55 +434,78 @@ async function loadSales(){
  for(const s of d.sales)row(t,[s.id,s.sellerId,s.soldAt,statusMap[s.status]||s.status,brl(s.premiumCents),brl(s.activationCents),s.commissionState==="retained"?"Retida":"Liberada"]);
  if(!d.sales.length)row(t,["Sem registros nesta competência"]);
 }
-async function loadProfessionalGoals(){
+function personalMoneyCents(value){
+ const raw=String(value??"").trim().replace(/\s/g,"");
+ if(!raw)return 0;
+ if(!/^[0-9.,]+$/.test(raw))throw Error("Bônus: informe um valor válido em reais");
+ let normalized=raw;
+ if(raw.includes(",")){
+  if(!/^\d{1,3}(?:\.\d{3})*,\d{1,2}$/.test(raw)&&!/^\d+,\d{1,2}$/.test(raw))throw Error("Use 1300 ou 1.300,50");
+  normalized=raw.replace(/\./g,"").replace(",",".");
+ }else if(/^\d{1,3}(?:\.\d{3})+$/.test(raw))normalized=raw.replace(/\./g,"");
+ else if(!/^\d+(?:\.\d{1,2})?$/.test(raw))throw Error("Use 1300 ou 1300,50");
+ return cents(normalized);
+}
+async function loadProfessionalGoals({rules:givenRules=null}={}){
  if(currentUser?.productMode!=="individual")return;
- const root=$("professionalGoalExperience");root.hidden=false;
- const [rulesResponse,snapshot]=await Promise.all([
-  call("/api/commercial/rules"),call("/api/commercial/summary"+contextMonth())
- ]);
- const rules=rulesResponse.rules;
- if(!rules){$("professionalGoalCards").textContent="Configure suas metas e comissões para acompanhar seu progresso.";return}
- const tiers=rules.tiers.filter(t=>t.minSales>0),sold=Number(snapshot.counts?.sold||0);
- const current=tiers.findIndex(t=>sold<t.minSales);
- const cards=$("professionalGoalCards");empty(cards);
+ $("professionalGoalExperience").hidden=false;
+ const [result,snap]=await Promise.all([givenRules?Promise.resolve({rules:givenRules}):call("/api/commercial/rules"),call("/api/commercial/summary"+contextMonth())]);
+ const {rules}=result;
+ const cards=$("professionalGoalCards"),summary=$("professionalGoalSummary"),pace=$("professionalGoalPace"),finance=$("professionalGoalFinance"),notice=$("professionalGoalStatus");
+ for(const el of [cards,summary,pace,finance])empty(el);
+ if(!rules){notice.textContent="Configure suas metas individuais para ver o progresso e as comissões.";return;}
+ const tiers=rules.tiers.filter(t=>t.minSales>0),sold=Number(snap.counts?.sold||0),index=tiers.findIndex(t=>sold<t.minSales);
  for(let i=0;i<tiers.length;i++){
-  const tier=tiers[i],previous=i?tiers[i-1]:null,done=sold>=tier.minSales,active=!done&&i===current;
-  const cardEl=document.createElement("div");cardEl.className="goal-tier "+(done?"done":active?"current":"future");
-  const top=document.createElement("div");top.className="goal-tier-top";
-  const label=document.createElement("span");label.textContent="META "+(i+1)+(active?" · ATUAL":"");
-  const state=document.createElement("span");state.textContent=done?"✓ Batida":active?"⚑ Em andamento":"♧ Próxima";
-  top.append(label,state);
-  const amount=document.createElement("strong");amount.textContent=n(tier.minSales)+" vendas";
-  const info=document.createElement("small");
-  info.textContent="+ "+brl(tier.bonusCents)+" de bônus"+(done?" · conquistada":active?" · faltam "+n(tier.minSales-sold)+" vendas":" · ainda não atingida");
-  cardEl.append(top,amount,info);
+  const tier=tiers[i],done=sold>=tier.minSales,active=!done&&i===index;
+  const el=document.createElement("article");el.className="goal-tier "+(done?"done":active?"current":"future");
+  const head=document.createElement("div");head.className="goal-tier-top";
+  const title=textEl("span","META "+(i+1)+(active?" · ATUAL":"")),status=textEl("span",done?"✓ Batida":active?"● Em andamento":"◌ Próxima");
+  status.className="goal-state";head.append(title,status);
+  const value=textEl("strong",n(tier.minSales)+" vendas"),bonus=textEl("span","+ "+brl(tier.bonusCents)+" de bônus"+(done?" · conquistado":""));
+  bonus.className="goal-bonus";el.append(head,value,bonus);
   if(active){
-   const track=document.createElement("div");track.className="goal-progress";
-   const fill=document.createElement("span");fill.style.width=Math.min(100,Math.max(0,sold/tier.minSales*100))+"%";track.append(fill);cardEl.append(track);
-  }
-  cards.append(cardEl);
+   const pct=Math.max(0,Math.min(100,sold/Math.max(1,tier.minSales)*100)),progress=document.createElement("div"),fill=document.createElement("span");
+   progress.className="goal-progress";progress.setAttribute("role","progressbar");progress.setAttribute("aria-label","Progresso da meta "+(i+1));
+   progress.setAttribute("aria-valuenow",String(Math.min(sold,tier.minSales)));progress.setAttribute("aria-valuemin","0");progress.setAttribute("aria-valuemax",String(tier.minSales));
+   fill.style.width=pct+"%";progress.append(fill);
+   const detail=document.createElement("div");detail.className="goal-progress-detail";detail.append(textEl("span","Faltam "+n(tier.minSales-sold)+" vendas"),textEl("span",n(pct)+"%"));el.append(detail,progress);
+  }else if(!done){const hint=textEl("span","Disponível após a meta anterior");hint.className="goal-progress-detail";el.append(hint)}
+  cards.append(el);
  }
- const summary=$("professionalGoalSummary");empty(summary);
- card(summary,"Vendas realizadas",n(sold));
- card(summary,"Meta atual",n((tiers[current]||tiers[tiers.length-1])?.minSales||0));
- card(summary,"Faltam",n(current<0?0:tiers[current].minSales-sold));
- const pace=$("professionalGoalPace");empty(pace);
- card(pace,"Dias úteis",n(snapshot.workdays?.total));
- card(pace,"Dias transcorridos",n(snapshot.workdays?.elapsed));
- card(pace,"Média por dia",n(snapshot.pace?.averageDaily));
- card(pace,"Projeção mensal",n(snapshot.pace?.projectedSales));
+ const current=index>=0?tiers[index]:tiers[tiers.length-1],remaining=index>=0?Math.max(0,current.minSales-sold):0;
+ card(summary,"Vendas realizadas",n(sold),"Confirmadas no período");
+ card(summary,index<0?"Última meta":"Meta atual",n(current?.minSales||0),"Vendas da faixa");
+ card(summary,"Faltam",n(remaining),"Para a próxima meta");
+ card(summary,"Bônus conquistados",brl(snap.target?.achievedBonusCents),"Faixas atingidas");
+ card(pace,"Dias úteis",n(snap.workdays?.total),"Calendário do mês");
+ card(pace,"Dias trabalhados",n(snap.workdays?.elapsed),"Dias úteis decorridos");
+ card(pace,"Dias úteis restantes",n(snap.workdays?.remaining),"Até o fim do mês");
+ card(pace,"Média diária",n(snap.pace?.averageDaily),"Vendas / dia útil");
+ card(pace,"Projeção mensal",n(snap.pace?.projectedSales),"Estimativa, não garantia");
+ card(pace,"Ritmo necessário",n(snap.pace?.requiredDaily),"Vendas / dia útil");
+ const paid=Number(snap.commissions?.effectiveCents||0),held=Number(snap.commissions?.retainedCents||0),bonus=Number(snap.target?.achievedBonusCents||0);
+ card(finance,"Comissões efetivas",brl(paid),"Apenas valores classificados como efetivos");
+ card(finance,"Comissões retidas",brl(held),"Aguardando liberação");
+ card(finance,"Bônus conquistados",brl(bonus),"Metas individuais atingidas");
+ card(finance,"Total estimado",brl(paid+bonus),"Comissões efetivas + bônus, não pago");
+ notice.textContent=index<0?"Todas as metas configuradas foram alcançadas!":snap.pace?.atRisk?"O ritmo necessário está acima da média atual. Reforce os follow-ups.":"Acompanhe sua média de vendas e o progresso até a próxima meta.";
 }
 async function loadRules(){
  const {rules}=await call("/api/commercial/rules");
  if(!rules)return;
  const tier=rules.tiers.filter(x=>x.minSales>0).slice(0,3);
  for(let i=0;i<tier.length;i++){$("g"+(i+1)).value=tier[i].minSales;$("b"+(i+1)).value=tier[i].bonusCents/100}
+ if(currentUser?.productMode==="individual"){
+  const fourth=rules.tiers.filter(t=>t.minSales>0)[3];
+  $("g4").value=fourth?.minSales??"";$("b4").value=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format((fourth?.bonusCents||0)/100);
+  for(let i=1;i<=3;i++)$("b"+i).value=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format((tier[i-1]?.bonusCents||0)/100);
+ }
  $("rateSale").value=rules.salesRateBps/100;
  $("rateActive").value=rules.activationRateBps/100;
  $("rateRecurring").value=rules.recurringRateBps/100;
  $("fixed").value=rules.fixedSalaryCents/100;
  if(currentUser?.productMode!=="individual")$("teamTarget").value=rules.teamTargetSales??40;
- if(currentUser?.productMode==="individual")await loadProfessionalGoals();
+ if(currentUser?.productMode==="individual")await loadProfessionalGoals({rules});
 }
 async function loadTeam(){
  const data=await call("/api/commercial/team"+contextMonth());
@@ -633,6 +656,10 @@ async function init(){
   $("goalsTitle").textContent="Minhas metas individuais";
   $("goalsDescription").textContent="Metas por faixa de vendas da sua própria carteira. Bônus, comissões e projeções são exclusivamente individuais.";
   $("rulesTitle").textContent="Minhas metas e comissões";
+  $("rulesHelper").hidden=false;
+  $("recalculateGoals").hidden=false;
+  document.querySelectorAll(".professional-fourth-goal").forEach(label=>{label.hidden=false;label.style.display="grid";label.querySelector("input").disabled=false});
+  for(let i=1;i<=4;i++){$("b"+i).type="text";$("b"+i).inputMode="decimal";}
   $("saveRulesButton").textContent="Salvar minhas metas individuais";
   $("teamTargetLabel").hidden=true;
   $("teamTargetLabel").style.display="none";
@@ -650,6 +677,7 @@ async function init(){
  if(note&&!individual)note.textContent="Permissões e indicadores por cargo na empresa. Integrações dependem de validação.";
  const banner=document.querySelector(".banner");
  if(banner&&individual)banner.textContent="COMVERXA PROFESSIONAL · Metas, vendas, bônus e comissões exclusivamente individuais. Canais WhatsApp dependem de conexão validada.";
+ $("recalculateGoals").addEventListener("click",()=>loadProfessionalGoals().catch(e=>notify(e.message,true)));
  $("cvxRefresh").addEventListener("click",()=>loadDashboard().catch(e=>notify(e.message,true)));
  $("cvxExport").addEventListener("click",()=>{window.open(portalApi("/api/commercial/report/print"+contextMonth()),"_blank","noopener,noreferrer")});
  $("period").value=period;
@@ -796,10 +824,11 @@ async function init(){
  bindForm("policyForm","/api/commercial/policies",v=>({id:v.id,sellerId:v.sellerId,startsOn:v.startsOn,endsOn:v.endsOn,productType:v.productType,status:v.status}));
  bindForm("rulesForm","/api/commercial/rules",v=>{
   const tiers=[{minSales:0,bonusCents:0}];
-  for(let i=1;i<=3;i++)tiers.push({minSales:Number($("g"+i).value),bonusCents:cents($("b"+i).value)});
+  for(let i=1;i<=3;i++)tiers.push({minSales:Number($("g"+i).value),bonusCents:individual?personalMoneyCents($("b"+i).value):cents($("b"+i).value)});
+  if(individual&&$("g4").value.trim())tiers.push({minSales:Number($("g4").value),bonusCents:personalMoneyCents($("b4").value)});
   return {tiers,salesRateBps:basis($("rateSale").value),activationRateBps:basis($("rateActive").value),recurringRateBps:basis($("rateRecurring").value),
     fixedSalaryCents:cents($("fixed").value),teamTargetSales:individual?null:Number($("teamTarget").value),halfSaturday:true};
- });
+ },individual?()=>loadRules():null);
  bindForm("sellerGoalForm","/api/commercial/seller-plans",v=>({sellerId:v.sellerId,tiers:[
   {minSales:0,bonusCents:0},{minSales:Number(v.goal1),bonusCents:cents(v.bonus1)},{minSales:Number(v.goal2),bonusCents:cents(v.bonus2)}]}));
  $("userForm").addEventListener("submit",async e=>{
