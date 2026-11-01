@@ -73,3 +73,24 @@ test("bulk lead import skips duplicates, preserves tenant isolation and enforces
   assert.throws(()=>store.importBatch(agent,[{...lead,sellerId:"seller-other"}]),/Forbidden/);
  }finally{db.close()}
 });
+
+test("batch import HTTP requires CSRF, rejects cross-tenant seller and skips duplicate contacts",async()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const store=createCommercialStore(db),leads=createLeadsStore(db);
+  let session=agent,csrf=false;
+  const app=createCommercialHttpHandler({store,leads,enabled:true,getSession:async()=>session,verifyCsrf:async()=>csrf});
+  const post=items=>new Request("https://crm.test/api/commercial/leads/import",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({items})});
+  const rows=[{name:"Contato Um",phone:"31999990001"},{name:"Contato Dois",phone:"31999990002"}];
+  assert.equal((await app(post(rows))).status,403);
+  csrf=true;
+  let response=await app(post(rows));assert.equal(response.status,200);assert.equal((await response.json()).created,2);
+  response=await app(post(rows));assert.equal((await response.json()).duplicates,2);
+  assert.equal(leads.list(agent).length,2);
+  session=otherTenant;response=await app(post([{name:"Outro Cliente",phone:"31999990001"}]));
+  assert.equal((await response.json()).created,1);
+  assert.equal(leads.list(agent).length,2);
+  session=agent;response=await app(post([{name:"Não autorizado",sellerId:"seller-other",phone:"31999990003"}]));
+  assert.equal(response.status,403);
+ }finally{db.close()}
+});
