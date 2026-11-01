@@ -836,11 +836,11 @@ async function init(){
     if(name)results.push({name,phone,email});
    }
   }else{
-   const blocks=text.split(/\n\s*\n/).filter(Boolean);
+   const blocks=text.split(/\n\s*\n|(?=^\s*(?:Nome|Cliente)\s*:)/im).filter(Boolean);
    for(const block of blocks){
-    const name=block.match(/(?:^|\n)\s*(?:nome|cliente)\s*:\s*(.+)/i)?.[1]?.trim()||"";
-    const phone=block.match(/(?:telefone|celular|whatsapp|fone)\s*:\s*([+()\d\s-]{10,24})/i)?.[1]?.replace(/\D/g,"")||"";
-    const email=block.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]||"";
+    const name=block.match(/(?:^|\n)\s*(?:nome(?: completo)?|cliente|interessado)\s*:\s*([^\n]+)/i)?.[1]?.trim()||"";
+    const phone=block.match(/(?:telefone|celular|whatsapp|fone|contato)\s*:\s*([+()\d\s-]{10,24})/i)?.[1]?.replace(/\D/g,"")||"";
+    const email=block.match(/(?:^|\n)\s*(?:e-mail|email)\s*:\s*([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i)?.[1]||"";
     if(name)results.push({name,phone,email});
    }
    if(!results.length){
