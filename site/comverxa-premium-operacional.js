@@ -817,6 +817,81 @@ async function init(){
   const field=$("waWebhookToken");field.type=field.type==="password"?"text":"password";
   $("waRevealWebhook").textContent=field.type==="password"?"Mostrar token":"Ocultar token";
  });
+
+ let leadImportRows=[];
+ function parseCsvLine(line,sep){let out=[],value="",quote=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(quote&&line[i+1]==='"'){value+='"';i++}else quote=!quote}else if(c===sep&&!quote){out.push(value.trim());value=""}else value+=c}out.push(value.trim());return out}
+ function parseImportedLeads(text){
+  const raw=text.replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);
+  const structured=/^(nome|name|cliente)[;\t,]/i.test(raw[0]||"");
+  const separator=(raw[0]||"").includes("\t")?"\t":(raw[0]||"").includes(";")?";":",";
+  const results=[],seen=new Set();
+  if(structured){
+   const headers=parseCsvLine(raw[0],separator).map(x=>x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""));
+   const field=(cols,keys)=>{const idx=headers.findIndex(h=>keys.some(k=>h.includes(k)));return idx>=0?cols[idx]||"":""};
+   for(const line of raw.slice(1)){
+    const cols=parseCsvLine(line,separator);
+    const name=field(cols,["nome","cliente","name"]);
+    const phone=field(cols,["telefone","celular","whatsapp","fone"]).replace(/\D/g,"");
+    const email=field(cols,["email","e-mail"]);
+    if(name)results.push({name,phone,email});
+   }
+  }else{
+   const blocks=text.split(/\n\s*\n/).filter(Boolean);
+   for(const block of blocks){
+    const name=block.match(/(?:^|\n)\s*(?:nome|cliente)\s*:\s*(.+)/i)?.[1]?.trim()||"";
+    const phone=block.match(/(?:telefone|celular|whatsapp|fone)\s*:\s*([+()\d\s-]{10,24})/i)?.[1]?.replace(/\D/g,"")||"";
+    const email=block.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]||"";
+    if(name)results.push({name,phone,email});
+   }
+   if(!results.length){
+    for(const line of raw){
+     const cols=parseCsvLine(line,separator);
+     if(cols.length<2)continue;
+     results.push({name:cols[0],phone:(cols.find(x=>/\d{2}\D*9?\d{4}\D*\d{4}/.test(x))||"").replace(/\D/g,""),email:cols.find(x=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))||""});
+    }
+   }
+  }
+  const rows=[];
+  for(const item of results){
+   const name=item.name?.trim().slice(0,120)||"";
+   let phone=item.phone?.replace(/\D/g,"")||"";
+   if(phone.startsWith("55")&&phone.length>=12)phone=phone.slice(2);
+   const email=(item.email||"").trim().toLowerCase();
+   if(name.length<2||(!/^\d{10,11}$/.test(phone)&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))continue;
+   const key=phone||email;if(seen.has(key))continue;seen.add(key);
+   rows.push({name,phone,email,sellerId:currentUser.id,stage:"lead",source:"other",temperature:"cold",consentStatus:"unknown"});
+  }
+  return rows.slice(0,500);
+ }
+ function displayLeadPreview(){
+  const preview=$("leadImportPreview");preview.replaceChildren();
+  const table=document.createElement("table"),tbody=document.createElement("tbody");
+  for(const item of leadImportRows.slice(0,10)){const tr=document.createElement("tr");for(const val of [item.name,item.phone,item.email]){const td=document.createElement("td");td.textContent=val;tr.append(td)}tbody.append(tr)}
+  table.append(tbody);preview.append(table);
+  $("leadImportStatus").textContent=leadImportRows.length+" leads válidos identificados. Revise antes de importar.";
+  $("leadImportConfirm").disabled=leadImportRows.length===0;
+ }
+ $("leadPasteOpen").addEventListener("click",()=>{$("leadImportPanel").hidden=false;$("leadPasteText").focus()});
+ $("leadImportFile").addEventListener("change",async event=>{
+  const file=event.currentTarget.files[0];if(!file)return;
+  if(file.size>1048576){notify("Limite de 1 MB por arquivo.",true);return}
+  if(!/\.(csv|txt)$/i.test(file.name)){notify("Use CSV ou TXT. Exporte arquivos Excel para CSV.",true);return}
+  $("leadImportPanel").hidden=false;$("leadPasteText").value=await file.text();
+  leadImportRows=parseImportedLeads($("leadPasteText").value);displayLeadPreview();
+ });
+ $("leadPreviewBtn").addEventListener("click",()=>{leadImportRows=parseImportedLeads($("leadPasteText").value);displayLeadPreview()});
+ $("leadImportConfirm").addEventListener("click",async()=>{
+  const button=$("leadImportConfirm");button.disabled=true;let created=0,duplicates=0,invalid=0;
+  try{
+   for(let i=0;i<leadImportRows.length;i+=20){
+    const result=await call("/api/commercial/leads/import",{method:"POST",body:{items:leadImportRows.slice(i,i+20)}});
+    created+=result.created;duplicates+=result.duplicates;invalid+=result.invalid;
+   }
+   $("leadImportStatus").textContent="Importação: "+created+" criados; "+duplicates+" duplicados; "+invalid+" inválidos.";
+   leadImportRows=[];await loadLeads();
+  }catch(error){notify("Erro de importação: "+error.message,true)}finally{button.disabled=false}
+ });
+
  $("refreshLeads").addEventListener("click",()=>loadLeads().catch(e=>notify(e.message,true)));
  $("leadTable").addEventListener("click",async event=>{
   const button=event.target.closest("button[data-action]");if(!button)return;
