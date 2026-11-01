@@ -4,6 +4,7 @@ on:
     paths:
       - 'backend/owner-control-center.mjs'
       - 'tests/owner-control-center.test.mjs'
+      - 'tests/lead-import-ui-contract.test.mjs'
       - 'backend/commercial-premium-server.mjs'
       - 'backend/commercial-premium-store.mjs'
       - 'site/comverxa-premium-operacional.*'
@@ -29,4 +30,4 @@ jobs:
           node --check site/comverxa-premium-operacional.js
       - name: Test product isolation and commission logic
         run: |
-          node --test tests/commercial-separate-services.test.mjs tests/commercial-premium.test.mjs tests/owner-control-center.test.mjs
+          node --test tests/commercial-separate-services.test.mjs tests/commercial-premium.test.mjs tests/owner-control-center.test.mjs tests/lead-import-ui-contract.test.mjs
