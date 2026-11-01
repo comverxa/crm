@@ -44,7 +44,8 @@ export function createCommercialHttpHandler({store,leads=null,getSession,verifyC
     if(action==="leads"&&req.method==="GET")
      return json(200,{leads:leads.list(session,{stage:url.searchParams.get("stage")||undefined,
       ddd:url.searchParams.get("ddd")||undefined,uf:url.searchParams.get("uf")||undefined,limit:200})});
-    if(action==="leads/summary"&&req.method==="GET")return json(200,leads.summary(session));
+    if(action==="leads/import"&&req.method==="POST")return json(200,leads.importBatch(session,input.items));
+     if(action==="leads/summary"&&req.method==="GET")return json(200,leads.summary(session));
     if(action==="leads"&&req.method==="POST")return json(201,{lead:leads.create(session,input)});
     const parts=action.split("/");
     if(parts[0]==="leads"&&parts[1]&&parts.length<=4){
