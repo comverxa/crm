@@ -94,3 +94,16 @@ test("batch import HTTP requires CSRF, rejects cross-tenant seller and skips dup
   assert.equal(response.status,403);
  }finally{db.close()}
 });
+
+test("batch deduplicates matching email even when phone differs",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const leads=createLeadsStore(db);
+  const result=leads.importBatch(agent,[
+   {name:"Primeira Pessoa",phone:"31999990011",email:"mesmo@example.test"},
+   {name:"Segunda Pessoa",phone:"31999990012",email:"mesmo@example.test"}
+  ]);
+  assert.deepEqual(result,{created:1,duplicates:1,invalid:0});
+  assert.equal(leads.list(agent).length,1);
+ }finally{db.close()}
+});
