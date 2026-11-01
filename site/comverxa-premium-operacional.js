@@ -855,7 +855,8 @@ async function init(){
    const name=item.name?.trim().slice(0,120)||"";
    let phone=item.phone?.replace(/\D/g,"")||"";
    if(phone.startsWith("55")&&phone.length>=12)phone=phone.slice(2);
-   const email=(item.email||"").trim().toLowerCase();
+   let email=(item.email||"").trim().toLowerCase();
+   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))email="";
    if(!/^\d{10,11}$/.test(phone))phone="";
    if(name.length<2||(!phone&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))continue;
    const keys=[phone&&"p:"+phone,email&&"e:"+email].filter(Boolean);if(keys.some(key=>seen.has(key)))continue;keys.forEach(key=>seen.add(key));
