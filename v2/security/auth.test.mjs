@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {hashPassword,verifyPassword,issueSession,readSession,tenantQuery} from './auth.mjs';
+const secret='this_is_a_random_test_secret_very_long_12345';
+test('password hashing and rejection',()=>{const x=hashPassword('my-secure-password-2026');assert.equal(verifyPassword('my-secure-password-2026',x),true);assert.equal(verifyPassword('wrong',x),false);});
+test('session issued for identified tenant',()=>{const x=issueSession({userId:'u1',tenantId:'company_1',role:'agent'},secret,100);assert.deepEqual(readSession(x,secret,101),{userId:'u1',tenantId:'company_1',role:'agent'});});
+test('expired session rejected',()=>{const x=issueSession({userId:'u1',tenantId:'t1',role:'agent'},secret,100);assert.equal(readSession(x,secret,8*3600+101),null);});
+test('tampered session rejected',()=>{const x=issueSession({userId:'u1',tenantId:'t1',role:'agent'},secret,100);assert.equal(readSession(x+'x',secret,101),null);});
+test('tenant-less queries rejected',()=>{assert.throws(()=>tenantQuery({tenantId:'t1'},'SELECT * FROM leads'));});
+test('tenant scope binds as first SQL parameter',()=>{assert.deepEqual(tenantQuery({tenantId:'t1'},'SELECT * FROM leads WHERE tenant_id=$1 AND id=$2',[3]).values,['t1',3]);});
