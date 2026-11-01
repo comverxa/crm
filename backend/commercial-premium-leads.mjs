@@ -77,9 +77,9 @@ export function createLeadsStore(db){
     try{
      const v=canonical(raw,session);
      if(!v.phone&&!v.email)throw Error("Missing contact");
-     const key=v.phone?"p:"+v.phone:"e:"+v.email;
-     if(seen.has(key)){duplicates++;continue}
-     seen.add(key);
+     const keys=[v.phone&&"p:"+v.phone,v.email&&"e:"+v.email].filter(Boolean);
+     if(keys.some(key=>seen.has(key))){duplicates++;continue}
+     keys.forEach(key=>seen.add(key));
      const duplicate=stmt(db,"SELECT id FROM cvx_pilot_leads WHERE tenant_id=? AND ((? != '' AND phone=?) OR (? != '' AND email=?)) LIMIT 1").get(session.tenantId,v.phone,v.phone,v.email,v.email);
      if(duplicate){duplicates++;continue}
      this.create(session,{...v,sellerId:v.sellerId});
