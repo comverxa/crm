@@ -1,0 +1,15 @@
+name: COMVERXA V2 security tests
+on:
+  push:
+    branches: [feature/comverxa-v2-production-readiness]
+  pull_request:
+    paths: ['v2/security/**']
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test v2/security/auth.test.mjs
