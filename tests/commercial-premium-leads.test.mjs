@@ -107,3 +107,19 @@ test("batch deduplicates matching email even when phone differs",()=>{
   assert.equal(leads.list(agent).length,1);
  }finally{db.close()}
 });
+
+test("import handles 20-row batches and repeated batch safely",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const leads=createLeadsStore(db);
+  const items=Array.from({length:20},(_,i)=>({name:"Contato "+i,phone:"31999"+String(i).padStart(6,"0")}));
+  const first=leads.importBatch(agent,items);
+  assert.equal(first.created,20);
+  assert.equal(first.duplicates,0);
+  const second=leads.importBatch(agent,items);
+  assert.equal(second.created,0);
+  assert.equal(second.duplicates,20);
+  assert.equal(leads.list(agent).length,20);
+  assert.throws(()=>leads.importBatch(agent,Array.from({length:26},()=>items[0])),/batch size/);
+ }finally{db.close()}
+});
