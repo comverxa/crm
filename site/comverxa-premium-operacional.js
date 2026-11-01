@@ -858,10 +858,11 @@ async function init(){
    if(phone.startsWith("55")&&phone.length>=12)phone=phone.slice(2);
    const email=(item.email||"").trim().toLowerCase();
    if(name.length<2||(!/^\d{10,11}$/.test(phone)&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))continue;
-   const key=phone||email;if(seen.has(key))continue;seen.add(key);
+   const keys=[phone&&"p:"+phone,email&&"e:"+email].filter(Boolean);if(keys.some(key=>seen.has(key)))continue;keys.forEach(key=>seen.add(key));
    rows.push({name,phone,email,sellerId:currentUser.id,stage:"lead",source:"other",temperature:"cold",consentStatus:"unknown"});
   }
-  return rows.slice(0,500);
+  if(rows.length>500)throw Error("Limite de 500 leads por importação. Divida o arquivo.");
+  return rows;
  }
  function displayLeadPreview(){
   const preview=$("leadImportPreview");preview.replaceChildren();
@@ -877,9 +878,9 @@ async function init(){
   if(file.size>1048576){notify("Limite de 1 MB por arquivo.",true);return}
   if(!/\.(csv|txt)$/i.test(file.name)){notify("Use CSV ou TXT. Exporte arquivos Excel para CSV.",true);return}
   $("leadImportPanel").hidden=false;$("leadPasteText").value=await file.text();
-  leadImportRows=parseImportedLeads($("leadPasteText").value);displayLeadPreview();
+  try{leadImportRows=parseImportedLeads($("leadPasteText").value);displayLeadPreview()}catch(err){leadImportRows=[];$("leadImportConfirm").disabled=true;notify(err.message,true)}
  });
- $("leadPreviewBtn").addEventListener("click",()=>{leadImportRows=parseImportedLeads($("leadPasteText").value);displayLeadPreview()});
+ $("leadPreviewBtn").addEventListener("click",()=>{try{leadImportRows=parseImportedLeads($("leadPasteText").value);displayLeadPreview()}catch(err){leadImportRows=[];$("leadImportConfirm").disabled=true;notify(err.message,true)}});
  $("leadImportConfirm").addEventListener("click",async()=>{
   const button=$("leadImportConfirm");button.disabled=true;let created=0,duplicates=0,invalid=0;
   try{
