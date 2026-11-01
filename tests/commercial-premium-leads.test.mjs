@@ -58,3 +58,18 @@ test("CRM lead HTTP endpoints require server auth, same tenant, CSRF, support st
   assert.equal(x.status,409);
  }finally{db.close()}
 });
+
+test("bulk lead import skips duplicates, preserves tenant isolation and enforces ownership",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const store=createLeadsStore(db);
+  const lead={name:"Maria Teste",phone:"31999991111",email:"maria@example.test"};
+  let x=store.importBatch(agent,[lead,lead,{name:"Carlos Teste",phone:"31988887777"},{name:"Sem telefone"}]);
+  assert.deepEqual(x,{created:2,duplicates:1,invalid:1});
+  assert.equal(store.list(agent).length,2);
+  x=store.importBatch(agent,[lead]);
+  assert.equal(x.duplicates,1);
+  assert.equal(store.list(otherTenant).length,0);
+  assert.throws(()=>store.importBatch(agent,[{...lead,sellerId:"seller-other"}]),/Forbidden/);
+ }finally{db.close()}
+});
