@@ -871,6 +871,11 @@ async function init(){
   $("leadImportStatus").textContent=leadImportRows.length+" leads válidos identificados. Revise antes de importar.";
   $("leadImportConfirm").disabled=leadImportRows.length===0;
  }
+ $("leadTemplateCsv").addEventListener("click",()=>{
+  const csv="\uFEFFNome;Telefone;Email\r\nMaria Exemplo;31999990000;maria@example.com\r\n";
+  const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  try{const a=document.createElement("a");a.href=url;a.download="comverxa-modelo-leads.csv";document.body.append(a);a.click();a.remove()}finally{setTimeout(()=>URL.revokeObjectURL(url),1500)}
+ });
  $("leadPasteOpen").addEventListener("click",()=>{$("leadImportPanel").hidden=false;$("leadPasteText").focus()});
  $("leadImportFile").addEventListener("change",async event=>{
   const file=event.currentTarget.files[0];if(!file)return;
