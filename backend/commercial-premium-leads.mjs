@@ -68,6 +68,26 @@ export function createLeadsStore(db){
     db.exec("COMMIT");return this.get(session,leadId);
    }catch(error){db.exec("ROLLBACK");if(/UNIQUE/.test(String(error)))throw Error("Duplicate lead");throw error}
   },
+  importBatch(session,items){
+   assertScope(session);
+   if(!Array.isArray(items)||items.length<1||items.length>25)throw Error("Invalid batch size");
+   let created=0,duplicates=0,invalid=0;
+   const seen=new Set();
+   for(const raw of items){
+    try{
+     const v=canonical(raw,session);
+     if(!v.phone&&!v.email)throw Error("Missing contact");
+     const keys=[v.phone&&"p:"+v.phone,v.email&&"e:"+v.email].filter(Boolean);
+     if(keys.some(key=>seen.has(key))){duplicates++;continue}
+     keys.forEach(key=>seen.add(key));
+     const duplicate=stmt(db,"SELECT id FROM cvx_pilot_leads WHERE tenant_id=? AND ((? != '' AND phone=?) OR (? != '' AND email=?)) LIMIT 1").get(session.tenantId,v.phone,v.phone,v.email,v.email);
+     if(duplicate){duplicates++;continue}
+     this.create(session,{...v,sellerId:v.sellerId});
+     created++;
+    }catch(e){if(/Forbidden|Unauthorized|Not found/.test(String(e.message)))throw e;invalid++}
+   }
+   return {created,duplicates,invalid};
+  },
   get(session,leadId){return row(scoped(session,leadId))},
   update(session,leadId,input){
    const old=scoped(session,leadId);

@@ -1,0 +1,28 @@
+name: COMVERXA Professional Lead Import
+on:
+  pull_request:
+    paths:
+      - 'backend/commercial-premium-leads.mjs'
+      - 'backend/commercial-premium-http.mjs'
+      - 'site/comverxa-premium-operacional.js'
+      - 'site/comverxa-premium-operacional.html'
+      - 'tests/commercial-premium-leads.test.mjs'
+      - 'tests/lead-import-ui-contract.test.mjs'
+      - '.github/workflows/professional-lead-import.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node --check site/comverxa-premium-operacional.js
+          node --check backend/commercial-premium-leads.mjs
+          node --check backend/commercial-premium-http.mjs
+          node --test tests/commercial-premium-leads.test.mjs tests/lead-import-ui-contract.test.mjs

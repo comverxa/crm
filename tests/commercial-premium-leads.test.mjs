@@ -58,3 +58,68 @@ test("CRM lead HTTP endpoints require server auth, same tenant, CSRF, support st
   assert.equal(x.status,409);
  }finally{db.close()}
 });
+
+test("bulk lead import skips duplicates, preserves tenant isolation and enforces ownership",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const store=createLeadsStore(db);
+  const lead={name:"Maria Teste",phone:"31999991111",email:"maria@example.test"};
+  let x=store.importBatch(agent,[lead,lead,{name:"Carlos Teste",phone:"31988887777"},{name:"Sem telefone"}]);
+  assert.deepEqual(x,{created:2,duplicates:1,invalid:1});
+  assert.equal(store.list(agent).length,2);
+  x=store.importBatch(agent,[lead]);
+  assert.equal(x.duplicates,1);
+  assert.equal(store.list(otherTenant).length,0);
+  assert.throws(()=>store.importBatch(agent,[{...lead,sellerId:"seller-other"}]),/Forbidden/);
+ }finally{db.close()}
+});
+
+test("batch import HTTP requires CSRF, rejects cross-tenant seller and skips duplicate contacts",async()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const store=createCommercialStore(db),leads=createLeadsStore(db);
+  let session=agent,csrf=false;
+  const app=createCommercialHttpHandler({store,leads,enabled:true,getSession:async()=>session,verifyCsrf:async()=>csrf});
+  const post=items=>new Request("https://crm.test/api/commercial/leads/import",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({items})});
+  const rows=[{name:"Contato Um",phone:"31999990001"},{name:"Contato Dois",phone:"31999990002"}];
+  assert.equal((await app(post(rows))).status,403);
+  csrf=true;
+  let response=await app(post(rows));assert.equal(response.status,200);assert.equal((await response.json()).created,2);
+  response=await app(post(rows));assert.equal((await response.json()).duplicates,2);
+  assert.equal(leads.list(agent).length,2);
+  session=otherTenant;response=await app(post([{name:"Outro Cliente",phone:"31999990001"}]));
+  assert.equal((await response.json()).created,1);
+  assert.equal(leads.list(agent).length,2);
+  session=agent;response=await app(post([{name:"Não autorizado",sellerId:"seller-other",phone:"31999990003"}]));
+  assert.equal(response.status,403);
+ }finally{db.close()}
+});
+
+test("batch deduplicates matching email even when phone differs",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const leads=createLeadsStore(db);
+  const result=leads.importBatch(agent,[
+   {name:"Primeira Pessoa",phone:"31999990011",email:"mesmo@example.test"},
+   {name:"Segunda Pessoa",phone:"31999990012",email:"mesmo@example.test"}
+  ]);
+  assert.deepEqual(result,{created:1,duplicates:1,invalid:0});
+  assert.equal(leads.list(agent).length,1);
+ }finally{db.close()}
+});
+
+test("import handles 20-row batches and repeated batch safely",()=>{
+ const db=new DatabaseSync(":memory:");
+ try{
+  const leads=createLeadsStore(db);
+  const items=Array.from({length:20},(_,i)=>({name:"Contato "+i,phone:"31999"+String(i).padStart(6,"0")}));
+  const first=leads.importBatch(agent,items);
+  assert.equal(first.created,20);
+  assert.equal(first.duplicates,0);
+  const second=leads.importBatch(agent,items);
+  assert.equal(second.created,0);
+  assert.equal(second.duplicates,20);
+  assert.equal(leads.list(agent).length,20);
+  assert.throws(()=>leads.importBatch(agent,Array.from({length:26},()=>items[0])),/batch size/);
+ }finally{db.close()}
+});
